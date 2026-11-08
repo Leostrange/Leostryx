@@ -44,8 +44,8 @@
       { id: "maven", kind: "pkg", ru: "Maven", en: "Maven", dru: "", den: "" }
     ] },
     { id: "android", ru: "Android: сборка APK", en: "Android: APK build", items: [
-      { id: "aapt", kind: "pkg", ru: "aapt + zipalign", en: "aapt + zipalign", dru: "Упаковка ресурсов и выравнивание APK; zipalign входит в пакет aapt.", den: "Resource packaging and APK alignment; zipalign is included in aapt.", verify: "aapt,zipalign" },
-      { id: "aapt2", kind: "pkg", ru: "aapt2", en: "aapt2", dru: "Нативный aapt2 — Gradle использует его вместо x86-версии.", den: "Native aapt2 — Gradle uses it instead of the x86 build.", verify: "aapt2" },
+      { id: "aapt", kind: "pkg", ru: "aapt + zipalign", en: "aapt + zipalign", dru: "Упаковка ресурсов и выравнивание APK.", den: "Resource packaging and APK alignment; zipalign is included in aapt.", verify: "aapt,zipalign" },
+      { id: "aapt2", kind: "pkg", ru: "aapt2", en: "aapt2", dru: "Обработка ресурсов Android.", den: "Native aapt2 — Gradle uses it instead of the x86 build.", verify: "aapt2" },
       { id: "aidl", kind: "pkg", ru: "aidl", en: "aidl", dru: "Нативный компилятор интерфейсов AIDL.", den: "Native AIDL interface compiler.", verify: "aidl" },
       { id: "d8", kind: "pkg", ru: "d8", en: "d8", dru: "Компиляция в DEX.", den: "DEX compiler.", verify: "d8" },
       { id: "apksigner", kind: "pkg", ru: "apksigner", en: "apksigner", dru: "Подпись APK v1–v4.", den: "APK signing v1–v4.", verify: "apksigner" },
@@ -67,10 +67,10 @@
     { id: "ndk", ru: "Android NDK", en: "Android NDK", items: [
       { id: "ndk-sysroot", kind: "pkg", ru: "NDK sysroot", en: "NDK sysroot", dru: "Заголовки и библиотеки Android для clang.", den: "Android headers and libraries for clang." },
       { id: "ndk-multilib", kind: "pkg", ru: "NDK multilib", en: "NDK multilib", dru: "Библиотеки для arm, x86, x86_64.", den: "Libraries for arm, x86, x86_64." },
-      { id: "ndk-full", kind: "ndk", ru: "Полный NDK (сборка Termux)", en: "Full NDK (Termux build)", dru: "ndk-build и CMake toolchain для Gradle. ~1 ГБ, из github.com/lzhiyong/termux-ndk.", den: "ndk-build and CMake toolchain for Gradle. ~1 GB, from github.com/lzhiyong/termux-ndk.", verify: "ndk" }
+      { id: "ndk-full", kind: "ndk", ru: "Полный NDK (сборка Termux)", en: "Full NDK (Termux build)", dru: "Инструменты для нативных Android-сборок.", den: "ndk-build and CMake toolchain for Gradle. ~1 GB, from github.com/lzhiyong/termux-ndk.", verify: "ndk" }
     ] },
     { id: "flutter", ru: "Flutter & Dart", en: "Flutter & Dart", note: { ru: "Кроссплатформенный SDK для создания Android/Web-приложений. Автоматически настраивается для Android bionic через agy-fix-flutter.", en: "Cross-platform SDK for Android/Web apps. Automatically patched for Android bionic userspace via agy-fix-flutter." }, items: [
-      { id: "flutter-sdk", kind: "flutter", ru: "Flutter SDK (stable)", en: "Flutter SDK (stable)", dru: "SDK Flutter + Dart + автопатч bionic libc.", den: "Flutter SDK + Dart + bionic libc autopatch.", verify: "flutter,dart" }
+      { id: "flutter-sdk", kind: "flutter", ru: "Flutter SDK (stable)", en: "Flutter SDK (stable)", dru: "SDK для Flutter-приложений.", den: "Flutter SDK + Dart + bionic libc autopatch.", verify: "flutter,dart" }
     ] },
     { id: "lang", ru: "Другие языки", en: "Other languages", items: [
       { id: "rust", kind: "pkg", ru: "Rust (cargo)", en: "Rust (cargo)", dru: "", den: "", verify: "rust" },
@@ -96,9 +96,7 @@
     { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, SDK 35",
       items: ["openjdk-17", "gradle", "kotlin", "aapt", "aapt2", "d8", "apksigner", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
     { id: "native", ru: "Нативный код (NDK)", en: "Native code (NDK)", dru: "clang, CMake, Ninja, NDK sysroot/multilib", den: "clang, CMake, Ninja, NDK sysroot/multilib",
-      items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] },
-    { id: "flutter", ru: "Flutter-разработка", en: "Flutter development", dru: "Flutter SDK, OpenJDK 17, Gradle, aapt2, SDK 35", den: "Flutter SDK, OpenJDK 17, Gradle, aapt2, SDK 35",
-      items: ["flutter-sdk", "openjdk-17", "gradle", "aapt", "aapt2", "d8", "apksigner", "android-tools", "platforms;android-35", "build-tools;35.0.0"] }
+      items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] }
   ];
   var ITEMS = {};
   GROUPS.forEach(function (g) { g.items.forEach(function (it) { it.group = g.id; ITEMS[it.id] = it; }); });
@@ -109,6 +107,8 @@
   var special = { cmdline: false, platforms: {}, buildtools: {}, ndk: [], flutter: false };
   var checks = {};          // verify name -> {ok, text}
   var selected = {};
+  var versionOpen = {};
+  var batchLog = "";
   var job = null;           // {id, op, label, log, rc}
   var queue = [];
   var logOpen = false;
@@ -131,8 +131,8 @@
   }
 
   /* ------------------------------------------------------------ jobs */
-  function run(op, arg, label, after) {
-    queue.push({ op: op, arg: arg || "", label: label, after: after });
+  function run(op, arg, label, after, continueOnFailure) {
+    queue.push({ op: op, arg: arg || "", label: label, after: after, continueOnFailure: !!continueOnFailure });
     if (!job) next();
     render();
   }
@@ -140,14 +140,14 @@
     var q = queue.shift();
     if (!q) { job = null; render(); return; }
     var b = bridge();
-    if (!b) { job = { op: q.op, label: q.label, log: T("Нативный мост AgyTools недоступен.", "Native AgyTools bridge is not available."), rc: "1", after: q.after }; finish(); return; }
+    if (!b) { job = { op: q.op, label: q.label, log: T("Нативный мост AgyTools недоступен.", "Native AgyTools bridge is not available."), rc: "1", after: q.after, continueOnFailure: q.continueOnFailure }; finish(); return; }
     var id = b.start(q.op, q.arg);
     if (!id || /^ERR/.test(id)) {
-      job = { op: q.op, label: q.label, log: T("Не удалось запустить: ", "Could not start: ") + String(id), rc: "1", after: q.after };
+      job = { op: q.op, label: q.label, log: T("Не удалось запустить: ", "Could not start: ") + String(id), rc: "1", after: q.after, continueOnFailure: q.continueOnFailure };
       finish();
       return;
     }
-    job = { id: id, op: q.op, arg: q.arg, label: q.label, log: "", rc: "", after: q.after, t0: Date.now() };
+    job = { id: id, op: q.op, arg: q.arg, label: q.label, log: "", rc: "", after: q.after, continueOnFailure: q.continueOnFailure, t0: Date.now() };
     lastLogChange = Date.now();
     store("agyToolsJob", JSON.stringify({ id: id, op: q.op, arg: q.arg, label: q.label, t0: job.t0 }));
 
@@ -177,7 +177,7 @@
     var j = job;
     store("agyToolsJob", null);
     parse(j);
-    if (j.rc !== "0" && !QUIET[j.op]) {
+    if (j.rc !== "0" && !QUIET[j.op] && !j.continueOnFailure) {
       // Stop subsequent changes; still refresh the actual installed state.
       queue = queue.filter(function (q) { return q.op === "status"; });
     }
@@ -224,11 +224,12 @@
     return true;
   }
 
-  function refresh(withVerify) {
+  function refresh(withVerify, afterStatus) {
     var names = [];
     GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.kind === "pkg") names.push(it.id); }); });
     run("status", names.join(","), T("Обновление состояния", "Refreshing status"), function () {
       loaded = true;
+      if (afterStatus) afterStatus();
       if (!withVerify) return;
       var v = [];
       GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.verify && installed(it)) v = v.concat(it.verify.split(",")); }); });
@@ -237,8 +238,23 @@
     });
   }
 
+  function nodeConflict(ids) {
+    var wantLts = ids.indexOf("nodejs-lts") >= 0, wantCurrent = ids.indexOf("nodejs") >= 0;
+    if (wantLts && (wantCurrent || installed(ITEMS.nodejs))) return T("Чтобы установить Node.js LTS, сначала удалите другую версию Node.js и снимите её выбор. Версии используют общие файлы npm.", "To install Node.js LTS, remove the other Node.js version and deselect it first. Both versions share npm files.");
+    if (wantCurrent && installed(ITEMS["nodejs-lts"])) return T("Чтобы установить другую версию Node.js, сначала удалите Node.js LTS. Версии используют общие файлы npm.", "To install the other Node.js version, remove Node.js LTS first. Both versions share npm files.");
+    return "";
+  }
   function installIds(ids) {
+    var conflict = nodeConflict(ids); if (conflict) { alert(conflict); return; }
+    batchLog = ""; logOpen = true;
     var pk = [], sdk = [], npm = [], ndk = false, flutter = false;
+    var failures = [];
+    function recordFailure(j) {
+      if (!j) return;
+      batchLog += "\n== " + (j.label || j.op) + "\n" + (j.log || "") + "\n";
+      if (String(j.rc) === "0") return;
+      failures.push((j.label || j.op) + "\n" + (j.log || T("Ошибка запуска", "Failed to start")));
+    }
     ids.forEach(function (id) {
       var it = ITEMS[id]; if (!it) return;
       if (it.kind === "pkg") { if (availability(it)) pk.push(id); }
@@ -247,12 +263,17 @@
       else if (it.kind === "ndk") ndk = true;
       else if (it.kind === "flutter") flutter = true;
     });
-    if (pk.length) run("install", pk.join(" "), T("Установка: ", "Install: ") + pk.join(", "));
-    if (npm.length) run("npm", npm.join(" "), "npm -g " + npm.join(" "));
-    if (sdk.length) run("sdk", sdk.join(" "), "sdkmanager " + sdk.join(" "));
-    if (ndk) run("ndk", "", T("Полный NDK", "Full NDK"));
-    if (flutter) run("flutter", "", T("Flutter SDK", "Flutter SDK"));
-    refresh(true);
+    if (pk.length) run("install", pk.join(" "), T("Установка: ", "Install: ") + pk.join(", "), recordFailure, true);
+    if (npm.length) run("npm", npm.join(" "), "npm -g " + npm.join(" "), recordFailure, true);
+    if (sdk.length) run("sdk", sdk.join(" "), "sdkmanager " + sdk.join(" "), recordFailure, true);
+    if (ndk) run("ndk", "", T("Полный NDK", "Full NDK"), recordFailure, true);
+    if (flutter) run("flutter", "", T("Flutter SDK", "Flutter SDK"), recordFailure, true);
+    refresh(true, function () {
+      if (batchLog) {
+        lastDone = {op: "install", label: failures.length ? T("Ошибки установки", "Installation errors") : T("Установка завершена", "Installation complete"), rc: failures.length ? "1" : "0", log: batchLog};
+        logOpen = true;
+      }
+    });
   }
   function removeId(id) {
     var it = ITEMS[id]; if (!it) return;
@@ -269,6 +290,10 @@
     if (!installed(it)) return false;
     if (!it.verify) return true;
     return it.verify.split(",").every(function (v) { return checks[v] && checks[v].ok; });
+  }
+  function needsPresetInstall(it) {
+    if (!installed(it)) return true;
+    return !!(it.verify && it.verify.split(",").some(function (v) { return checks[v] && !checks[v].ok; }));
   }
   function badge(it) {
     if (job && job.arg && (" " + job.arg.replace(/,/g, " ") + " ").indexOf(" " + it.id + " ") >= 0 && /install|sdk|npm/.test(job.op))
@@ -288,13 +313,15 @@
   }
   function checkLine(it) {
     if (!it.verify || !installed(it)) return "";
-    var out = "";
-    it.verify.split(",").forEach(function (v) {
-      var c = checks[v]; if (!c) return;
-      out += '<div class="agy-t-check ' + (c.ok ? "ok" : "bad") + '">' + (c.ok ? "✓ " : "✗ ") + esc(v + ": " + c.text) + "</div>";
-    });
-    return out;
+    var failed = it.verify.split(",").some(function(v) { return checks[v] && !checks[v].ok; });
+    return failed ? '<div class="agy-t-check bad">' + esc(T("Ошибка проверки — откройте журнал", "Check failed — open the log")) + '</div>' : "";
   }
+  var VERSION_GROUPS = {
+    node: [{title: ["Node.js", "Node.js"], ids: ["nodejs-lts", "nodejs"]}],
+    java: [{title: ["OpenJDK", "OpenJDK"], ids: ["openjdk-17", "openjdk-21"]}],
+    sdk: [{title: ["Платформа Android", "Android platform"], ids: ["platforms;android-37.1", "platforms;android-37.0", "platforms;android-36", "platforms;android-35", "platforms;android-34"]},
+          {title: ["Android Build-tools", "Android Build-tools"], ids: ["build-tools;37.0.0", "build-tools;36.0.0", "build-tools;35.0.0", "build-tools;34.0.0"]}]
+  };
 
   function render() {
     if (!root || !root.isConnected) return;
@@ -318,26 +345,41 @@
 
     h += '<div class="agy-t-sec">' + esc(T("Готовые наборы", "Presets")) + "</div>";
     PRESETS.forEach(function (p) {
-      var all = p.items.every(function (id) { var it = ITEMS[id]; return it && verified(it); });
-      h += '<div class="agy-t-card"><div class="agy-t-main"><div class="agy-t-name">' + esc(T(p.ru, p.en)) + '</div><div class="agy-t-desc">' + esc(T(p.dru, p.den)) + "</div></div>" +
+      var all = p.items.every(function (id) { var it = ITEMS[id]; return it && !needsPresetInstall(it); });
+      var pending = p.items.filter(function (id) { var it = ITEMS[id]; return it && availability(it) && needsPresetInstall(it); }).length;
+      h += '<div class="agy-t-card"><div class="agy-t-main"><div class="agy-t-name">' + esc(T(p.ru, p.en)) + '</div><div class="agy-t-desc">' + esc(T(p.dru, p.den)) + ' · ' + esc(T("В наборе: ", "In preset: ") + p.items.length) + (loaded && !busy && pending ? ' · ' + esc(T("К установке: ", "To install: ") + pending) : '') + "</div></div>" +
         (all ? '<span class="agy-t-badge ok">' + esc(T("Готово", "Ready")) + "</span>"
              : '<button type="button" class="agy-t-btn" data-preset="' + p.id + '"' + (busy ? " disabled" : "") + ">" + esc(T("Установить", "Install")) + "</button>") + "</div>";
     });
 
     GROUPS.forEach(function (g) {
       h += '<div class="agy-t-sec">' + esc(T(g.ru, g.en)) + "</div>";
-      if (g.note) h += '<div class="agy-t-note">' + esc(T(g.note.ru, g.note.en)) + "</div>";
+      if (g.id === "sdk") h += '<div class="agy-t-note">' + esc(T("Платформы и инструменты сборки Android.", "Android platforms and build tools.")) + "</div>";
+      if (g.id === "flutter") h += '<div class="agy-t-note">' + esc(T("SDK для разработки Flutter-приложений.", "SDK for Flutter development.")) + "</div>";
       h += '<div class="agy-t-group">';
-      g.items.forEach(function (it) {
+      function renderItem(it) {
         var inst = installed(it), av = availability(it);
         h += '<div class="agy-t-row">' +
           '<label class="agy-t-chk"><input type="checkbox" data-sel="' + esc(it.id) + '"' + (selected[it.id] ? " checked" : "") + (inst || !av || busy ? " disabled" : "") + "></label>" +
           '<div class="agy-t-main"><div class="agy-t-name">' + esc(T(it.ru, it.en)) + " " + badge(it) + "</div>" +
           (T(it.dru, it.den) ? '<div class="agy-t-desc">' + esc(T(it.dru, it.den)) + "</div>" : "") + checkLine(it) + "</div>" +
-          (inst && it.kind !== "npm"
-            ? ((it.verify && it.verify.split(",").some(function(v) { return checks[v] && !checks[v].ok; })) ? '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Починить", "Repair")) + "</button>" : '<button type="button" class="agy-t-btn sec" data-rm="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Удалить", "Remove")) + "</button>")
+          (inst
+            ? ((it.verify && it.verify.split(",").some(function(v) { return checks[v] && !checks[v].ok; })) ? '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Починить", "Repair")) + "</button>" : (it.kind !== "npm" ? '<button type="button" class="agy-t-btn sec" data-rm="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Удалить", "Remove")) + "</button>" : ""))
             : (!inst && av ? '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Установить", "Install")) + "</button>" : "")) +
           "</div>";
+      }
+      var rendered = {};
+      g.items.forEach(function(it) {
+        var groups = VERSION_GROUPS[g.id] || [];
+        var vg = groups.filter(function(x) { return x.ids.indexOf(it.id) >= 0; })[0];
+        if (!vg) { renderItem(it); return; }
+        var key = g.id + ":" + vg.title[1];
+        if (rendered[key]) return;
+        rendered[key] = true;
+        h += '<div class="agy-t-versions"><div class="agy-t-row"><div class="agy-t-main"><div class="agy-t-name">' + esc(T(vg.title[0], vg.title[1])) + '</div><div class="agy-t-desc">' + esc(T("Выбор версии", "Choose version")) + '</div></div>' +
+          '<button type="button" class="agy-t-btn sec" data-version-toggle="' + esc(key) + '" aria-expanded="' + (versionOpen[key] ? 'true' : 'false') + '">' + esc(versionOpen[key] ? T("Скрыть ▲", "Hide ▲") : T("Версии ▼", "Versions ▼")) + '</button></div>';
+        if (versionOpen[key]) vg.ids.forEach(function(id) { if (ITEMS[id]) renderItem(ITEMS[id]); });
+        h += '</div>';
       });
       h += "</div>";
     });
@@ -358,6 +400,20 @@
   // Progress model from pkg / curl / sdkmanager output.
   function progress(j) {
     var raw = j.log || "", r = { pct: -1, phase: "", facts: [] };
+    // Each pkg invocation reports its own package list and counters. In
+    // particular npm is installed in a second invocation after Node.js.
+    // Never combine the first list with Setting up lines from later runs.
+    var pkgStage = "";
+    if (/install|upgrade/.test(j.op)) {
+      var stages = Array.from(raw.matchAll(/^== pkg (?:install|upgrade)\b[^\r\n]*/gm));
+      if (stages.length) {
+        var latestStage = stages[stages.length - 1];
+        pkgStage = latestStage[0].slice(3);
+        raw = raw.slice(latestStage.index);
+      }
+      var lists = Array.from(raw.matchAll(/^The following NEW packages will be installed:\s*$/gm));
+      if (lists.length) raw = raw.slice(lists[lists.length - 1].index);
+    }
     var mNew = /The following NEW packages will be installed:\n([\s\S]*?)\n(?:Need to get|\S)/.exec(raw);
     var names = mNew ? mNew[1].trim().split(/\s+/) : [];
     var total = names.length;
@@ -371,8 +427,9 @@
       r.pct = Math.min(99, Math.round((dl / total) * 50 + (sets.length / total) * 50));
       var lastName = sets.length ? sets[sets.length - 1].replace(/^Setting up /, "") : "";
       r.phase = sets.length >= gets && gets
-        ? T("Установлено ", "Installed ") + sets.length + T(" из ", " of ") + total + (lastName ? " · " + lastName : "")
-        : T("Загрузка ", "Downloading ") + Math.max(gets, 1) + T(" из ", " of ") + total + (cur ? " · " + Math.round(cur) + "%" : "");
+        ? T("Установлено ", "Installed ") + Math.min(sets.length, total) + T(" из ", " of ") + total + (lastName ? " · " + lastName : "")
+        : T("Загрузка ", "Downloading ") + Math.min(Math.max(gets, 1), total) + T(" из ", " of ") + total + (cur ? " · " + Math.round(cur) + "%" : "");
+      if (pkgStage === "pkg install npm") r.phase = "npm · " + r.phase;
       r.facts.push(T("Пакетов: ", "Packages: ") + total + (size ? T(" · объём ", " · size ") + size : ""));
     } else if (/sdk|ndk|npm|flutter/.test(j.op) && pcts.length) {
       r.pct = Math.min(99, Math.round(cur));
@@ -384,6 +441,12 @@
     }
     var steps = raw.match(/^== .+$/gm);
     if (!r.phase && steps) r.phase = steps[steps.length - 1].slice(3);
+    if (/^(sdk|npm)$/.test(j.op) && j.arg) {
+      var requested = j.arg.trim().split(/\s+/).filter(Boolean).length;
+      if (requested) r.facts.push(T("Компонентов на этом этапе: ", "Components in this stage: ") + requested);
+    } else if (/^(ndk|flutter)$/.test(j.op)) {
+      r.facts.push(T("Компонентов на этом этапе: 1", "Components in this stage: 1"));
+    }
     return r;
   }
   function elapsed(j) {
@@ -410,12 +473,12 @@
     panel.querySelector(".agy-t-jpct").textContent = running && pr.pct >= 0 ? pr.pct + "%" : "";
     panel.querySelector(".agy-t-jphase").textContent = checking ? T("Проверка компонентов…", "Checking components…") : running ? (pr.phase || T("Выполняется…", "Running…"))
       : ok ? T("Готово", "Done") : T("Ошибка — откройте журнал", "Failed — open the log");
-    panel.querySelector(".agy-t-jtime").textContent = running ? elapsed(j) + (queue.filter(function (q) { return !QUIET[q.op]; }).length ? T(" · ещё в очереди: ", " · queued: ") + queue.filter(function (q) { return !QUIET[q.op]; }).length : "") : "";
+    panel.querySelector(".agy-t-jtime").textContent = running ? elapsed(j) + (queue.filter(function (q) { return !QUIET[q.op]; }).length ? T(" · этапов в очереди: ", " · stages queued: ") + queue.filter(function (q) { return !QUIET[q.op]; }).length : "") : "";
     panel.querySelector(".agy-t-jfacts").textContent = pr.facts.join("  ");
     var bar = panel.querySelector(".agy-t-pbar"), fill = panel.querySelector(".agy-t-pfill");
     bar.hidden = !running && !ok;
     fill.style.width = (pr.pct >= 0 ? Math.max(3, pr.pct) : 3) + "%";
-    var text = cleanLog(j.log);
+    var text = cleanLog((j === job && batchLog ? batchLog + "\n== " + j.label + "\n" : "") + j.log);
     var lines = text.split("\n").filter(function (l) { return l.trim(); });
     panel.querySelector(".agy-t-jtail").textContent = logOpen ? "" : (lines[lines.length - 1] || "");
     panel.querySelector(".agy-t-jlog").textContent = logOpen ? T("Скрыть журнал", "Hide log") : T("Журнал", "Log");
@@ -430,7 +493,16 @@
 
   function onClick(e) {
     var b = e.target.closest("button,input"); if (!b || b.disabled) return;
-    if (b.matches("input[data-sel]")) { selected[b.getAttribute("data-sel")] = b.checked; render(); return; }
+    var toggle = b.getAttribute("data-version-toggle");
+    if (toggle) { versionOpen[toggle] = !versionOpen[toggle]; render(); return; }
+    if (b.matches("input[data-sel]")) {
+      var selectedId = b.getAttribute("data-sel");
+      var proposed = Object.keys(selected).filter(function(k) { return selected[k] && k !== selectedId; });
+      if (b.checked) proposed.push(selectedId);
+      var conflict = nodeConflict(proposed);
+      if (conflict) { b.checked = false; alert(conflict); return; }
+      selected[selectedId] = b.checked; render(); return;
+    }
     var act = b.getAttribute("data-act");
     if (act === "refresh") refresh(true);
     else if (act === "upgrade") { run("upgrade", "", T("Обновление пакетов", "Upgrading packages")); refresh(true); }
@@ -458,7 +530,7 @@
     }
     else if (b.getAttribute("data-preset")) {
       var p = PRESETS.filter(function (x) { return x.id === b.getAttribute("data-preset"); })[0];
-      if (p) installIds(p.items.filter(function (id) { return ITEMS[id] && !verified(ITEMS[id]); }));
+      if (p) installIds(p.items.filter(function (id) { return ITEMS[id] && needsPresetInstall(ITEMS[id]); }));
     }
     else if (b.getAttribute("data-in")) installIds([b.getAttribute("data-in")]);
     else if (b.getAttribute("data-rm")) removeId(b.getAttribute("data-rm"));
@@ -487,17 +559,8 @@
     render();
     if (!loaded) loadCache();
     render();
-    // Auto-verify on entrance: if no cache, checks are missing, or cache is stale (>2 min), run verify.
-    var c = null; try { c = JSON.parse(store("agyToolsCache") || "null"); } catch (e) {}
-    var needsVerify = !c || !c.checks || !Object.keys(c.checks).length;
-    if (!job) {
-      if (!hasIndex && Object.keys(status).length === 0) {
-        run("index", "", T("Загрузка списка пакетов", "Downloading package list"));
-        refresh(true);
-      } else if (needsVerify || (c && Date.now() - c.t > 120000)) {
-        refresh(true);
-      }
-    }
+    // Opening this page only refreshes installed status; verification is explicit.
+    if (!job) refresh(false);
   };
 })();
 

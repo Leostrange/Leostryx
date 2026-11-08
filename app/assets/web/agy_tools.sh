@@ -24,9 +24,93 @@ fail() { printf '@@error %s\n' "$*"; exit 1; }
 # Mobile/VPN links routinely reset connections (curl error 35 "Recv failure"),
 # which pkg surfaces as "download failed"; most installs succeed on a retry.
 pkg_retry() {
-    local n=1 max=3
+    local n=1 max=3 rc refreshed=0
+    if [ "${1:-}" = pkg ] && { [ "${2:-}" = install ] || [ "${2:-}" = upgrade ]; }; then
+        local fetch_dst="$PREFIX/libexec/pkg/lib/fetch.sh"
+        if [ -f "$fetch_dst" ]; then
+            cat > "$fetch_dst.agy-new" <<'AGY_PKG_FETCH_EOF'
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
+# fetch.sh -- download with sha256 verification and cache.
+# Requires curl, sha256sum, log, die.
+
+# human_size BYTES
+human_size() {
+    local bytes="$1"
+    if [ -z "$bytes" ] || [ "$bytes" -le 0 ] 2>/dev/null; then
+        echo ""
+    elif [ "$bytes" -ge 1048576 ]; then
+        awk -v b="$bytes" 'BEGIN { printf "%.1f MB", b / 1048576 }'
+    elif [ "$bytes" -ge 1024 ]; then
+        awk -v b="$bytes" 'BEGIN { printf "%d kB", (b + 1023) / 1024 }'
+    else
+        printf '%d B' "$bytes"
+    fi
+}
+
+# fetch URL SHA256 OUT [SIZE] [GET_INDEX]
+fetch() {
+    local url="$1" sha="$2" out="$3" size="${4:-}" idx="${5:-1}" have sz_str="" http_code curl_status
+    if [ -f "$out" ] && [ -n "$sha" ]; then
+        have="$(sha256sum "$out" | cut -d' ' -f1)"
+        if [ "$have" = "$sha" ]; then
+            return 0
+        fi
+    fi
+    mkdir -p "$(dirname "$out")"
+    if [ -n "$size" ]; then
+        sz_str=" [$(human_size "$size")]"
+    fi
+    printf 'Get:%s %s%s\n' "$idx" "$url" "$sz_str"
+    # Do not retry a permanent HTTP 404 six times. The caller can refresh
+    # repository metadata once and retry the package using the new index.
+    http_code=$(curl -# -fL --retry 3 --retry-delay 2 --retry-max-time 120 \
+        --connect-timeout 20 --cacert "$PKG_CERT" -o "$out.part" \
+        -w '%{http_code}' "$url") && curl_status=0 || curl_status=$?
+    # The index contains a SHA-256, so an identical package can be fetched
+    # safely from this listed Termux mirror if the primary returns 404.
+    if [ "$curl_status" -ne 0 ] && [ "$http_code" = 404 ] && [ -n "$sha" ]; then
+        case "$url" in
+            https://packages-cf.termux.dev/apt/termux-main/*|https://packages.termux.dev/apt/termux-main/*)
+                local rel mirror_url
+                rel="${url#*/apt/termux-main/}"
+                mirror_url="https://mirrors.bfsu.edu.cn/termux/apt/termux-main/$rel"
+                printf 'Primary returned 404; trying a listed Termux mirror.\n' >&2
+                rm -f "$out.part"
+                http_code=$(curl -# -fL --retry 2 --retry-delay 2 --retry-max-time 120 \
+                    --connect-timeout 20 --cacert "$PKG_CERT" -o "$out.part" \
+                    -w '%{http_code}' "$mirror_url") && curl_status=0 || curl_status=$?
+                ;;
+        esac
+    fi
+    if [ "$curl_status" -ne 0 ]; then
+        rm -f "$out.part"
+        if [ "$http_code" = 404 ]; then
+            printf 'pkg: error: HTTP 404: %s\n' "$url" >&2
+            exit 44
+        fi
+        die "download failed: $url (curl $curl_status, HTTP ${http_code:-unknown})"
+    fi
+    if [ -n "$sha" ]; then
+        have="$(sha256sum "$out.part" | cut -d' ' -f1)"
+        [ "$have" = "$sha" ] || { rm -f "$out.part"; die "sha256 mismatch $(basename "$out"): got $have want $sha"; }
+    fi
+    mv "$out.part" "$out"
+}
+AGY_PKG_FETCH_EOF
+            if cmp -s "$fetch_dst.agy-new" "$fetch_dst"; then rm -f "$fetch_dst.agy-new"; else mv -f "$fetch_dst.agy-new" "$fetch_dst" || return 1; fi
+        fi
+    fi
     while :; do
-        "$@" && return 0
+        "$@" && return 0 || rc=$?
+        if [ "$rc" -eq 44 ]; then
+            if [ "$refreshed" -eq 0 ] && [ "${1:-}" = pkg ] && [ "${2:-}" = install ]; then
+                refreshed=1
+                step "Package not found (HTTP 404); refreshing repository index once"
+                pkg update || return 44
+                continue
+            fi
+            return 44
+        fi
         [ "$n" -ge "$max" ] && return 1
         n=$((n + 1))
         step "transient failure, retry $n/$max"
@@ -56,10 +140,11 @@ export ANDROID_HOME="$SDK"
 export ANDROID_SDK_ROOT="$SDK"
 [ -d "$SDK/cmdline-tools/latest/bin" ] && export PATH="\$PATH:$SDK/cmdline-tools/latest/bin"
 for _d in "$SDK"/ndk/*/; do [ -d "\$_d" ] && export ANDROID_NDK_HOME="\${_d%/}" ANDROID_NDK_ROOT="\${_d%/}"; done; unset _d
-[ -d "$PREFIX/lib/jvm/java-17-openjdk" ] && export JAVA_HOME="$PREFIX/lib/jvm/java-17-openjdk"
-[ -z "\${JAVA_HOME:-}" ] && [ -d "$PREFIX/lib/jvm/java-21-openjdk" ] && export JAVA_HOME="$PREFIX/lib/jvm/java-21-openjdk"
+[ -n "\${JAVA_HOME:-}" ] && [ ! -x "\$JAVA_HOME/bin/java" ] && unset JAVA_HOME
+[ -z "\${JAVA_HOME:-}" ] && [ -x "$PREFIX/lib/jvm/java-21-openjdk/bin/java" ] && export JAVA_HOME="$PREFIX/lib/jvm/java-21-openjdk"
+[ -z "\${JAVA_HOME:-}" ] && [ -x "$PREFIX/lib/jvm/java-17-openjdk/bin/java" ] && export JAVA_HOME="$PREFIX/lib/jvm/java-17-openjdk"
 [ -n "\${JAVA_HOME:-}" ] && [ -x "\$JAVA_HOME/bin/java" ] && export PATH="\$JAVA_HOME/bin:\$PATH"
-[ -d "$HOME/flutter_sdk/bin" ] && export PATH="\$PATH:$HOME/flutter_sdk/bin" && export FLUTTER_ROOT="$HOME/flutter_sdk"
+[ -d "$HOME/flutter_sdk/bin" ] && export PATH="$HOME/flutter_sdk/bin:\$PATH" && export FLUTTER_ROOT="$HOME/flutter_sdk"
 export GRADLE_USER_HOME="\$HOME/.gradle"
 EOF
     mkdir -p "$HOME/.gradle" "$PREFIX/tmp"
@@ -71,6 +156,7 @@ EOF
             || printf 'android.aapt2FromMavenOverride=%s\n' "$PREFIX/bin/aapt2" >> "$gp"
     fi
     grep -q '^org.gradle.daemon=' "$gp" || printf 'org.gradle.daemon=false\n' >> "$gp"
+    grep -q '^org.gradle.native=' "$gp" || printf 'org.gradle.native=false\n' >> "$gp"
     grep -q '^org.gradle.jvmargs=' "$gp" || printf 'org.gradle.jvmargs=-Xmx1536m\n' >> "$gp"
     # Keep existing JVM options and add only missing Android-specific paths.
     local gp_tmp="$gp.agy-tmp-$$"
@@ -93,6 +179,16 @@ EOF
 - node, npm, java, gradle, sdkmanager, ndk-build, npm global CLIs have bridges in runtime/bin that load this environment automatically.
 EOF
     fi
+    if [ -f "$AGENTS" ] && ! grep -q 'AGY-KMP-COMPAT' "$AGENTS"; then
+        cat >> "$AGENTS" <<'EOF'
+
+<!-- AGY-KMP-COMPAT -->
+## KMP/Compose compatibility
+- Match compileSdk to the requirements of the project's dependencies; install the corresponding Android platform before building.
+- When an older KMP androidTarget() project encounters AGP 9 new-DSL or built-in Kotlin conflicts, consult project compatibility and consider android.newDsl=false and android.builtInKotlin=false in that project's gradle.properties. Do not set them globally.
+- For Gradle launcher issues on Android, check JAVA_TOOL_OPTIONS for user.home and java.io.tmpdir and use the configured Gradle bridge; keep project JVM options and build logs for diagnosis.
+EOF
+    fi
 }
 
 # ------------------------------------------------------------ agent bridges
@@ -102,9 +198,9 @@ EOF
 # scripts with "#!/usr/bin/env" / "#!/bin/sh" shebangs, which do not exist on
 # Android) need bridges of their own; the Android/Java env is loaded in each.
 RB="$PREFIX/../runtime/bin"
-BRIDGED="node npm npx corepack yarn pnpm pnpx tsc tsserver java javac jar keytool kotlin kotlinc gradle mvn sdkmanager avdmanager ndk-build aapt aapt2 aidl d8 apksigner zipalign adb apktool jadx"
+BRIDGED="node npm npx corepack yarn pnpm pnpx tsc tsserver java javac javap jdeps jshell jar keytool kotlin kotlinc gradle mvn sdkmanager avdmanager apkanalyzer lint ndk-build aapt aapt2 aidl d8 apksigner zipalign adb apktool jadx"
 make_bridge() { # name
-    local name="$1" target="$PREFIX/bin/$1" first runner=""
+    local name="$1" target="$PREFIX/bin/$1" first runner="" tmp="$RB/.agy-bridge-$1-$$"
     [ -e "$target" ] || return 0
     [ -d "$RB" ] || return 0
     first="$(head -c 160 "$(readlink -f "$target")" 2>/dev/null | tr -d "\000" | head -n 1)"
@@ -112,13 +208,22 @@ make_bridge() { # name
         "#!"*node*)            runner='"$PREFIX/bin/node" ' ;;
         "#!"*sh*|"#!"*bash*)   runner='"$PREFIX/bin/bash" ' ;;
     esac
-    cat > "$RB/$name" <<EOF
+    cat > "$tmp" <<EOF
 #!/system/bin/sh
 # AGY tools bridge -> \$PREFIX/bin/$name
 PREFIX='$PREFIX'
 export PREFIX TERMUX__PREFIX="\$PREFIX"
 [ -f "\$PREFIX/lib/libtermux-exec.so" ] && export LD_PRELOAD="\$PREFIX/lib/libtermux-exec.so"
 export LD_LIBRARY_PATH="\$PREFIX/lib"
+case "$name" in
+  java|javac|javap|jdeps|jshell|jar|keytool|kotlin|kotlinc|gradle|mvn|sdkmanager|avdmanager|apkanalyzer|lint|d8|apksigner|apktool|jadx)
+    case " \${JAVA_TOOL_OPTIONS:-} " in *" -Duser.home="*) ;; *) JAVA_TOOL_OPTIONS="\${JAVA_TOOL_OPTIONS:+\$JAVA_TOOL_OPTIONS }-Duser.home=\$HOME" ;; esac
+    case " \$JAVA_TOOL_OPTIONS " in *" -Djava.io.tmpdir="*) ;; *) JAVA_TOOL_OPTIONS="\$JAVA_TOOL_OPTIONS -Djava.io.tmpdir=\$PREFIX/tmp" ;; esac
+    export JAVA_TOOL_OPTIONS ;;
+esac
+case "$name" in
+  gradle) case " \${GRADLE_OPTS:-} " in *" -Dorg.gradle.native="*) ;; *) export GRADLE_OPTS="\${GRADLE_OPTS:+\$GRADLE_OPTS }-Dorg.gradle.native=false" ;; esac ;;
+esac
 export PATH="\$PREFIX/../runtime/bin:\$PREFIX/bin:/system/bin"
 TMPDIR="\$PREFIX/tmp"; export TMPDIR
 export OPENSSL_CONF="\$PREFIX/etc/tls/openssl.cnf" SSL_CERT_FILE="\$PREFIX/etc/tls/cert.pem" CURL_CA_BUNDLE="\$PREFIX/etc/tls/cert.pem"
@@ -126,7 +231,7 @@ export OPENSSL_CONF="\$PREFIX/etc/tls/openssl.cnf" SSL_CERT_FILE="\$PREFIX/etc/t
 # Resolve symlinks: scripts like ndk-build locate their resources via \$0.
 exec $runner"\$(readlink -f "\$PREFIX/bin/$name")" "\$@"
 EOF
-    chmod 755 "$RB/$name" 2>/dev/null || true
+    chmod 755 "$tmp" && mv -f "$tmp" "$RB/$name" || { rm -f "$tmp"; fail "bridge $name"; }
 }
 refresh_build_tools() {
     local bt t dest target
@@ -148,12 +253,22 @@ refresh_build_tools() {
 refresh_bridges() {
     # Restore entry points omitted by package post-install scripts when the
     # actual executable exists. Never replace an existing working command.
-    local j target
-    for j in java javac jar keytool; do
-        if [ ! -x "$PREFIX/bin/$j" ]; then
-            for target in "$PREFIX/lib/jvm/java-17-openjdk/bin/$j" "$PREFIX/lib/jvm/java-21-openjdk/bin/$j"; do
-                if [ -x "$target" ]; then ln -sf "$target" "$PREFIX/bin/$j"; break; fi
-            done
+    local j target selected existing
+    selected="${JAVA_HOME:-}"
+    if [ -z "$selected" ] || [ ! -x "$selected/bin/java" ]; then
+        selected=""
+        for target in "$PREFIX/lib/jvm/java-21-openjdk" "$PREFIX/lib/jvm/java-17-openjdk"; do
+            if [ -x "$target/bin/java" ]; then selected="$target"; break; fi
+        done
+    fi
+    for j in java javac javap jdeps jshell jar keytool; do
+        [ -n "$selected" ] && [ -x "$selected/bin/$j" ] || continue
+        # Replace only missing or previously generated links into the JDK tree.
+        if [ -L "$PREFIX/bin/$j" ]; then
+            existing="$(readlink -f "$PREFIX/bin/$j" 2>/dev/null || true)"
+            case "$existing" in "$PREFIX"/lib/jvm/*/bin/"$j") ln -sf "$selected/bin/$j" "$PREFIX/bin/$j" ;; esac
+        elif [ ! -e "$PREFIX/bin/$j" ]; then
+            ln -s "$selected/bin/$j" "$PREFIX/bin/$j"
         fi
     done
     for j in npm npx; do
@@ -162,8 +277,8 @@ refresh_bridges() {
     done
     # SDK / NDK entry points into $PREFIX/bin first.
     local t
-    for t in sdkmanager avdmanager; do
-        [ -e "$SDK/cmdline-tools/latest/bin/$t" ] && ln -sf "$SDK/cmdline-tools/latest/bin/$t" "$PREFIX/bin/$t"
+    for t in sdkmanager avdmanager apkanalyzer lint; do
+        [ -e "$SDK/cmdline-tools/latest/bin/$t" ] && [ ! -e "$PREFIX/bin/$t" ] && ln -s "$SDK/cmdline-tools/latest/bin/$t" "$PREFIX/bin/$t"
     done
     for t in "$SDK"/ndk/*/ndk-build; do [ -e "$t" ] && ln -sf "$t" "$PREFIX/bin/ndk-build"; done
     refresh_build_tools
@@ -224,7 +339,7 @@ op_status() {
         if [ -s "$p/source.properties" ] && [ -s "$p/lib/d8.jar" ] && [ -s "$p/core-lambda-stubs.jar" ]; then say "@@special build-tools $(basename "$p")"; else say "@@special build-tools $(basename "$p") incomplete"; fi
     done
     for p in "$SDK"/ndk/*; do [ -d "$p" ] && say "@@special ndk $(basename "$p")"; done
-    [ -x "$HOME/flutter_sdk/bin/flutter" ] && say "@@special flutter ok" || say "@@special flutter -"
+    if [ -x "$HOME/flutter_sdk/bin/flutter" ] && [ -x "$HOME/flutter_sdk/bin/cache/dart-sdk/bin/dart" ] && [ -f "$HOME/flutter_sdk/bin/cache/flutter_tools.snapshot" ]; then say "@@special flutter ok"; else say "@@special flutter -"; fi
     command -v pnpm >/dev/null 2>&1 && say "@@npm pnpm ok" || say "@@npm pnpm -"
     command -v tsc  >/dev/null 2>&1 && say "@@npm typescript ok" || say "@@npm typescript -"
     say "@@done"
@@ -245,6 +360,7 @@ node_package_installed() {
 }
 check_node_conflicts() {
     local n
+    case " $ARG " in *" nodejs "*) case " $ARG " in *" nodejs-lts "*) fail "Node.js variants cannot be installed together; select one" ;; esac ;; esac
     for n in $ARG; do
         case "$n" in
             nodejs-lts) if ! node_package_installed nodejs-lts && node_package_installed nodejs; then fail "Node.js current is already installed; select one version before switching"; fi ;;
@@ -261,8 +377,14 @@ op_install() {
     # shellcheck disable=SC2086
     if ! pkg_retry pkg install $ARG; then
         step "batch install failed; retrying package by package"
-        local p ok=1
+        local p ok=1 preferred_node=""
+        case " $ARG " in *" nodejs-lts "*) preferred_node=nodejs-lts ;; *" nodejs "*) preferred_node=nodejs ;; esac
+        if [ -n "$preferred_node" ]; then
+            step "pkg install $preferred_node (selected Node.js version first)"
+            pkg_retry pkg install "$preferred_node" || fail "selected Node.js installation failed; remaining packages were not installed"
+        fi
         for p in $ARG; do
+            [ "$p" = "$preferred_node" ] && continue
             step "pkg install $p"
             pkg_retry pkg install "$p" || { ok=0; say "@@warn failed: $p"; }
         done
@@ -324,6 +446,12 @@ op_npm() {
     step "Fix paths in npm tools"
     agy-fix-paths "$PREFIX/bin" "$PREFIX/lib/node_modules" || fail "fix paths"
     refresh_bridges
+    for p in $ARG; do
+        case "$p" in
+            typescript) step "Verify TypeScript compiler"; "$RB/tsc" --version || fail "TypeScript compiler verification failed" ;;
+            pnpm) step "Verify pnpm"; "$RB/pnpm" --version || fail "pnpm verification failed" ;;
+        esac
+    done
     say "@@done"
 }
 
@@ -342,19 +470,24 @@ op_sdk() {
     mkdir -p "$SDK"
     if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
         step "Download Android command-line tools"
-        local z="$PREFIX/tmp/cmdline-tools.zip"
+        local z="$PREFIX/tmp/cmdline-tools.zip" stage
+        [ ! -e "$SDK/cmdline-tools/latest" ] || fail "Existing cmdline-tools/latest is incomplete; preserved for inspection"
         curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 600 -o "$z" "$CMDLINE_URL" || fail "download cmdline-tools"
-        rm -rf "$SDK/cmdline-tools/latest" "$PREFIX/tmp/cmdline-tools"
         mkdir -p "$SDK/cmdline-tools"
-        unzip -q -o "$z" -d "$PREFIX/tmp" || fail "unzip cmdline-tools"
-        mv "$PREFIX/tmp/cmdline-tools" "$SDK/cmdline-tools/latest" || fail "move cmdline-tools"
+        stage="$(mktemp -d "$PREFIX/tmp/agy-cmdline.XXXXXX")" || fail "create temporary directory"
+        if ! unzip -q "$z" -d "$stage" || [ ! -f "$stage/cmdline-tools/bin/sdkmanager" ]; then
+            rm -rf "$stage"
+            fail "invalid cmdline-tools archive"
+        fi
+        mv "$stage/cmdline-tools" "$SDK/cmdline-tools/latest" || fail "move cmdline-tools"
+        rmdir "$stage" 2>/dev/null || true
         rm -f "$z"
     fi
     write_env
     . "$ENVF"
     local comps="${ARG:-platforms;android-35 build-tools;35.0.0}"
     step "Accept licenses"
-    yes | bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses >/dev/null 2>&1 || true
+    yes | bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses || fail "sdkmanager license acceptance failed"
     step "sdkmanager $comps"
     # shellcheck disable=SC2086
     bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" $comps || fail "sdkmanager"
@@ -423,29 +556,35 @@ op_ndkremove() {
 }
 op_flutter() {
     ensure_index
-    step "Installing required dependencies for Flutter (git, curl, tar, xz-utils, python, dart)"
-    pkg_retry pkg install git curl tar xz-utils python dart || fail "dependencies for flutter"
+    step "Installing required dependencies for Flutter (git, curl, unzip, tar, xz-utils, python, dart)"
+    pkg_retry pkg install git curl unzip tar xz-utils python dart || fail "dependencies for flutter"
     step "Installing Flutter SDK (stable branch)"
     local FSDK="$HOME/flutter_sdk"
     if [ -d "$FSDK/.git" ]; then
-        step "Updating existing Flutter SDK repository"
-        git -C "$FSDK" fetch --depth=1 origin stable || true
-        git -C "$FSDK" checkout stable || true
+        step "Using existing Flutter SDK checkout (local changes preserved)"
     elif [ -d "$FSDK" ]; then
-        step "Existing non-git Flutter directory found, replacing with official git repo"
-        rm -rf "$FSDK"
-        git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$FSDK" || fail "git clone flutter"
+        fail "Existing Flutter directory is not a git checkout; preserved at $FSDK"
     else
         git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$FSDK" || fail "git clone flutter"
     fi
     export FLUTTER_ROOT="$FSDK"
-    case ":$PATH:" in
-        *":$FSDK/bin:"*) ;;
-        *) export PATH="$FSDK/bin:$PATH" ;;
-    esac
     write_env
+    # A fresh clone has no Dart cache. Download the exact engine-pinned SDK
+    # before checking its version; invoking flutter itself here would try to
+    # execute the downloaded Linux/glibc Dart binary on Android.
+    if [ ! -s "$FSDK/bin/cache/dart-sdk/version" ]; then
+        [ ! -L "$FSDK/bin/cache/dart-sdk" ] || fail "Flutter Dart symlink is broken; inspect before retrying"
+        step "Preparing Flutter engine and Dart SDK metadata"
+        export FLUTTER_ROOT="$FSDK"
+        bash "$FSDK/bin/internal/update_engine_version.sh" || fail "Flutter engine metadata preparation failed"
+        bash "$FSDK/bin/internal/update_dart_sdk.sh" || fail "Flutter Dart SDK preparation failed"
+        [ -s "$FSDK/bin/cache/dart-sdk/version" ] || fail "Flutter Dart version unavailable after preparation"
+    fi
     step "Running Antigravity Flutter/Dart bionic patcher (agy-fix-flutter)"
-    agy-fix-flutter || say "@@warn agy-fix-flutter finished with warnings"
+    agy-fix-flutter || fail "Flutter compatibility patch failed; inspect the log"
+    export PATH="$FSDK/bin:$PATH"
+    step "Verifying Flutter startup (first run may take several minutes)"
+    "$FSDK/bin/flutter" --version || fail "Flutter startup failed; inspect the log"
     refresh_bridges
     say "@@done"
 }
@@ -599,6 +738,8 @@ op_verify() {
 }
 # ------------------------------------------------------------ MCP management
 op_mcp() {
+    umask 077
+    [ -f "$HOME/.gemini/config/mcp_config.json" ] && chmod 600 "$HOME/.gemini/config/mcp_config.json" 2>/dev/null || true
     local cmd="${ARG%% *}"
     local rest=""
     if [ "$cmd" != "$ARG" ]; then
@@ -610,6 +751,28 @@ op_mcp() {
 
     case "$cmd" in
         status)
+            # Wrap only the configured stdio GitHub server; preserve command,
+            # arguments, environment and all other server settings.
+            if [ -x "$node_exec" ] && [ -f "$HOME/web/agy_mcp_stdio_proxy.js" ] && [ -f "$cfg" ]; then
+                python3 - "$cfg" "$node_exec" "$HOME/web/agy_mcp_stdio_proxy.js" <<'PYPROXY' || true
+import json, os, sys
+path, node, proxy = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as f: data = json.load(f)
+    server = data.get("mcpServers", {}).get("github-mcp-server")
+    if isinstance(server, dict) and isinstance(server.get("command"), str) and server["command"] and not server.get("url"):
+        args = server.get("args", [])
+        if isinstance(args, list) and not (args and args[0] == proxy):
+            server["args"] = [proxy, server["command"]] + args
+            server["command"] = node
+            tmp = path + ".agy-proxy-tmp"
+            with open(tmp, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+except (OSError, ValueError, TypeError):
+    pass
+PYPROXY
+            fi
             step "Checking MCP components and servers"
             command -v node >/dev/null 2>&1 && say "@@mcp_comp node ok $(node -v 2>/dev/null)" || say "@@mcp_comp node - missing"
             command -v npm >/dev/null 2>&1 && say "@@mcp_comp npm ok $(npm -v 2>/dev/null)" || say "@@mcp_comp npm - missing"
@@ -623,9 +786,11 @@ op_mcp() {
             [ -f "$PREFIX/lib/node_modules/@upstash/context7-mcp/dist/index.js" ] && say "@@mcp_comp context7 ok installed" || say "@@mcp_comp context7 - missing"
             [ -f "$PREFIX/lib/node_modules/@modelcontextprotocol/server-brave-search/dist/index.js" ] && say "@@mcp_comp brave ok installed" || say "@@mcp_comp brave - missing"
             [ -f "$PREFIX/lib/node_modules/@utcp/mcp-bridge/dist/index.js" ] && say "@@mcp_comp utcp_bridge ok installed" || say "@@mcp_comp utcp_bridge - missing"
-            [ -f "$PREFIX/lib/node_modules/@utcp/sdk/dist/index.js" ] && say "@@mcp_comp utcp_sdk ok installed" || say "@@mcp_comp utcp_sdk - missing"
-            [ -f "$PREFIX/lib/node_modules/@utcp/http/dist/index.js" ] && say "@@mcp_comp utcp_http ok installed" || say "@@mcp_comp utcp_http - missing"
-            [ -f "$PREFIX/lib/node_modules/@utcp/file/dist/index.js" ] && say "@@mcp_comp utcp_file ok installed" || say "@@mcp_comp utcp_file - missing"
+            for utcp_part in sdk http file; do
+                if [ -f "$PREFIX/lib/node_modules/@utcp/$utcp_part/package.json" ] || [ -f "$PREFIX/lib/node_modules/@utcp/mcp-bridge/node_modules/@utcp/$utcp_part/package.json" ]; then
+                    say "@@mcp_comp utcp_$utcp_part ok installed"
+                else say "@@mcp_comp utcp_$utcp_part - missing"; fi
+            done
             command -v gopls >/dev/null 2>&1 && say "@@mcp_comp gopls ok installed" || say "@@mcp_comp gopls - missing"
             command -v python3 >/dev/null 2>&1 && say "@@mcp_comp python ok $(python3 -V 2>/dev/null | awk '{print $2}')" || say "@@mcp_comp python - missing"
             command -v git >/dev/null 2>&1 && say "@@mcp_comp git ok $(git --version 2>/dev/null | awk '{print $3}')" || say "@@mcp_comp git - missing"
@@ -648,11 +813,11 @@ try:
             keys = []
             for k, v in env.items():
                 if k in ("EXA_API_KEY", "GITHUB_PERSONAL_ACCESS_TOKEN", "X-Goog-Api-Key", "NOTION_API_KEY", "SENTRY_AUTH_TOKEN", "BRAVE_API_KEY"):
-                    keys.append("%s=%s" % (k, v))
+                    keys.append("%s=%s" % (k, "***" if v else ""))
             if name == "StitchMCP":
                 for a in srv.get("args", []):
                     if "X-Goog-Api-Key" in a:
-                        keys.append("X-Goog-Api-Key=%s" % a.split(":", 1)[-1].strip())
+                        keys.append("X-Goog-Api-Key=%s" % ("***" if a.split(":", 1)[-1].strip() else ""))
             print("@@mcp_srv %s %s %s" % (name, dis, ",".join(keys)))
 
     # UTCP status
@@ -683,10 +848,9 @@ PY
             say "@@done"
             ;;
         install-all)
-            step "Installing Node.js & npm if needed"
+            step "Checking Node.js and npm"
             if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-                ensure_index
-                pkg_retry pkg install -y nodejs-lts npm || fail "pkg install nodejs-lts"
+                fail "Node.js and npm are required. Install them in Settings > Tools."
             fi
             step "Installing MCP npm packages"
             pkg_retry npm install -g --fetch-retries=5 --fetch-retry-maxtimeout=60000 \
@@ -701,8 +865,6 @@ PY
                 @upstash/context7-mcp || fail "npm install mcp packages"
             step "Fixing tool paths"
             agy-fix-paths "$PREFIX/bin" "$PREFIX/lib/node_modules" 2>/dev/null || true
-            step "Installing gopls"
-            pkg_retry pkg install gopls 2>/dev/null || true
             step "Normalizing mcp_config.json with native node paths"
             python3 - "$cfg" "$PREFIX" "$HOME" <<'PY' || true
 import json, sys, os
@@ -852,18 +1014,16 @@ PY
                     agy-fix-paths "$PREFIX/bin" "$PREFIX/lib/node_modules" 2>/dev/null || true
                     ;;
                 gopls)
-                    step "Installing gopls"
-                    pkg_retry pkg install gopls || fail "pkg install gopls"
+                    fail "Install Go tools in Settings > Tools"
                     ;;
                 node)
-                    step "Installing Node.js LTS"
-                    ensure_index
-                    pkg_retry pkg install -y nodejs-lts npm || fail "pkg install nodejs-lts"
+                    fail "Install Node.js in Settings > Tools"
                     ;;
-                utcp-bridge|utcp-sdk|utcp-http|utcp-file|utcp-all)
-                    step "Installing UTCP packages (@utcp/mcp-bridge, @utcp/sdk, @utcp/http, @utcp/file, @utcp/cli)"
+                utcp_bridge|utcp_sdk|utcp_http|utcp_file|utcp-bridge|utcp-sdk|utcp-http|utcp-file|utcp-all)
+                    step "Installing UTCP MCP bridge and its dependencies"
                     pkg_retry npm install -g --fetch-retries=5 --fetch-retry-maxtimeout=60000 \
-                        @utcp/mcp-bridge @utcp/sdk @utcp/http @utcp/file @utcp/cli @utcp/dotenv-loader || fail "npm install utcp"
+                        @utcp/mcp-bridge || fail "npm install utcp"
+                    [ -f "$PREFIX/lib/node_modules/@utcp/mcp-bridge/dist/index.js" ] || fail "UTCP bridge entry point not found after install"
                     agy-fix-paths "$PREFIX/bin" "$PREFIX/lib/node_modules" 2>/dev/null || true
                     ;;
                 *)
@@ -938,6 +1098,8 @@ PY
 import json, sys, os
 cfg, srv, kv, prefix, home = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 k, v = kv.split("=", 1)
+if v == "***":
+    sys.exit(0)
 data = {"mcpServers": {}}
 if os.path.exists(cfg) and os.path.getsize(cfg) > 0:
     try:
@@ -1028,6 +1190,10 @@ if not s.get("command"):
         s["command"] = node_exec
         s["args"] = [os.path.join(nm, "@modelcontextprotocol/server-filesystem/dist/index.js"), "/storage/emulated/0"]
         s["env"] = dict(env_std)
+    elif srv == "context7":
+        s["command"] = node_exec
+        s["args"] = [os.path.join(nm, "@upstash/context7-mcp/dist/index.js")]
+        s["env"] = dict(env_std)
     elif srv == "github-mcp-server":
         s["command"] = node_exec
         s["args"] = [os.path.join(nm, "@modelcontextprotocol/server-github/dist/index.js")]
@@ -1040,6 +1206,10 @@ if not s.get("command"):
             "--header",
             "X-Goog-Api-Key: YOUR_KEY"
         ]
+        s["env"] = dict(env_std)
+    elif srv == "microsoft-learn":
+        s["command"] = node_exec
+        s["args"] = [os.path.join(nm, "mcp-remote/dist/proxy.js"), "https://learn.microsoft.com/api/mcp"]
         s["env"] = dict(env_std)
 
 if val == "1":
@@ -1144,7 +1314,7 @@ if os.path.exists(utcp_cfg):
 tmpls = [t for t in data.get("manual_call_templates", []) if t.get("name") != name]
 
 new_tmpl = {"name": name}
-if ctype == "file" or source.endswith(".json") or source.startswith("/") or source.startswith("~"):
+if ctype == "file" or source.startswith("/") or source.startswith("~"):
     expanded_path = os.path.expanduser(source)
     new_tmpl["call_template_type"] = "file"
     new_tmpl["file_path"] = expanded_path
@@ -1602,6 +1772,84 @@ PY
             say "@@done"
             ;;
         install-plugin)
+            if [ "$rest" = "android-cli-plugin" ] || [ "$rest" = "modern-web-guidance" ]; then
+                command -v git >/dev/null 2>&1 || fail "Git is required; install it in Settings > Tools"
+                python3 - "$cfg_dir" "$rest" <<'PYOFFICIAL' || fail "Official plugin installation failed"
+import json, os, shutil, subprocess, sys, tempfile, urllib.request
+cfg, name = sys.argv[1:]
+plugins = os.path.join(cfg, "plugins")
+os.makedirs(plugins, exist_ok=True)
+target = os.path.join(plugins, name)
+with tempfile.TemporaryDirectory(prefix="agy-plugin-", dir=plugins) as tmp:
+    if name == "android-cli-plugin":
+        home = os.environ["HOME"]
+        loader = os.path.join(home, "runtime", "bin", "libloader.so")
+        libdir = os.path.join(home, "runtime", "lib")
+        dest = os.path.join(home, "opt", "android-cli", "android")
+        bridge = os.path.join(home, "runtime", "bin", "android")
+        if not os.path.isfile(loader) or not os.path.isfile(os.path.join(libdir, "libc.so.6")):
+            raise SystemExit("Android CLI requires the bundled ARM64 glibc runtime")
+        if os.path.lexists(bridge):
+            try:
+                with open(bridge, encoding="utf-8") as f:
+                    managed = "# AGY_ANDROID_CLI_BRIDGE" in f.read(512)
+            except (OSError, UnicodeError):
+                managed = False
+            if not managed:
+                raise SystemExit("An existing android command was preserved; cannot replace its bridge")
+        print("Downloading the official Linux ARM64 Android CLI (approximately 90 MB)...", flush=True)
+        candidate = os.path.join(tmp, "android-cli")
+        with urllib.request.urlopen("https://dl.google.com/android/cli/latest/linux_arm64/android-cli", timeout=60) as response, open(candidate, "wb") as out:
+            shutil.copyfileobj(response, out, 1024 * 1024)
+        with open(candidate, "rb") as f:
+            hdr = f.read(20)
+        if hdr[:4] != b"\x7fELF" or hdr[4:6] != b"\x02\x01" or hdr[18:20] != b"\xb7\x00":
+            raise SystemExit("Downloaded Android CLI is not an ARM64 ELF executable")
+        os.chmod(candidate, 0o755)
+        env = dict(os.environ)
+        env.pop("LD_PRELOAD", None)
+        env.pop("LD_LIBRARY_PATH", None)
+        print("Checking Android CLI with the bundled loader...", flush=True)
+        try:
+            check = subprocess.run([loader, "--library-path", libdir, candidate, "--version"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise SystemExit("Android CLI could not be started: " + str(exc))
+        print(check.stdout[-4000:], flush=True)
+        if check.returncode != 0:
+            raise SystemExit("Android CLI compatibility check failed; existing tools were not replaced")
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copyfile(candidate, dest + ".new")
+        os.chmod(dest + ".new", 0o755)
+        os.replace(dest + ".new", dest)
+        bridge_text = '#!/system/bin/sh\n# AGY_ANDROID_CLI_BRIDGE\nunset LD_PRELOAD LD_LIBRARY_PATH\nexec "$HOME/runtime/bin/libloader.so" --library-path "$HOME/runtime/lib" "$HOME/opt/android-cli/android" "$@"\n'
+        with open(bridge + ".new", "w", encoding="utf-8") as f:
+            f.write(bridge_text)
+        os.chmod(bridge + ".new", 0o755)
+        os.replace(bridge + ".new", bridge)
+        print("Android CLI installed and version check passed", flush=True)
+    if os.path.exists(target):
+        print("Plugin already installed; retained existing files", flush=True)
+        raise SystemExit(0)
+    checkout = os.path.join(tmp, "checkout")
+    url = {"android-cli-plugin": "https://github.com/android/android-cli-plugin.git", "modern-web-guidance": "https://github.com/GoogleChrome/modern-web-guidance.git"}[name]
+    subprocess.run(["git", "clone", "--depth", "1", url, checkout], check=True)
+    if name == "android-cli-plugin":
+        source = os.path.join(checkout, "plugins", "android-cli-codex")
+        if not os.path.isfile(os.path.join(source, "skills", "android-cli", "SKILL.md")):
+            raise SystemExit("Official Android CLI skill not found in repository")
+        with open(os.path.join(source, "plugin.json"), "w", encoding="utf-8") as f:
+            json.dump({"name": "Android CLI", "description": "Official Android CLI skill from android/android-cli-plugin", "version": "1"}, f)
+    else:
+        source = checkout
+        if not os.path.isfile(os.path.join(source, "plugin.json")) or not os.path.isfile(os.path.join(source, "skills", "modern-web-guidance", "SKILL.md")):
+            raise SystemExit("Official Modern Web Guidance files not found")
+        shutil.rmtree(os.path.join(source, ".git"), ignore_errors=True)
+    os.rename(source, target)
+print("Official plugin installed:", name)
+PYOFFICIAL
+                say "@@done"
+                return
+            fi
             python3 - "$cfg_dir" "$rest" <<'PY' || fail "install-plugin failed"
 import sys, os, json, shutil
 

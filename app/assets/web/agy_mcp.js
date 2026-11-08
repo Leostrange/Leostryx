@@ -35,7 +35,6 @@
 
   // Components status
   var comps = {
-    node: { label: "Node.js LTS & npm", desc: T("Среда JavaScript/TypeScript", "JavaScript/TypeScript runtime"), ok: false, val: "" },
     sequential: { label: "Sequential Thinking", desc: "@modelcontextprotocol/server-sequential-thinking", ok: false, val: "" },
     memory: { label: "Memory Graph", desc: "@modelcontextprotocol/server-memory", ok: false, val: "" },
     filesystem: { label: "Filesystem Access", desc: "@modelcontextprotocol/server-filesystem", ok: false, val: "" },
@@ -49,9 +48,6 @@
     utcp_sdk: { label: "UTCP Core SDK", desc: "@utcp/sdk (Universal Tool Calling Protocol)", ok: false, val: "" },
     utcp_http: { label: "UTCP HTTP & OpenAPI", desc: "@utcp/http (HTTP клиент и парсер OpenAPI 3.0)", ok: false, val: "" },
     utcp_file: { label: "UTCP Local Files", desc: "@utcp/file (драйвер локальных JSON/YAML мануалов)", ok: false, val: "" },
-    gopls: { label: "Go Language Server", desc: "gopls mcp", ok: false, val: "" },
-    python: { label: "Python 3 & pip", desc: T("Среда Python", "Python runtime"), ok: false, val: "" },
-    git: { label: "Git", desc: T("Контроль версий", "Version control"), ok: false, val: "" }
   };
 
   // Ready-to-use UTCP Presets
@@ -61,7 +57,7 @@
       title: "Open-Meteo Weather API",
       desc: T("Точный прогноз погоды и текущая температура по координатам по всему миру без API ключа.",
               "Accurate weather forecast and current temperature by coordinates worldwide without API key."),
-      source: "/data/user/0/com.agyru.bp/files/.gemini/config/utcp_manuals/open-meteo.json",
+      source: "/data/user/0/com.agyru.t2/files/.gemini/config/utcp_manuals/open-meteo.json",
       tools: ["get_weather"]
     },
     {
@@ -69,7 +65,7 @@
       title: "IP Geolocation API",
       desc: T("Определение страны, города, координат и интернет-провайдера по любому IP адресу.",
               "Detect country, city, coordinates and ISP for any IP address."),
-      source: "/data/user/0/com.agyru.bp/files/.gemini/config/utcp_manuals/ip-lookup.json",
+      source: "/data/user/0/com.agyru.t2/files/.gemini/config/utcp_manuals/ip-lookup.json",
       tools: ["lookup_ip"]
     },
     {
@@ -77,7 +73,7 @@
       title: "REST Countries Global API",
       desc: T("Энциклопедические данные по странам мира (столицы, валюты, население, границы, языки).",
               "Comprehensive data on world countries (capitals, currencies, population, languages)."),
-      source: "/data/user/0/com.agyru.bp/files/.gemini/config/utcp_manuals/rest-countries.json",
+      source: "/data/user/0/com.agyru.t2/files/.gemini/config/utcp_manuals/rest-countries.json",
       tools: ["get_country"]
     },
     {
@@ -85,7 +81,7 @@
       title: "CoinGecko Crypto API",
       desc: T("Актуальные курсы криптовалют (BTC, ETH, TON, SOL) в USD, EUR, RUB и динамика за 24 часа.",
               "Live cryptocurrency prices (BTC, ETH, TON, SOL) in USD/EUR/RUB and 24h change."),
-      source: "/data/user/0/com.agyru.bp/files/.gemini/config/utcp_manuals/coingecko.json",
+      source: "/data/user/0/com.agyru.t2/files/.gemini/config/utcp_manuals/coingecko.json",
       tools: ["get_crypto_price"]
     }
   ];
@@ -182,6 +178,16 @@
       keys: {}
     },
     {
+      name: "microsoft-learn",
+      title: "Microsoft Learn MCP",
+      category: "dev",
+      tags: ["microsoft", "learn", "documentation", "документация"],
+      desc: T("Поиск по официальной документации Microsoft.", "Search official Microsoft documentation."),
+      isBuiltin: true,
+      comp: "remote",
+      keys: {}
+    },
+    {
       name: "github-mcp-server",
       title: "GitHub MCP",
       category: "dev",
@@ -191,17 +197,6 @@
       isBuiltin: true,
       comp: "github",
       keys: { GITHUB_PERSONAL_ACCESS_TOKEN: "" }
-    },
-    {
-      name: "gopls-mcp-server",
-      title: "Go Language Server (gopls)",
-      category: "dev",
-      tags: ["golang", "go", "lsp", "анализ кода", "типы"],
-      desc: T("Статический анализ, переход к определениям, поиск символов и диагностика кода на Go.",
-              "Code analysis, go-to-definition, symbol references and diagnostics for Go."),
-      isBuiltin: true,
-      comp: "gopls",
-      keys: {}
     },
     {
       name: "StitchMCP",
@@ -318,13 +313,13 @@
     (function poll() {
       var r = {};
       try { r = JSON.parse(b.read(id) || "{}"); } catch (e) {}
-      if (r.log) {
+      if (r.log && cmd !== "status") {
         logText = r.log;
         renderLog();
       }
       if (r.rc !== undefined && r.rc !== "") {
         job = null;
-        parseLog(logText);
+        parseLog(r.log || "");
         if (done) done(r);
         render();
         return;
@@ -607,7 +602,7 @@
         "Universal protocol for direct tool and API calling without intermediate proxy servers. Connects OpenAPI/Swagger 3.0 specs and native JSON manuals. The @utcp/mcp-bridge exports tools to Antigravity and custom models (OpenAI, Claude, DeepSeek)."
       )) + '</div>';
       html += '  <div class="agy-mcp-utcp-hero-meta">';
-      html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мост UTCP ↔ MCP: ", "UTCP ↔ MCP Bridge: ")) + (isUtcpActive ? '<b style="color:#10b981;">' + esc(T("Активен", "Active")) + '</b>' : '<b style="color:#f59e0b;">' + esc(T("Готов", "Ready")) + '</b>') + '</span>';
+      html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мост UTCP ↔ MCP: ", "UTCP ↔ MCP Bridge: ")) + (isUtcpActive && comps.utcp_bridge.ok ? '<b style="color:#10b981;">' + esc(T("Включён", "Enabled")) + '</b>' : '<b style="color:#f59e0b;">' + esc(comps.utcp_bridge.ok ? T("Установлен", "Installed") : T("Не установлен", "Not installed")) + '</b>') + '</span>';
       html += '    <span class="agy-mcp-utcp-meta-item">Конфиг: ~/.gemini/config/utcp_config.json</span>';
       html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мануалов: ", "Manuals: ")) + Object.keys(utcpManuals).length + '</span>';
       html += '  </div>';
@@ -753,7 +748,7 @@
       html += '    <div class="agy-mcp-modal-desc">' + esc(T("Укажите идентификатор сервера, исполняемый файл или команду, аргументы и переменные окружения.", "Specify server identifier, executable command, arguments and environment variables.")) + '</div>';
       html += '    <div class="agy-mcp-modal-form">';
       html += '      <div class="agy-mcp-field"><label>' + esc(T("Имя / ID сервера (без пробелов)", "Server ID")) + '</label><input type="text" id="mcp-modal-name" placeholder="my-custom-mcp"></div>';
-      html += '      <div class="agy-mcp-field"><label>' + esc(T("Команда (node, python3 или путь)", "Command")) + '</label><input type="text" id="mcp-modal-cmd" placeholder="/data/user/0/com.agyru.bp/files/runtime/bin/node"></div>';
+      html += '      <div class="agy-mcp-field"><label>' + esc(T("Команда (node, python3 или путь)", "Command")) + '</label><input type="text" id="mcp-modal-cmd" placeholder="/data/user/0/com.agyru.t2/files/runtime/bin/node"></div>';
       html += '      <div class="agy-mcp-field"><label>' + esc(T("Аргументы (через запятую)", "Arguments (comma-separated)")) + '</label><input type="text" id="mcp-modal-args" placeholder="/path/to/server.js,arg1"></div>';
       html += '      <div class="agy-mcp-field"><label>' + esc(T("Переменные среды (KEY1=VAL1,KEY2=VAL2)", "Env Variables (comma-separated)")) + '</label><input type="text" id="mcp-modal-env" placeholder="API_KEY=xyz,DEBUG=1"></div>';
       html += '    </div>';
@@ -990,8 +985,9 @@
       var inp = root.querySelector('input[data-srv="' + srv + '"][data-key="' + key + '"]');
       if (inp) {
         var val = inp.value.trim();
+        if (val === "***") return;
         runOp("set-key", srv + " " + key + "=" + val, function () {
-          if (activeServers[srv]) activeServers[srv].keys[key] = val;
+          if (activeServers[srv]) activeServers[srv].keys[key] = val ? "***" : "";
           render();
         });
       }

@@ -58,6 +58,20 @@
   // Only packs that fully work on Android without Docker/Postgres/etc.
   var CATALOG_PLUGINS = [
     {
+      id: "android-cli-plugin",
+      name: "Android CLI",
+      desc: T("Официальные инструкции Google для Android CLI. Для работы требуется совместимый Android CLI.", "Official Android CLI guidance. A compatible Android CLI is required."),
+      skills: ["android-cli"],
+      tags: ["Android", "Google", "CLI"]
+    },
+    {
+      id: "modern-web-guidance",
+      name: "Modern Web Guidance",
+      desc: T("Официальный набор Google Chrome для современной веб-разработки.", "Official Google Chrome modern web development guidance."),
+      skills: ["modern-web-guidance", "chrome-extensions"],
+      tags: ["Web", "Google", "CSS"]
+    },
+    {
       id: "google-workspace",
       name: "Google Workspace & Cloud",
       desc: T("Инструменты для работы с Google Docs, Sheets, Slides, Drive и Cloud API.", "Integration with Google Workspace: Docs, Sheets, Slides, Drive and Cloud API."),

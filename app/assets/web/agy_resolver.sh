@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # resolver.sh -- strict dependency closure and install-order resolution.
 # Requires index_lookup, index_provider, db_exists and deb_vercmp.
 
@@ -40,6 +40,25 @@ choose_dep() {
     done <<EOF
 $(printf '%s' "$term" | tr '|' '\n')
 EOF
+    # Reuse an explicitly requested or already planned alternative before
+    # picking the first candidate in the repository index.
+    while IFS= read -r alt; do
+        nm="$(printf '%s' "$alt" | sed 's/^ *//; s/(.*//; s/\[.*//; s/:.*//; s/[[:space:]]*$//')"
+        valid_package_name "$nm" || continue
+        { [ -f "$work/requested/$nm" ] || [ -f "$work/done/$nm" ]; } || continue
+        con="$(printf '%s' "$alt" | sed -n 's/.*(\([^)]*\)).*/\1/p')"
+        op="$(printf '%s' "$con" | awk '{print $1}')"
+        ver="$(printf '%s' "$con" | awk '{print $2}')"
+        line="$(index_lookup "$nm")"; line="${line#*"$tab"}"
+        [ -n "$line" ] || continue
+        if [ -n "$ver" ]; then
+            ver_satisfies "$(printf '%s' "$line" | cut -f2)" "$op" "$ver" || continue
+        fi
+        printf '%s\n' "$line"
+        return 0
+    done <<EOF
+$(printf '%s' "$term" | tr '|' '\n')
+EOF
     while IFS= read -r alt; do
         alt="$(printf '%s' "$alt" | sed 's/^ *//; s/ *$//')"
         [ -n "$alt" ] || continue
@@ -67,7 +86,11 @@ EOF
 # for invalid names, unresolved dependencies, and cycles; no partial order leaks.
 resolve() {
     local work="$PKG_ROOT/tmp/resolve.$$" name entry line provider rootname failed=0 tab=$'\t'
-    rm -rf "$work"; mkdir -p "$work"
+    rm -rf "$work"; mkdir -p "$work/requested"
+    for name in "$@"; do
+        valid_package_name "$name" || { warn "invalid package name: $name"; rm -rf "$work"; return 1; }
+        : > "$work/requested/$name"
+    done
     for name in "$@"; do
         if ! valid_package_name "$name"; then
             warn "invalid package name: $name"
@@ -99,6 +122,12 @@ resolve() {
 r_visit() {
     local name="$1" work="$2" line deps term cand cname tab=$'\t'
     valid_package_name "$name" || { warn "invalid package name in index: $name"; return 1; }
+    local other=""
+    case "$name" in nodejs) other=nodejs-lts ;; nodejs-lts) other=nodejs ;; esac
+    if [ -n "$other" ] && { db_exists "$other" || [ -f "$work/requested/$other" ] || [ -f "$work/done/$other" ] || [ -f "$work/doing/$other" ]; }; then
+        warn "conflicting Node.js packages: $name and $other; installation stopped"
+        return 1
+    fi
     [ -f "$work/done/$name" ] && return 0
     db_exists "$name" && return 0
     [ -f "$work/doing/$name" ] && { warn "dependency cycle at: $name"; return 1; }

@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # fetch.sh -- download with sha256 verification and cache.
 # Requires curl, sha256sum, log, die.
 

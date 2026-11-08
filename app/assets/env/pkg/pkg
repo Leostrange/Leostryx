@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # pkg -- self-written package manager for the tlx environment.
 set -uo pipefail
 trap '' 36 37 2>/dev/null || true

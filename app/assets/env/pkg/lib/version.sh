@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # version.sh -- Debian version comparison wrappers.
 # Requires PKG_LIB (dir of vercmp.awk).
 

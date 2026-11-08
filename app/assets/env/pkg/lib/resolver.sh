@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # resolver.sh -- strict dependency closure and install-order resolution.
 # Requires index_lookup, index_provider, db_exists and deb_vercmp.
 

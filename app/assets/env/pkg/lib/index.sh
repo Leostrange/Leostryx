@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # index.sh -- Packages index helpers.
 # Requires PKG_LIB, PKG_INDEX, deb_gt (version.sh).
 

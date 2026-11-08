@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # deb.sh -- read .deb (ar archive) + extract members. No `ar` dependency.
 # Uses dd/tail/head for ar, tar for payloads, and xz/gzip/zstd/bzip2 by suffix.
 

@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # agy-fix-flutter — apply the Flutter/Dart toolchain fixes for the AGY
 # Android sandbox (Termux userspace, bionic libc, no glibc loader).
 #
@@ -29,24 +29,40 @@ CACHE="$FSDK/bin/cache"
 if [ ! -d "$FSDK" ]; then
     warn "flutter_sdk not found at $FSDK (skip dart-sdk swap)"
 elif [ -L "$CACHE/dart-sdk" ]; then
-    ok "dart-sdk already a symlink -> $(readlink "$CACHE/dart-sdk")"
+    if [ "$(readlink "$CACHE/dart-sdk")" != "$PREFIX/lib/dart-sdk" ] || [ ! -x "$CACHE/dart-sdk/bin/dart" ]; then
+        warn "Flutter Dart symlink is unexpected or broken; inspect it before continuing"
+    elif [ ! -s "$CACHE/engine.stamp" ] || [ ! -s "$CACHE/engine-dart-sdk.stamp" ] || ! cmp -s "$CACHE/engine.stamp" "$CACHE/engine-dart-sdk.stamp"; then
+        warn "Flutter engine/Dart cache stamps are missing or differ; inspect compatibility before continuing"
+    elif [ ! -s "$CACHE/dart-sdk.glibc/version" ] || [ "$(cat "$CACHE/dart-sdk.glibc/version")" != "$("$PREFIX/bin/dart" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)" ]; then
+        warn "Dart package version does not match the saved Flutter SDK; inspect compatibility before continuing"
+    else
+        ok "dart-sdk already a symlink -> $(readlink "$CACHE/dart-sdk")"
+    fi
 else
     PKG_DART_DIR="$PREFIX/lib/dart-sdk"
     if [ ! -d "$PKG_DART_DIR" ]; then
         warn "Termux Dart missing — run: pkg install dart"
-    elif ! command -v dart >/dev/null 2>&1; then
-        warn "'dart' not on PATH — run: pkg install dart"
+    elif [ ! -x "$PREFIX/bin/dart" ]; then
+        warn "Termux Dart executable missing — run: pkg install dart"
     else
         cache_ver="$(cat "$CACHE/dart-sdk/version" 2>/dev/null || true)"
-        pkg_ver="$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+        pkg_ver="$("$PREFIX/bin/dart" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
         if [ -z "$cache_ver" ] || [ "$cache_ver" != "$pkg_ver" ]; then
             warn "Dart versions differ (cache=${cache_ver:-?} pkg=${pkg_ver:-?}) — NOT swapping; install the matching 'pkg install dart'"
         else
-            rm -rf "$CACHE/dart-sdk.glibc"
-            mv "$CACHE/dart-sdk" "$CACHE/dart-sdk.glibc"
-            ln -s "$PKG_DART_DIR" "$CACHE/dart-sdk"
-            did "dart-sdk glibc -> bionic symlink (original kept as dart-sdk.glibc, v$cache_ver)"
-            NEED_SNAPSHOT=1
+            if [ -e "$CACHE/dart-sdk.glibc" ]; then
+                warn "Existing dart-sdk.glibc backup preserved; inspect it before swapping Dart"
+            elif mv "$CACHE/dart-sdk" "$CACHE/dart-sdk.glibc"; then
+                if ln -s "$PKG_DART_DIR" "$CACHE/dart-sdk"; then
+                    did "dart-sdk glibc -> bionic symlink (original kept as dart-sdk.glibc, v$cache_ver)"
+                    NEED_SNAPSHOT=1
+                else
+                    mv "$CACHE/dart-sdk.glibc" "$CACHE/dart-sdk" || true
+                    warn "Could not create Dart symlink"
+                fi
+            else
+                warn "Could not preserve original Dart SDK"
+            fi
         fi
     fi
 fi

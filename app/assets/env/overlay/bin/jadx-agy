@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # jadx-agy — jadx wrapper for the AGY Android sandbox.
 #
 # Termux-OpenJDK hardcodes Termux paths: user.home/.cache and java.io.tmpdir

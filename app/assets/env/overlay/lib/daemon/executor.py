@@ -128,14 +128,14 @@ def _run_task_worker(task):
     success = False
     output = ""
     env = os.environ.copy()
-    env["PATH"] = f"/data/user/0/com.agyru.bp/files/usr/bin:{env.get('PATH', '')}"
-    env["HOME"] = "/data/user/0/com.agyru.bp/files"
+    env["PATH"] = f"/data/user/0/com.agyru.t2/files/usr/bin:{env.get('PATH', '')}"
+    env["HOME"] = "/data/user/0/com.agyru.t2/files"
     if convo_id:
         env["AGY_CONVERSATION_ID"] = convo_id
     if project:
         env["AGY_PROJECT_DIR"] = project
 
-    cwd = project if (project and os.path.isdir(project)) else "/data/user/0/com.agyru.bp/files"
+    cwd = project if (project and os.path.isdir(project)) else "/data/user/0/com.agyru.t2/files"
 
     try:
         res = subprocess.run(

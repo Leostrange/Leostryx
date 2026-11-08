@@ -9,10 +9,10 @@
 ## 1. Platform & Environment Identity
 
 - **Platform:** Native Android (Linux kernel 6.1+, ARM64 / `aarch64` architecture, **ARMv8.0-A+ baseline** with ARMv8.0 LSE emulation and native ARMv8.1-A+ LSE atomics).
-- **Application Context:** Runs directly inside the Antigravity (`com.agyru.bp`) sandbox.
+- **Application Context:** Runs directly inside the Antigravity (`com.agyru.t2`) sandbox.
 - **Key Filesystem Paths:**
-  - Application Root (`$HOME`): `/data/user/0/com.agyru.bp/files` (or app-private `files/` directory).
-  - Linux Userspace Prefix (`$PREFIX`): `$HOME/usr` (`/data/user/0/com.agyru.bp/files/usr`).
+  - Application Root (`$HOME`): `/data/user/0/com.agyru.t2/files` (or app-private `files/` directory).
+  - Linux Userspace Prefix (`$PREFIX`): `$HOME/usr` (`/data/user/0/com.agyru.t2/files/usr`).
   - Binary Directory: `$PREFIX/bin`.
   - Runtime Internals: `$HOME/runtime/bin`.
   - External / Shared Storage: `/storage/emulated/0` (Projects typically reside in `/storage/emulated/0/Documents/`).
@@ -114,7 +114,7 @@ The agent has native access to Shizuku's elevated ADB shell (`uid=2000(shell)`):
 ## 5. Development & Server Guidelines
 
 - **Port Binding:** Local development servers (Vite, Next.js, Express, FastAPI) MUST bind to `localhost` or `127.0.0.1`.
-- **Reserved Ports:** Ports `48135` (core) and `48138` (gateway) are reserved for Antigravity core webview/API. Never bind dev servers to these ports.
+- **Reserved Ports:** Ports `48155` (core) and `48158` (gateway) are reserved for Antigravity core webview/API. Never bind dev servers to these ports.
 - **Safe Dev Ports:** `3000`, `5173`, `8000`, `8080`.
 - **Native Compilation:** When compiling native C/C++/Rust code, target `-march=armv8-a` baseline (ARMv8.0-A minimum, with runtime LSE emulation or native atomics).
 

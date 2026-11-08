@@ -1,4 +1,4 @@
-#!/data/user/0/com.agyru.bp/files/usr/bin/bash
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
 # util.sh -- shared helpers for pkg.
 
 PKG_VERSION="0.1.0"
@@ -87,7 +87,7 @@ load_conf() {
     : "${PKG_CHANNEL:=stable}"
     : "${PKG_COMPONENT:=main}"
     : "${PKG_ARCH:=aarch64}"
-    # data.tar paths are ./data/user/0/com.agyru.bp/files/usr/... -> 6 components.
+    # data.tar paths are ./data/user/0/com.agyru.t2/files/usr/... -> 6 components.
     # deb_files strips by component count, not by a hardcoded prefix string.
     : "${PKG_DEB_STRIP:=6}"
 }

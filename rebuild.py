@@ -37,7 +37,7 @@ def which_exe(name):
     p = shutil.which(name)
     if p:
         return p
-    prefix = os.environ.get("PREFIX", "/data/user/0/com.agyru.bp/files/usr")
+    prefix = os.environ.get("PREFIX", "/data/user/0/com.agyru.t2/files/usr")
     cand = Path(prefix) / "bin" / name
     return str(cand) if cand.exists() else name
 
