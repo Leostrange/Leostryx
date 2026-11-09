@@ -117,8 +117,10 @@ html[data-agy-language="ru"] .capitalize {
   padding: 4px !important;
   max-width: calc(100vw - 16px) !important;
 }
-.z-\[6000\] > [role="menu"],
-.z-\[6000\] > [role="menu"].\!w-56 {
+/* Sort menu popover: main.js uses .agy-narrow-menu instead of Tailwind !w-56
+   to control width. Content-hugging, capped at 210px. */
+.agy-narrow-menu,
+.z-\[6000\] .agy-narrow-menu {
   min-width: 148px !important;
   width: max-content !important;
   max-width: 210px !important;

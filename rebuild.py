@@ -5,7 +5,7 @@
   app/                      — распакованное дерево standard-APK (без META-INF)
   variants/bypass/          — дельта bypass (manifest.json + liblanguage_server.so)
   compress-map.json         — файлы, которые в APK хранятся без сжатия
-  dist/antigravity-debug.keystore — ключ подписи (SHA-256 7360d934… — совпадает
+  dist/antigravity-signing.p12 — ключ подписи (SHA-256 7360d934… — совпадает
                               с установленным приложением, APK встаёт поверх)
 
 Сборка (нужны Python 3, Java 17 и apksigner):
@@ -30,7 +30,7 @@ BYPASS = {
     "assets/runtime/manifest.json": ROOT / "variants/bypass/assets/runtime/manifest.json",
     "assets/runtime/bin/liblanguage_server.so": ROOT / "variants/bypass/assets/runtime/bin/liblanguage_server.so",
 }
-KEYSTORE = ROOT / "dist/antigravity-debug.keystore"
+KEYSTORE = ROOT / "dist/antigravity-signing.p12"
 
 
 def which_exe(name):
@@ -122,7 +122,7 @@ def sign(unsigned):
     if apksigner_bin:
         subprocess.check_call([
             apksigner_bin, "sign",
-            "--ks", str(KEYSTORE), "--ks-key-alias", "debug",
+            "--ks", str(KEYSTORE), "--ks-key-alias", "antigravity",
             "--ks-pass", "pass:android", "--key-pass", "pass:android",
             "--out", str(out), str(unsigned),
         ])
@@ -131,7 +131,7 @@ def sign(unsigned):
         subprocess.check_call([
             java_bin, "-jar", str(uber_jar),
             "--apks", str(unsigned),
-            "--ks", str(KEYSTORE), "--ksAlias", "debug",
+            "--ks", str(KEYSTORE), "--ksAlias", "antigravity",
             "--ksPass", "android", "--ksKeyPass", "android",
             "--out", str(signed_dir),
             "--skipZipAlign",
