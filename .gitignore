@@ -10,3 +10,6 @@ __pycache__/
 # лежат внутри APK и в архиве Antigravity-BP-repo.zip релиза
 app/assets/runtime/bin/liblanguage_server.so
 variants/bypass/assets/runtime/bin/liblanguage_server.so
+signing/
+*.p12
+*.keystore
