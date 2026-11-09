@@ -188,13 +188,33 @@
       }
       var zip = buildZip(files);
       var blob = new Blob([zip], { type: "application/zip" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = "session-" + String(cascadeId).slice(0, 8) + "-" + new Date().toISOString().slice(0, 10) + ".zip";
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-      toast(transcriptText ? "Сессия сохранена в ZIP." : "ZIP сохранён, но транскрипт получить не удалось — см. MANIFEST.txt.");
+      var fname = "session-" + String(cascadeId).slice(0, 8) + "-" + new Date().toISOString().slice(0, 10) + ".zip";
+      /* AGY-P1-5: самодостаточный нативный мост (Android WebView), anchor как fallback */
+      function agyB64(b, cb, err) {
+        try {
+          var fr = new FileReader();
+          fr.onload = function () { var s = String(fr.result || ""); var i = s.indexOf(","); cb(i >= 0 ? s.slice(i + 1) : s); };
+          fr.onerror = err; fr.readAsDataURL(b);
+        } catch (e) { err(e); }
+      }
+      function agyAnchor() {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+        toast(transcriptText ? "Сессия сохранена в ZIP." : "ZIP сохранён, но транскрипт получить не удалось — см. MANIFEST.txt.");
+      }
+      var agyA = (window.AndroidBridge && window.AndroidBridge.saveBlob) ? window.AndroidBridge : (window.Android && window.Android.saveBlob ? window.Android : null);
+      var agyTok = window.__AG_NATIVE_BRIDGE_TOKEN__ || (function () { try { return localStorage.getItem("agy_bridge_token"); } catch (e) { return null; } })();
+      if (agyA && agyTok) {
+        agyB64(blob, function (b64) {
+          try {
+            agyA.saveBlob(agyTok, b64, fname, "application/zip");
+            toast("Сессия сохранена: " + fname + " (папка Загрузки).");
+          } catch (e) { agyAnchor(); }
+        }, agyAnchor);
+      } else { agyAnchor(); }
     })().catch(function (e) { console.error("[agyExportSession]", e); toast("Не удалось сохранить сессию: " + e); });
   };
 })();

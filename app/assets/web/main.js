@@ -1,0 +1,1 @@
+/* AGY-P0-WIPEGUARD: placeholder so CoreInstaller.isWebExtracted() sees web/main.js and stops re-extracting assets/web over patched files on every start. The real bundle is generated/main.js (referenced by index.html). */

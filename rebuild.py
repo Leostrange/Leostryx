@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Сборка Antigravity-BP 3.0 (standard / bypass) из полного дерева.
+"""Сборка Antigravity-BP 3.0.1 (standard / bypass) из полного дерева.
 
 Источники:
   app/                      — распакованное дерево standard-APK (без META-INF)

@@ -358,3 +358,171 @@ try { console.log('[AGY bridge.core] ready (endpoints: ' + Object.keys(ENDPOINTS
 
 
 })();
+
+/* AGY-P1-5-APPENDER: Android blob download bridge (loads before main.js).
+ * Installs window.downloadBlobOverride (consumed by dialogService.saveFileWithDialog)
+ * and window.__agDownloadBridge helper (used by agy_export_session.js / selftest). */
+(function () {
+  'use strict';
+  if (window.__agDownloadBridge && window.__agDownloadBridge.__installed) return;
+  function android() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.saveBlob === 'function') return window.AndroidBridge;
+    if (window.Android && typeof window.Android.saveBlob === 'function') return window.Android;
+    return null;
+  }
+  function token() { return window.__AG_NATIVE_BRIDGE_TOKEN__ || null; }
+  function ready() {
+    if (android() && token()) return true;
+    try { return !!(android() && window.localStorage && window.localStorage.getItem('agy_bridge_token')); } catch (e) { return false; }
+  }
+  function tokenAny() {
+    if (window.__AG_NATIVE_BRIDGE_TOKEN__) return window.__AG_NATIVE_BRIDGE_TOKEN__;
+    try { return window.localStorage ? window.localStorage.getItem('agy_bridge_token') : null; } catch (e) { return null; }
+  }
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function () {
+          var s = String(fr.result || '');
+          var i = s.indexOf(',');
+          resolve(i >= 0 ? s.slice(i + 1) : s);
+        };
+        fr.onerror = function () { reject(new Error('FileReader failed')); };
+        fr.readAsDataURL(blob);
+      } catch (e) { reject(e); }
+    });
+  }
+  function legacyAnchorSave(blob, filename) {
+    try {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = String(filename || 'download');
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    } catch (e) { console.warn('[AGY DownloadBridge] legacy save failed:', e); }
+  }
+  function nativeSave(blob, filename) {
+    return blobToBase64(blob).then(function (b64) {
+      var a = android();
+      if (!a || typeof a.saveBlob !== 'function') throw new Error('saveBlob unavailable');
+      a.saveBlob(tokenAny(), b64, String(filename || 'download'),
+        blob && blob.type ? String(blob.type) : 'application/octet-stream');
+      return String(filename || 'download');
+    });
+  }
+  window.__agDownloadBridge = {
+    __installed: true,
+    ready: ready,
+    save: function (blob, filename) {
+      if (!ready()) return Promise.reject(new Error('native bridge not ready'));
+      return nativeSave(blob, filename);
+    },
+    override: function (blob, defaultPath) {
+      if (!ready()) return Promise.resolve(null);
+      return nativeSave(blob, defaultPath).catch(function (e) {
+        console.warn('[AGY DownloadBridge] native save failed, legacy fallback:', e);
+        legacyAnchorSave(blob, defaultPath);
+        return String(defaultPath || 'download');
+      });
+    }
+  };
+  if (ready() && !window.downloadBlobOverride) {
+    try {
+      window.downloadBlobOverride = function (blob, defaultPath) {
+        return window.__agDownloadBridge.override(blob, defaultPath);
+      };
+    } catch (e) { console.warn('[AGY DownloadBridge] override install failed:', e); }
+  }
+  try { console.log('[AGY DownloadBridge] installed, native ready =', ready()); } catch (e) {}
+})();
+
+/* AGY-P2-16-APPENDER: narrowed to generation URLs (P2-22). stream stall watchdog (see fixes/p2_16_stream_watchdog.sh).
+ * Wraps window.fetch; streaming responses get an idle watchdog that errors the
+ * stream after 'first' ms without any data (before first chunk) or 'idle' ms
+ * between chunks. Prevents the UI from waiting forever on a dead stream. */
+(function () {
+  'use strict';
+  if (window.__agStreamWatchdog) return;
+  var cfg = { first: 180000, idle: 120000, on: true };
+  try {
+    var raw = window.localStorage && window.localStorage.getItem('agyStreamWatchdog');
+    if (raw) {
+      var c = JSON.parse(raw) || {};
+      if (c.first) cfg.first = +c.first;
+      if (c.idle) cfg.idle = +c.idle;
+      if (c.on === false) cfg.on = false;
+    }
+  } catch (e) {}
+  function watchdogStream(body) {
+    var reader = body.getReader();
+    var seen = false;
+    return new ReadableStream({
+      pull: function (ctrl) {
+        return new Promise(function (resolve) {
+          var gap = seen ? cfg.idle : cfg.first;
+          var timer = setTimeout(function () {
+            try { ctrl.error(new Error('AGY-P2-16: поток завис (нет данных ' + Math.round(gap / 1000) + 'с) — соединение разорвано')); } catch (e) {}
+            try { reader.cancel(); } catch (e) {}
+            resolve();
+          }, gap);
+          reader.read().then(function (r) {
+            clearTimeout(timer);
+            if (r.done) { try { ctrl.close(); } catch (e) {} resolve(); return; }
+            seen = true;
+            try { ctrl.enqueue(r.value); } catch (e) {}
+            resolve();
+          }, function (err) {
+            clearTimeout(timer);
+            try { ctrl.error(err); } catch (e) {}
+            resolve();
+          });
+        });
+      },
+      cancel: function (reason) { try { return reader.cancel(reason); } catch (e) {} }
+    });
+  }
+  function isStreamish(resp) {
+    try {
+      var ct = '', cl = '';
+      try { ct = String(resp.headers.get('content-type') || '').toLowerCase(); } catch (e) {}
+      try { cl = resp.headers.get('content-length'); } catch (e) {}
+      return !cl || /grpc|event-stream|ndjson|octet-stream|chunked/.test(ct);
+    } catch (e) { return false; }
+  }
+  var orig = window.fetch;
+  if (typeof orig !== 'function') return;
+  function urlOf(input) {
+    try {
+      if (typeof input === 'string') return input;
+      if (input && input.url) return String(input.url);
+    } catch (e) {}
+    return '';
+  }
+  function isGeneration(input) {
+    return /generat|cascade|completion|inference|chat/i.test(urlOf(input));
+  }
+  function wrapped(input, init) {
+    var p = orig.call(this, input, init);
+    return p.then(function (resp) {
+      if (!cfg.on || !isGeneration(input)) return resp;
+      if (!resp || !resp.body || typeof resp.body.getReader !== 'function') return resp;
+      if (!isStreamish(resp)) return resp;
+      try {
+        return new Response(watchdogStream(resp.body), {
+          status: resp.status, statusText: resp.statusText, headers: resp.headers
+        });
+      } catch (e) {
+        try { console.warn('[AGY P2-16] wrap failed:', e); } catch (_) {}
+        return resp;
+      }
+    });
+  }
+  window.fetch = wrapped;
+  window.__agStreamWatchdog = {
+    __installed: true,
+    config: cfg,
+    rewrap: function () { window.fetch = wrapped; }
+  };
+  try { console.log('[AGY P2-16] stream watchdog installed (first=' + cfg.first + ' idle=' + cfg.idle + ')'); } catch (e) {}
+})();

@@ -419,6 +419,34 @@ op_remove() {
     pkg remove $ARG || fail "pkg remove"
     say "@@done"
 }
+# AGY-P2-11: сводка обновлений (JSON) для предпоказа перед pkg upgrade
+op_pkgstats() {
+    python3 - "$PREFIX/var/lib/pkg" <<'PSEOF'
+import os, sys, json
+base = sys.argv[1]
+try:
+    inst = {}
+    d = os.path.join(base, "installed")
+    for f in os.listdir(d):
+        if f.endswith(".meta"):
+            meta = {}
+            for line in open(os.path.join(d, f)):
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    meta[k] = v
+            inst[meta.get("name", f[:-5])] = meta.get("version", "")
+    avail = {}
+    for line in open(os.path.join(base, "index", "repo.1.tsv")):
+        p = line.rstrip("\n").split("\t")
+        if len(p) >= 11:
+            avail[p[0]] = (p[1], int(p[9]))
+    upd = [(n, v, avail[n][0], avail[n][1]) for n, v in inst.items()
+           if n in avail and avail[n][0] != v]
+    print(json.dumps({"rc": "0", "count": len(upd), "bytes": sum(u[3] for u in upd)}))
+except Exception as e:
+    print(json.dumps({"rc": "1", "error": str(e)}))
+PSEOF
+}
 op_upgrade() {
     step "pkg update"; pkg_retry pkg update || fail "pkg update"
     step "pkg upgrade"; pkg_retry pkg upgrade || fail "pkg upgrade"
@@ -1985,12 +2013,265 @@ PY
     esac
 }
 
+# The tools console uses a PTY so a shell session retains cwd and environment.
+op_termopen() {
+    python3 -u - <<'PYTERM'
+import os, pty, select, sys, errno
+home=os.environ['HOME']; prefix=os.environ['PREFIX']
+fifo=home+'/.agy-tools-terminal.fifo'; pidfile=home+'/.agy-tools-terminal.pid'
+def owner_alive():  # AGY-P2-15: жив ли владелец прежней сессии
+    try:
+        with open(pidfile) as f: pid=int(f.read().strip())
+        os.kill(pid,0); return True
+    except (ValueError,OSError): return False
+if os.path.lexists(fifo):
+    if owner_alive():
+        print('Terminal already exists or was not closed; restart the app to recover.', flush=True)
+        sys.exit(1)
+    try: os.unlink(fifo)
+    except OSError: pass  # AGY-P2-15: stale FIFO от погибшей сессии — самоочистка
+try:
+    with open(pidfile,'w') as f: f.write(str(os.getpid()))
+except OSError: pass
+os.mkfifo(fifo,0o600)
+pid,master=pty.fork()
+if pid==0:
+    os.environ['TERM']='xterm'; os.environ['PATH']=prefix+'/bin:'+home+'/runtime/bin:/system/bin'
+    os.execv(prefix+'/bin/bash',[prefix+'/bin/bash','--noprofile','--norc','-i'])
+try:
+    rd=os.open(fifo,os.O_RDWR|os.O_NONBLOCK)
+    print('@@TERMINAL_READY',flush=True)
+    while True:
+        ready,_,_=select.select([master,rd],[],[],0.25)
+        if master in ready:
+            try: data=os.read(master,8192)
+            except OSError as e:
+                if e.errno==errno.EIO: break
+                raise
+            if not data: break
+            os.write(sys.stdout.fileno(),data)
+        if rd in ready:
+            data=os.read(rd,4096)
+            if data: os.write(master,data)
+        got,status=os.waitpid(pid,os.WNOHANG)
+        if got==pid: break
+finally:
+    try: os.unlink(fifo)
+    except OSError: pass
+    try: os.unlink(pidfile)  # AGY-P2-15
+    except OSError: pass
+    try: os.close(master)
+    except OSError: pass
+PYTERM
+}
+op_terminput() {
+    AGY_INPUT="$ARG" python3 - <<'PYINPUT'
+import base64, os, sys
+try:
+    data=base64.b64decode(os.environ['AGY_INPUT'],validate=True)
+    if not data or len(data)>400: raise ValueError('input size')
+    fd=os.open(os.environ['HOME']+'/.agy-tools-terminal.fifo',os.O_WRONLY|os.O_NONBLOCK)
+    os.write(fd,data); os.close(fd)
+except Exception as e:
+    print('Terminal input failed:', e); sys.exit(1)
+PYINPUT
+}
+# AGY-P2-15: принудительное завершение зависшей терминальной сессии
+op_termkill() {
+    python3 - <<'PYKILL'
+import os, sys
+home=os.environ['HOME']; pidfile=home+'/.agy-tools-terminal.pid'
+try:
+    with open(pidfile) as f: pid=int(f.read().strip())
+    os.kill(pid,15); print('terminal killed:', pid)
+except FileNotFoundError:
+    print('no terminal session')
+except ProcessLookupError:
+    print('terminal owner already dead; cleaning')
+except Exception as e:
+    print('termkill failed:', e); sys.exit(1)
+for p in (home+'/.agy-tools-terminal.fifo', pidfile):
+    try: os.unlink(p)
+    except OSError: pass
+PYKILL
+}
+op_histread() {
+    AGY_OFFSET="$ARG" python3 - <<'PYHIST'
+import os, glob, base64
+try: off=int(os.environ['AGY_OFFSET'] or '0')
+except ValueError: raise SystemExit(1)
+if off<0: raise SystemExit(1)
+root=os.path.join(os.environ['HOME'],'agy-tools')
+chunks=[]
+for d in sorted(glob.glob(os.path.join(root,'job-*'))):
+    if d==os.environ.get('AGY_JOB_DIR'): continue
+    try:
+        with open(os.path.join(d,'log'),'rb') as f: data=f.read()
+        try:
+            with open(os.path.join(d,'rc'),'r') as f: rc=f.read().strip()
+        except OSError: rc=''
+        # AGY-P2-23: слово "error" в лицензиях/прогрессе не ошибка. Только rc!=0 или @@fail.
+        if (rc and rc!='0') or b'@@fail ' in data:
+            chunks.append(('\n=== '+os.path.basename(d)+' (rc='+rc+') ===\n').encode()+data+b'\n')
+    except OSError: pass
+all_data=b''.join(chunks); end=min(len(all_data),off+12000)
+print('@@HISTORY %d %d %s' % (end,len(all_data),base64.b64encode(all_data[off:end]).decode()))
+PYHIST
+}
+
+
+# AGY-P2-19: HTML → PDF (pymupdf), минуя пустой системный принтер.
+op_pdfin() {
+    AGY_PDF_CHUNK="$ARG" python3 - <<'PYPDFIN'
+import os, sys, base64
+home = os.environ["HOME"]
+d = os.path.join(home, ".agy-pdf")
+os.makedirs(d, exist_ok=True)
+raw = os.environ.get("AGY_PDF_CHUNK", "")
+if raw == "RESET":
+    open(os.path.join(d, "in.html"), "w").close()
+    print("pdfin reset")
+    sys.exit(0)
+try:
+    data = base64.b64decode(raw)
+except Exception as e:
+    print("pdfin bad chunk:", e); sys.exit(1)
+if len(data) > 200000:
+    print("pdfin chunk too large"); sys.exit(1)
+path = os.path.join(d, "in.html")
+if os.path.exists(path) and os.path.getsize(path) > 8000000:
+    print("pdfin html too large"); sys.exit(1)
+with open(path, "ab") as f:
+    f.write(data)
+print("pdfin", len(data))
+PYPDFIN
+}
+op_pdf() {
+    python3 - <<'PYPDF'
+import os, sys, base64
+home = os.environ["HOME"]
+src = os.path.join(home, ".agy-pdf", "in.html")
+dst = os.path.join(home, ".agy-pdf", "out.pdf")
+if not os.path.isfile(src) or os.path.getsize(src) == 0:
+    print("pdf: empty html"); sys.exit(1)
+html = open(src, encoding="utf-8", errors="replace").read()
+try:
+    import pymupdf
+except Exception as e:
+    print("pdf: pymupdf missing:", e); sys.exit(1)
+css = "body{font-family:sans-serif;font-size:12px;line-height:1.35} h1{font-size:20px} h2{font-size:16px} pre,code{font-family:monospace;font-size:10px} table{border-collapse:collapse} td,th{border:1px solid #999;padding:4px}"
+story = pymupdf.Story(html=html, user_css=css)
+mediabox = pymupdf.paper_rect("a4")
+where = mediabox + (36, 36, -36, -36)
+writer = pymupdf.DocumentWriter(dst)
+more = True
+pages = 0
+while more and pages < 80:
+    dev = writer.begin_page(mediabox)
+    more, _ = story.place(where)
+    story.draw(dev)
+    writer.end_page()
+    pages += 1
+writer.close()
+data = open(dst, "rb").read()
+if len(data) < 500 or not data.startswith(b"%PDF"):
+    print("pdf: empty or invalid output", len(data)); sys.exit(1)
+print("PDF pages", pages, "bytes", len(data))
+b64 = base64.b64encode(data).decode("ascii")
+step = 12000
+for i in range(0, len(b64), step):
+    print("@@PDFB64 " + b64[i:i+step])
+PYPDF
+}
+
+
+# AGY-P2-20: одна команда консоли инструментов (не PTY проекта).
+# Нужна, потому что FIFO сессии termopen умирает вместе с джобой:
+# terminput тогда падает с ENXIO/ENOENT.
+op_termrun() {
+    AGY_TERM_B64="$ARG" python3 - <<'PYRUN'
+import os, sys, base64, subprocess
+raw = os.environ.get("AGY_TERM_B64", "")
+try:
+    cmd = base64.b64decode(raw).decode("utf-8", "replace")
+except Exception as e:
+    print("bad command:", e); sys.exit(1)
+cmd = cmd.replace("\r", "").strip("\n")
+if not cmd.strip():
+    print("(empty)"); sys.exit(0)
+if len(cmd) > 4000:
+    print("command too long"); sys.exit(1)
+home = os.environ.get("HOME", "/")
+prefix = os.environ.get("PREFIX", "")
+env = os.environ.copy()
+env["PATH"] = ":".join(x for x in [
+    prefix + "/bin" if prefix else "",
+    home + "/runtime/bin",
+    "/system/bin",
+    env.get("PATH", ""),
+] if x)
+env["TERM"] = "dumb"
+env["HOME"] = home
+try:
+    p = subprocess.run(
+        [prefix + "/bin/bash", "--noprofile", "--norc", "-lc", cmd],
+        cwd=home,
+        env=env,
+        capture_output=True,
+        timeout=25,
+    )
+except subprocess.TimeoutExpired as e:
+    out = (e.stdout or b"") + (e.stderr or b"")
+    sys.stdout.buffer.write(out)
+    print("\n(timeout 25s)")
+    sys.exit(124)
+data = (p.stdout or b"") + (p.stderr or b"")
+if len(data) > 200000:
+    data = data[:200000] + b"\n...(truncated)"
+sys.stdout.buffer.write(data)
+if data and not data.endswith(b"\n"):
+    sys.stdout.buffer.write(b"\n")
+print("(exit %d)" % p.returncode)
+sys.exit(0 if p.returncode == 0 else 1)
+PYRUN
+}
+
+
+# AGY-P2-20: очистка журнала ошибок инструментов (логи джоб с rc!=0).
+op_histclear() {
+    python3 - <<'PYCLR'
+import os, glob, shutil
+root = os.path.join(os.environ["HOME"], "agy-tools")
+n = 0
+for d in glob.glob(os.path.join(root, "job-*")):
+    rc = ""
+    try:
+        with open(os.path.join(d, "rc")) as f:
+            rc = f.read().strip()
+    except OSError:
+        continue
+    if rc and rc != "0":
+        shutil.rmtree(d, ignore_errors=True)
+        n += 1
+print("cleared", n)
+PYCLR
+}
+
 case "$OP" in
+    termopen)       op_termopen ;;
+    terminput)      op_terminput ;;
+    termkill)       op_termkill ;;  # AGY-P2-15
+    termrun)        op_termrun ;;   # AGY-P2-20
+    histread)       op_histread ;;
+    histclear)      op_histclear ;;  # AGY-P2-20
+    pdfin)          op_pdfin ;;  # AGY-P2-19
+    pdf)            op_pdf ;;    # AGY-P2-19
     status)         op_status ;;
     index)          op_index ;;
     install)        op_install ;;
     remove)         op_remove ;;
     upgrade)        op_upgrade ;;
+    pkgstats)       op_pkgstats ;;
     npm)            op_npm ;;
     sdk)            op_sdk ;;
     sdkremove)      op_sdkremove ;;

@@ -117,7 +117,12 @@ html[data-agy-language="ru"] .capitalize {
   padding: 4px !important;
   max-width: calc(100vw - 16px) !important;
 }
-.z-\[6000\] > [role="menu"] { min-width: 124px !important; max-width: min(288px, calc(100vw - 16px)) !important; }
+.z-\[6000\] > [role="menu"],
+.z-\[6000\] > [role="menu"].\!w-56 {
+  min-width: 148px !important;
+  width: max-content !important;
+  max-width: 210px !important;
+}
 .z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]) :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]) {
   min-height: 0 !important;
   padding: 6px 10px !important;

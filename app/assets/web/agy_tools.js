@@ -327,10 +327,11 @@
     if (!root || !root.isConnected) return;
     var busy = !!job || queue.length > 0;
     var nsel = Object.keys(selected).filter(function (k) { return selected[k]; }).length;
-    var h = '<div class="agy-t-head"><div class="agy-t-title">' + esc(T("Инструменты", "Tools")) + "</div>" +
+    var h = '<div class="agy-t-head"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div class="agy-t-title">' + esc(T("Инструменты", "Tools")) + '</div><button type="button" class="agy-t-btn sec" data-act="tools-menu" aria-label="' + esc(T("Меню инструментов", "Tools menu")) + '">☰</button></div>' +
       '<div class="agy-t-sub">' + esc(T("Компоненты для разработки прямо в приложении: Node.js для плагинов, Java, Android SDK/NDK, компиляторы. Устанавливаются в окружение агента и сразу доступны ему.", "Development components inside the app: Node.js for plugins, Java, Android SDK/NDK, compilers. Installed into the agent environment and available to it right away.")) + "</div>" +
       '<div class="agy-t-actions"><button type="button" data-act="refresh"' + (busy ? " disabled" : "") + ">" + esc(T("Проверить", "Check")) + "</button>" +
-      '<button type="button" data-act="upgrade"' + (busy ? " disabled" : "") + ">" + esc(T("Обновить всё", "Upgrade all")) + "</button></div></div>";
+      '<button type="button" data-act="upgrade"' + (busy ? " disabled" : "") + ">" + esc(T("Обновить всё", "Upgrade all")) + "</button>" +
+      '<button type="button" data-act="selftest-save"' + (busy ? " disabled" : "") + ">" + esc(T("Тест сохранения", "Save test")) + "</button></div></div>"; /* AGY-P1-5-SELFTEST */
 
     h += '<div class="agy-t-job" hidden>' +
       '<div class="agy-t-jtop"><span class="agy-t-jicon"></span><span class="agy-t-jlabel"></span><span class="agy-t-jpct"></span><button type="button" class="agy-t-jcancel" data-act="cancel-job" title="' + esc(T("Закрыть окно", "Close panel")) + '">✕</button></div>' +
@@ -491,6 +492,27 @@
     }
   }
 
+  /* AGY-P2-11: локальное уведомление (глобального toast нет в этом бандле) */
+  function agyToast11(msg){ try { var d=document.createElement("div"); d.textContent=msg; d.style.cssText="position:fixed;left:12px;right:12px;bottom:24px;z-index:999999;background:#222;color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.4;"; document.body.appendChild(d); setTimeout(function(){ try{d.remove();}catch(e){} },6000); } catch(e){ try{alert(msg);}catch(e2){} } }
+  /* AGY-P1-5-SELFTEST: диагностика нативного сохранения файлов */
+  function selftestSave15() {
+    var txt = "AGY selftest " + new Date().toISOString() + "\nЕсли вы видите этот файл в Загрузках — нативный экспорт работает.\n";
+    var blob = new Blob([txt], { type: "text/plain" });
+    var fr = new FileReader();
+    fr.onload = function () {
+      var s = String(fr.result || ""); var i = s.indexOf(",");
+      var b64 = i >= 0 ? s.slice(i + 1) : s;
+      var a = (window.AndroidBridge && window.AndroidBridge.saveBlob) ? window.AndroidBridge : (window.Android && window.Android.saveBlob ? window.Android : null);
+      var tok = window.__AG_NATIVE_BRIDGE_TOKEN__ || (function () { try { return localStorage.getItem("agy_bridge_token") || null; } catch (e) { return null; } })();
+      if (!a || !tok) { alert("Мост недоступен: saveBlob=" + (!!a) + ", токен=" + (!!tok)); return; }
+      try {
+        a.saveBlob(tok, b64, "agy-selftest.txt", "text/plain");
+        alert("saveBlob вызван. Файл agy-selftest.txt должен появиться в Загрузках.");
+      } catch (e) { alert("Ошибка saveBlob: " + e); }
+    };
+    fr.onerror = function () { alert("FileReader failed"); };
+    fr.readAsDataURL(blob);
+  }
   function onClick(e) {
     var b = e.target.closest("button,input"); if (!b || b.disabled) return;
     var toggle = b.getAttribute("data-version-toggle");
@@ -504,8 +526,41 @@
       selected[selectedId] = b.checked; render(); return;
     }
     var act = b.getAttribute("data-act");
-    if (act === "refresh") refresh(true);
-    else if (act === "upgrade") { run("upgrade", "", T("Обновление пакетов", "Upgrading packages")); refresh(true); }
+    if (act === "tools-menu") openToolsMenu();
+    else if (act === "selftest-save") { try { selftestSave15(); } catch (e15) { alert("selftest error: " + e15); } } /* AGY-P1-5-SELFTEST */
+    else if (act === "refresh") refresh(true);
+    /* AGY-P2-11: предпоказ объёма и подтверждение перед pkg upgrade */
+    else if (act === "upgrade") {
+      var b11 = bridge();
+      var doUpgrade = function () { run("upgrade", "", T("Обновление пакетов", "Upgrading packages")); refresh(true); };
+      if (!b11 || !b11.start) { doUpgrade(); return; }
+      var statsId = b11.start("pkgstats", "");
+      if (!statsId || /^ERR/.test(statsId)) { doUpgrade(); return; }
+      var poll11 = function (tries) {
+        var raw = "";
+        try { raw = b11.read(statsId) || ""; } catch (_) {}
+        var res = {};
+        try { res = JSON.parse(raw) || {}; } catch (_) {}
+        if (res.rc === undefined || res.rc === "") {
+          if (tries > 600) { doUpgrade(); return; }
+          setTimeout(function () { poll11(tries + 1); }, 150);
+          return;
+        }
+        var n = parseInt(res.count, 10);
+        var mb = Math.round((parseInt(res.bytes, 10) || 0) / 1048576);
+        var msg;
+        if (res.error || isNaN(n)) {
+          msg = T("Обновление пакетов может занять 10+ минут и десятки МБ. Продолжить?", "Upgrading packages may take 10+ minutes and tens of MB. Continue?");
+        } else if (n === 0) {
+          agyToast11(T("Обновления не требуются: все пакеты актуальны.", "Nothing to upgrade: all packages are up to date."));
+          return;
+        } else {
+          msg = T("Будет обновлено пакетов: ", "Packages to upgrade: ") + n + (mb > 0 ? ("\n" + T("Объём загрузки: ~", "Download size: ~") + mb + " МиБ") : "") + "\n\n" + T("Это может занять 10+ минут. Продолжить?", "This may take 10+ minutes. Continue?");
+        }
+        if (confirm(msg)) doUpgrade();
+      };
+      poll11(0);
+    }
     else if (act === "install-sel") { var ids = Object.keys(selected).filter(function (k) { return selected[k]; }); selected = {}; installIds(ids); }
     else if (act === "index") { run("index", "", T("Загрузка списка пакетов", "Downloading package list")); refresh(false); }
     else if (act === "log") { logOpen = !logOpen; renderLog(); }
@@ -513,13 +568,19 @@
       var shown = job && !QUIET[job.op] ? job : lastDone;
       var txt = shown ? cleanLog(shown.log || "") : "";
       if (!txt) return;
-      var area = document.createElement("textarea"); area.value = txt;
-      area.setAttribute("readonly", ""); area.style.position = "fixed"; area.style.left = "-9999px";
-      document.body.appendChild(area); area.select();
-      var copied = false; try { copied = document.execCommand("copy"); } catch (_) {}
-      area.remove();
-      if (!copied) { logOpen = true; renderLog(); alert(T("Не удалось скопировать. Выделите текст журнала вручную.", "Copy failed. Select the log text manually.")); }
-      else { b.textContent = T("Скопировано", "Copied"); }
+      /* AGY-P2-11: clipboard API first, execCommand fallback */
+      var ok11 = function () { b.textContent = T("Скопировано", "Copied"); };
+      var fail11 = function () { logOpen = true; renderLog(); alert(T("Не удалось скопировать. Выделите текст журнала вручную.", "Copy failed. Select the log text manually.")); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(ok11, function () {
+          var area = document.createElement("textarea"); area.value = txt;
+          area.setAttribute("readonly", ""); area.style.position = "fixed"; area.style.left = "-9999px";
+          document.body.appendChild(area); area.select();
+          var copied = false; try { copied = document.execCommand("copy"); } catch (_) {}
+          area.remove();
+          if (copied) ok11(); else fail11();
+        });
+      } else { fail11(); }
     }
     else if (act === "cancel-job") {
       // Closing the panel must not cancel a running operation or its follow-up checks.
@@ -534,6 +595,224 @@
     }
     else if (b.getAttribute("data-in")) installIds([b.getAttribute("data-in")]);
     else if (b.getAttribute("data-rm")) removeId(b.getAttribute("data-rm"));
+  }
+
+  var termJobId = null, termTimer = null, modal = null, historyText = "";
+  var scroll21List = [];
+  function closeToolsModal() {
+    if (modal && modal.__agyUnlockScroll) { try { modal.__agyUnlockScroll(); } catch (_) {} }
+    if (modal) modal.remove(); modal = null;
+    if (termTimer) clearTimeout(termTimer); termTimer = null;
+    scroll21List.forEach(function (fn) { try { if (fn && fn.__off) fn.__off(); } catch (_) {} });
+    scroll21List.length = 0;
+  }
+  function modalBox(title, body) {
+    closeToolsModal();
+    modal = document.createElement("div");
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px";
+    modal.innerHTML = '<div data-card style="box-sizing:border-box;background:#1c1c1e;color:#eee;border:1px solid #555;border-radius:16px;padding:16px;width:min(100%,680px);max-height:88vh;overflow:hidden;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong>' + esc(title) + '</strong><button type="button" data-modal="close">✕</button></div>' + body + '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener("click", function(e) { if (e.target===modal || e.target.getAttribute("data-modal")==="close") closeToolsModal(); });
+    /* AGY-P2-22: пока окно открыто, чат позади не листается вообще */
+    var scroller = document.scrollingElement || document.documentElement;
+    var lockedTop = scroller.scrollTop;
+    var lock = function () { if (scroller.scrollTop !== lockedTop) scroller.scrollTop = lockedTop; };
+    scroller.addEventListener("scroll", lock, { passive: true });
+    modal.__agyUnlockScroll = function () { try { scroller.removeEventListener("scroll", lock); } catch (_) {} };
+    modal.addEventListener("touchmove", function (e) {
+      var pane = e.target.closest && e.target.closest("[data-history],[data-terminal]");
+      if (!pane) e.preventDefault();
+    }, { passive: false });
+    return modal;
+  }
+  function openToolsMenu() {
+    var m=modalBox(T("Инструменты", "Tools"), '<div style="display:grid;gap:10px;margin-top:16px"><button type="button" data-modal="history">' + esc(T("История ошибок", "Error history")) + '</button><button type="button" data-modal="terminal">' + esc(T("Консоль приложения", "App console")) + '</button></div>');
+    m.querySelector('[data-modal="history"]').onclick=openErrorHistory;
+    m.querySelector('[data-modal="terminal"]').onclick=openToolsTerminal;
+  }
+  function pollAux(id, done, tries) {
+    if (!modal) return;
+    var b=bridge(), r={};
+    try { r=JSON.parse(b.read(id)||"{}"); } catch (_) {}
+    if (r.rc!==undefined && r.rc!=="") { done(r); return; }
+    if (tries>600) { done({rc:"1",log:"Timeout"}); return; }
+    setTimeout(function(){pollAux(id,done,tries+1);},150);
+  }
+  /* AGY-P2-18: clipboard API first (execCommand мёртв в Android WebView) */
+  function copyText(txt) {
+    var fail=function(){ alert(T("Не удалось скопировать; выделите текст вручную.", "Copy failed; select the text manually.")); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).catch(function(){
+        var a=document.createElement("textarea"); a.value=txt; a.style.cssText="position:fixed;left:-9999px"; document.body.appendChild(a); a.select();
+        var ok=false; try { ok=document.execCommand("copy"); } catch (_) {} a.remove();
+        if (!ok) fail();
+      });
+      return;
+    }
+    fail();
+  }
+
+  /* AGY-P2-21: видимый ползунок внутри окна (Android WebView не рисует ::-webkit-scrollbar) */
+  function attachScroll21(wrap, pane) {
+    if (!wrap || !pane) return function(){};
+    var sb = document.createElement("div");
+    sb.setAttribute("data-sb", "");
+    sb.style.cssText = "position:absolute;top:6px;right:2px;bottom:6px;width:18px;border-radius:10px;"
+      + "background:rgba(255,255,255,.06);opacity:0;transition:opacity .15s;touch-action:none;user-select:none;z-index:3";
+    var thumb = document.createElement("div");
+    thumb.style.cssText = "position:absolute;left:4px;width:10px;border-radius:6px;background:#9a9aa0;"
+      + "min-height:28px;opacity:.92;touch-action:none;user-select:none";
+    sb.appendChild(thumb);
+    wrap.appendChild(sb);
+    function sync() {
+      var ch = pane.clientHeight, sh = pane.scrollHeight;
+      if (sh <= ch + 6) { sb.style.opacity = "0"; sb.style.pointerEvents = "none"; return; }
+      sb.style.opacity = "1"; sb.style.pointerEvents = "auto";
+      var th = Math.max(28, Math.round((ch / sh) * sb.clientHeight));
+      thumb.style.height = th + "px";
+      var track = sb.clientHeight - th;
+      var max = sh - ch;
+      thumb.style.top = (max > 0 ? Math.round((pane.scrollTop / max) * track) : 0) + "px";
+    }
+    pane.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync);
+    var dragging = false, startY = 0, startTop = 0;
+    thumb.addEventListener("pointerdown", function (e) {
+      dragging = true; startY = e.clientY; startTop = parseFloat(thumb.style.top) || 0;
+      e.preventDefault(); e.stopPropagation();
+      try { thumb.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    thumb.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var th = thumb.offsetHeight;
+      var track = sb.clientHeight - th;
+      if (track <= 0) return;
+      var top = Math.min(track, Math.max(0, startTop + (e.clientY - startY)));
+      pane.scrollTop = (top / track) * (pane.scrollHeight - pane.clientHeight);
+    });
+    thumb.addEventListener("pointerup", function () { dragging = false; });
+    thumb.addEventListener("pointercancel", function () { dragging = false; });
+    sb.addEventListener("click", function (e) {
+      if (e.target !== sb) return;
+      var r = sb.getBoundingClientRect();
+      var y = e.clientY - r.top;
+      pane.scrollTop = (y / sb.clientHeight) * (pane.scrollHeight - pane.clientHeight) - pane.clientHeight / 2;
+      sync();
+    });
+    sync.__off = function () {
+      try { window.removeEventListener("resize", sync); } catch (_) {}
+    };
+    scroll21List.push(sync);
+    requestAnimationFrame(sync);
+    setTimeout(sync, 80);
+    setTimeout(sync, 400);
+    return sync;
+  }
+
+  function openErrorHistory() {
+    /* AGY-P2-20: тулбар истории ошибок + своя прокрутка, не терминал проекта */
+    var m=modalBox(T("История ошибок", "Error history"),
+      '<div data-toolbar style="display:flex;gap:8px;align-items:center;margin:12px 0 8px"></div>' +
+      '<div data-pane style="position:relative;flex:1 1 auto;min-height:200px">' +
+      '<pre data-history style="position:absolute;inset:0;white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:scroll;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;background:#101012;padding:10px 18px 10px 10px;margin:0;border-radius:10px"></pre></div>');
+    var bar=m.querySelector('[data-toolbar]');
+    function toolBtn(label, title) {
+      var b=document.createElement("button");
+      b.type="button"; b.textContent=label; b.title=title;
+      b.style.cssText="background:#2a2a2e;color:#eee;border:1px solid #555;border-radius:8px;padding:6px 10px;font-size:13px";
+      bar.appendChild(b); return b;
+    }
+    var btnCopy=toolBtn("⧉  " + T("Копировать всё", "Copy all"), T("Копировать всё", "Copy all"));
+    var btnClear=toolBtn("⌫  " + T("Очистить", "Clear"), T("Очистить журнал ошибок", "Clear error log"));
+    var output=m.querySelector('[data-history]'), decoder=new TextDecoder(), bytes=[]; historyText="";
+    var syncH=attachScroll21(m.querySelector('[data-pane]'), output);
+    output.textContent=T("Загрузка истории…", "Loading history…");
+    btnCopy.onclick=function(){ copyText(historyText); btnCopy.textContent="✓  " + T("Скопировано", "Copied"); setTimeout(function(){ btnCopy.textContent="⧉  " + T("Копировать всё", "Copy all"); }, 1200); };
+    btnClear.onclick=function(){
+      if (!confirm(T("Очистить журнал ошибок?", "Clear the error log?"))) return;
+      var id=bridge().start("histclear","");
+      if (!id || /^ERR/.test(id)) { alert(String(id)); return; }
+      pollAux(id, function(){ historyText=""; output.textContent=T("Ошибок пока нет.","No errors yet."); }, 0);
+    };
+    var userMoved=false, ignoreScroll=0;
+    output.addEventListener("scroll", function(){ if (!ignoreScroll) userMoved=true; }, {passive:true});
+    function placeScroll(top) {
+      ignoreScroll++;
+      output.scrollTop=top;
+      setTimeout(function(){ ignoreScroll=Math.max(0, ignoreScroll-1); }, 60);
+    }
+    function load(offset) {
+      if (modal!==m) return;
+      var id=bridge().start("histread",String(offset));
+      if (!id || /^ERR/.test(id)) { output.textContent=T("Не удалось открыть историю: ","Cannot open history: ")+id; return; }
+      pollAux(id,function(r){
+        if (modal!==m) return;
+        var match=/@@HISTORY (\d+) (\d+) ?([A-Za-z0-9+/=]*)/.exec(r.log||"");
+        if (String(r.rc)!=="0" || !match) {output.textContent=T("Ошибка чтения: ","Read error: ")+(r.log||"");return;}
+        var raw=atob(match[3]||""), part=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++)part[i]=raw.charCodeAt(i);
+        var keep=output.scrollTop, atBottom=keep+output.clientHeight>=output.scrollHeight-24;
+        historyText+=decoder.decode(part,{stream:Number(match[1])<Number(match[2])});
+        output.textContent=historyText || T("Ошибок пока нет.","No errors yet.");
+        if (!userMoved) placeScroll(0);
+        else if (atBottom) placeScroll(output.scrollHeight);
+        else placeScroll(keep);
+        if (typeof syncH === "function") syncH();
+        if (Number(match[1])<Number(match[2]) && Number(match[1])>offset) setTimeout(function(){load(Number(match[1]));},80);
+      },0);
+    }
+    if (!bridge()) {output.textContent=T("Мост недоступен.","Bridge unavailable.");return;} load(0);
+  }
+  function openToolsTerminal() {
+    /* AGY-P2-20: консоль снятия логов приложения. Каждая команда — отдельный запуск,
+       не PTY открытой сессии/проекта (тот FIFO умирал и ввод падал с ENXIO). */
+    var m=modalBox(T("Консоль приложения", "App console"),
+      '<div data-toolbar style="display:flex;gap:8px;align-items:center;margin:10px 0 8px"></div>' +
+      '<div data-pane style="position:relative;flex:1 1 auto;min-height:200px">' +
+      '<pre data-terminal style="position:absolute;inset:0;white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:scroll;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;background:#101012;padding:10px 18px 10px 10px;margin:0;border-radius:10px"></pre></div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px"><input data-command style="flex:1;min-width:0;background:#101012;color:#eee;border:1px solid #555;border-radius:8px;padding:8px" placeholder="' + esc(T("Команда для логов приложения", "Command for app logs")) + '">' +
+      '<button type="button" data-send style="background:#0b84ff;color:#fff;border:0;border-radius:8px;padding:8px 14px">▶</button></div>' +
+      '<div style="margin-top:6px;color:#888;font-size:12px">' + esc(T("Это не терминал открытого проекта: команда выполняется в окружении приложения и сразу завершается.", "This is not the open project terminal: the command runs in the app environment and then exits.")) + '</div>');
+    var bar=m.querySelector('[data-toolbar]');
+    function toolBtn(label, title) {
+      var b=document.createElement("button");
+      b.type="button"; b.textContent=label; b.title=title;
+      b.style.cssText="background:#2a2a2e;color:#eee;border:1px solid #555;border-radius:8px;padding:6px 10px;font-size:13px";
+      bar.appendChild(b); return b;
+    }
+    var out=m.querySelector('[data-terminal]'), input=m.querySelector('[data-command]');
+    var syncT=attachScroll21(m.querySelector('[data-pane]'), out);
+    var transcript="";
+    function paint(extra) {
+      if (extra) transcript += extra;
+      if (transcript.length > 80000) transcript = transcript.slice(-80000);
+      out.textContent = transcript || T("Готово. Введите команду, например: logcat -d -t 80", "Ready. Try: logcat -d -t 80");
+      out.scrollTop = out.scrollHeight;
+      if (typeof syncT === "function") syncT();
+    }
+    paint("");
+    toolBtn("⧉  " + T("Копировать", "Copy"), T("Копировать вывод", "Copy output")).onclick=function(){ copyText(transcript); };
+    toolBtn("⌫  " + T("Очистить", "Clear"), T("Очистить экран", "Clear screen")).onclick=function(){ transcript=""; paint(""); };
+    toolBtn("logcat", "logcat -d -t 80").onclick=function(){ input.value="logcat -d -t 80 *:W"; send(); };
+    if (!bridge()) { out.textContent=T("Мост недоступен.","Bridge unavailable."); return; }
+    function send(){
+      var v=(input.value||"").replace(/\r/g,"");
+      if (!v.trim()) return;
+      input.value="";
+      var encoded=new TextEncoder().encode(v);
+      if (encoded.length>3500){ alert(T("Команда слишком длинная.","Command is too long.")); return; }
+      var raw=""; encoded.forEach(function(x){ raw+=String.fromCharCode(x); });
+      transcript += "\n$ " + v + "\n";
+      paint("");
+      var id=bridge().start("termrun", btoa(raw));
+      if (!id || /^ERR/.test(id)) { paint(String(id||"ERR")+"\n"); return; }
+      pollAux(id, function(r){
+        var log=String(r.log||"");
+        paint(log.replace(/@@[A-Z0-9_]+[^\n]*\n?/g,"") + (log && !/\n$/.test(log) ? "\n" : ""));
+      }, 0);
+    }
+    m.querySelector('[data-send]').onclick=send;
+    input.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); send(); } };
+    input.focus();
   }
 
   window.__agyToolsMount = function (el) {
