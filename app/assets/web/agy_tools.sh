@@ -748,6 +748,9 @@ op_verify() {
             zipalign) chk zipalign sh -c 'zipalign 2>&1 | grep -q "Zip alignment utility"' ;;
             d8)      chk d8 d8 --version ;;
             apksigner) chk apksigner apksigner --version ;;
+            apktool) chk apktool apktool -version ;;
+            jadx)    chk jadx jadx --version ;;
+            openssl) chk openssl openssl version ;;
             adb)     chk adb adb version ;;
             sdk)     chk sdk sdkmanager --sdk_root="$SDK" --version ;;
             tsc)     chk tsc tsc -v ;;
@@ -2333,7 +2336,7 @@ items = set(x.strip() for x in items_str.split(",") if x.strip())
 if not items:
     items = {"providers", "mcp", "settings", "chats", "attachments"}
 ext = "/storage/emulated/0"
-default_dir = os.path.join(ext, "Antigravity Backup") if os.path.isdir(ext) and os.access(ext, os.W_OK) else os.path.join(home, "agy-backup")
+default_dir = os.path.join(ext, "Leostryx Backup") if os.path.isdir(ext) and os.access(ext, os.W_OK) else os.path.join(home, "agy-backup")
 outdir = custom.strip() if custom.strip() else default_dir
 os.makedirs(outdir, exist_ok=True)
 outpath = os.path.join(outdir, f"agy-backup-{ts}.zip")
@@ -2399,7 +2402,7 @@ manifest = {
     "created": ts,
     "files": count,
     "items": sorted(items),
-    "app_version": "3.0.1",
+    "app_version": "3.0.5",
 }
 z.writestr("manifest.json", json.dumps(manifest, indent=2))
 z.close()
@@ -2481,10 +2484,21 @@ PYRS
 op_bklist() {
     python3 - << 'PYBL'
 import os, glob, time
-outdir = "/storage/emulated/0/Antigravity Backup"
-if not os.path.isdir(outdir):
-    outdir = os.path.join(os.environ["HOME"], "agy-backup")
-files = sorted(glob.glob(os.path.join(outdir, "agy-backup-*.zip")), key=os.path.getmtime, reverse=True)
+dirs = [
+    "/storage/emulated/0/Leostryx Backup",
+    "/storage/emulated/0/Antigravity Backup",
+    os.path.join(os.environ["HOME"], "agy-backup"),
+]
+seen = set()
+all_files = []
+for d in dirs:
+    if os.path.isdir(d):
+        for f in glob.glob(os.path.join(d, "agy-backup-*.zip")):
+            bn = os.path.basename(f)
+            if bn not in seen:
+                seen.add(bn)
+                all_files.append(f)
+files = sorted(all_files, key=os.path.getmtime, reverse=True)
 for f in files[:30]:
     sz = os.path.getsize(f)
     ts = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(f)))
@@ -2499,13 +2513,19 @@ import os, sys
 name = os.environ.get("AGY_BKDEL", "").strip()
 if not name or "/" in name or ".." in name:
     print("@@BKDEL ERR:bad name"); sys.exit(1)
-outdir = "/storage/emulated/0/Antigravity Backup"
-if not os.path.isdir(outdir):
-    outdir = os.path.join(os.environ["HOME"], "agy-backup")
-path = os.path.join(outdir, name)
-if not os.path.isfile(path):
+dirs = [
+    "/storage/emulated/0/Leostryx Backup",
+    "/storage/emulated/0/Antigravity Backup",
+    os.path.join(os.environ["HOME"], "agy-backup"),
+]
+deleted = False
+for d in dirs:
+    path = os.path.join(d, name)
+    if os.path.isfile(path):
+        os.unlink(path)
+        deleted = True
+if not deleted:
     print("@@BKDEL ERR:not found"); sys.exit(1)
-os.unlink(path)
 print("@@BKDEL OK", name)
 PYBD
 }
@@ -2521,8 +2541,8 @@ try:
         headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "Leostryx-App"}
     )
     data = json.loads(urllib.request.urlopen(req, timeout=10, context=ctx).read())
-    tag = data.get("tag_name", "")
-    name = data.get("name", "")
+    tag = (data.get("tag_name", "") or "-").strip().replace(" ", "_")
+    name = (data.get("name", "") or tag or "-").strip().replace(" ", "_")
     apk_url = ""
     for a in data.get("assets", []):
         if a["name"].endswith("-standard.apk"):

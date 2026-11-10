@@ -88,7 +88,8 @@
   }
 
   window.__agyDictationMount = function (host) {
-    if (!host || host.__agyMounted) { if (host) render(host); return; }
+    if (!host) return;
+    if (host.__agyMounted) { render(host); return; }
     host.__agyMounted = true;
     render(host);
     host.addEventListener("change", function (e) { onChange(host, e); });

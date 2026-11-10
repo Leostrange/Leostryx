@@ -50,8 +50,8 @@
       { id: "d8", kind: "pkg", ru: "d8", en: "d8", dru: "Компиляция в DEX.", den: "DEX compiler.", verify: "d8" },
       { id: "apksigner", kind: "pkg", ru: "apksigner", en: "apksigner", dru: "Подпись APK v1–v4.", den: "APK signing v1–v4.", verify: "apksigner" },
       { id: "android-tools", kind: "pkg", ru: "adb / fastboot", en: "adb / fastboot", dru: "Отладка по Wi-Fi и через Shizuku.", den: "Debugging over Wi-Fi and via Shizuku.", verify: "adb" },
-      { id: "apktool", kind: "pkg", ru: "apktool", en: "apktool", dru: "Разбор и сборка APK.", den: "Decode and rebuild APKs." },
-      { id: "jadx", kind: "pkg", ru: "jadx", en: "jadx", dru: "Декомпилятор DEX → Java.", den: "DEX → Java decompiler." }
+      { id: "apktool", kind: "pkg", ru: "apktool", en: "apktool", dru: "Разбор и сборка APK.", den: "Decode and rebuild APKs.", verify: "apktool" },
+      { id: "jadx", kind: "pkg", ru: "jadx", en: "jadx", dru: "Декомпилятор DEX → Java.", den: "DEX → Java decompiler.", verify: "jadx" }
     ] },
     { id: "sdk", ru: "Android SDK", en: "Android SDK", note: { ru: "Загружается с dl.google.com через sdkmanager. Нужен OpenJDK — поставится сам. x86-бинарники build-tools заменяются нативными aapt/aapt2/zipalign.", en: "Downloaded from dl.google.com with sdkmanager. Needs OpenJDK (installed automatically). x86 build-tools binaries are replaced with native aapt/aapt2/zipalign." }, items: [
       { id: "platforms;android-37.1", kind: "sdk", ru: "Платформа Android API 37.1", en: "Android platform API 37.1", dru: "", den: "" },
@@ -80,6 +80,7 @@
       { id: "git", kind: "pkg", ru: "Git", en: "Git", dru: "", den: "", verify: "git" },
       { id: "gh", kind: "pkg", ru: "GitHub CLI", en: "GitHub CLI", dru: "", den: "" },
       { id: "openssh", kind: "pkg", ru: "OpenSSH", en: "OpenSSH", dru: "", den: "" },
+      { id: "openssl-tool", kind: "pkg", ru: "OpenSSL (openssl)", en: "OpenSSL (openssl)", dru: "Сертификаты, ключи подписи PKCS#12/PEM и криптография.", den: "Certificates, PKCS#12/PEM signing keys and cryptography.", verify: "openssl" },
       { id: "curl", kind: "pkg", ru: "curl", en: "curl", dru: "", den: "" },
       { id: "wget", kind: "pkg", ru: "wget", en: "wget", dru: "", den: "" },
       { id: "zip", kind: "pkg", ru: "zip", en: "zip", dru: "", den: "" },
@@ -99,10 +100,10 @@
     ] }
   ];
   var PRESETS = [
-    { id: "plugins", ru: "Плагины приложения", en: "App plugins", dru: "Node.js LTS, Python, clang, make", den: "Node.js LTS, Python, clang, make",
-      items: ["nodejs-lts", "python", "clang", "make", "pkg-config"] },
-    { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, SDK 35",
-      items: ["openjdk-17", "gradle", "kotlin", "aapt", "aapt2", "d8", "apksigner", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
+    { id: "plugins", ru: "Плагины приложения", en: "App plugins", dru: "Node.js LTS, Python, clang, make, openssl", den: "Node.js LTS, Python, clang, make, openssl",
+      items: ["nodejs-lts", "python", "clang", "make", "pkg-config", "openssl-tool"] },
+    { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35",
+      items: ["openjdk-17", "gradle", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
     { id: "native", ru: "Нативный код (NDK)", en: "Native code (NDK)", dru: "clang, CMake, Ninja, NDK sysroot/multilib", den: "clang, CMake, Ninja, NDK sysroot/multilib",
       items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] }
   ];
@@ -835,7 +836,9 @@
 
   /* AGY-BACKUP: экспорт/импорт всех данных (провайдеры, MCP, настройки, чаты) */
   function openBackupSection(hostEl) {
-    if (!hostEl || hostEl.querySelector("[data-backup-section]")) return;
+    if (!hostEl) return;
+    if (hostEl.querySelector("[data-backup-section]") && hostEl.children.length === 1) return;
+    hostEl.innerHTML = "";
     var wrap = document.createElement("div");
     wrap.className = "agy-tools";
     wrap.setAttribute("data-backup-section", "");
@@ -912,7 +915,7 @@
     var desc = document.createElement("div");
     desc.className = "agy-t-desc";
     desc.setAttribute("data-desc", "");
-    desc.textContent = T("Файл сохраняется в папку «Загрузки» на телефоне.", "File is saved to the Downloads folder on the phone.");
+    desc.textContent = T("Архив сохраняется в папку «Leostryx Backup» на телефоне.", "Archive is saved to the Leostryx Backup folder on the phone.");
     main.appendChild(desc);
 
     card.appendChild(main);
@@ -977,6 +980,7 @@
             "Done in " + timeStr + ": " + mb + " MB, " + m[3] + " files → " + m[1]
           );
           agyToast11(T("Бэкап за ", "Backup done in ") + timeStr);
+          refreshBkList();
         } else {
           desc.textContent = T("Ошибка экспорта: ", "Export error: ") + (r.log || "");
         }
@@ -990,7 +994,7 @@
     btnImport.onclick = function () {
       var b = bridge();
       if (!b) { alert(T("Мост недоступен.", "Bridge unavailable.")); return; }
-      var lsId = b.start("termrun", btoa("ls -1t /storage/emulated/0/Antigravity\\ Backup/agy-backup-*.zip 2>/dev/null | head -10"));
+      var lsId = b.start("termrun", btoa("ls -1t \"/storage/emulated/0/Leostryx Backup\"/agy-backup-*.zip \"/storage/emulated/0/Antigravity Backup\"/agy-backup-*.zip 2>/dev/null | head -15"));
       if (!lsId || /^ERR/.test(lsId)) { alert(String(lsId)); return; }
       pollStandalone(lsId, function (r) {
         var lines = (r.log || "").split("\n").filter(function (l) { return l.trim() && l.indexOf(".zip") >= 0; });
@@ -1127,7 +1131,9 @@
 
   /* AGY-ABOUT: О приложении — три карточки: приложение, разработчик, обновления */
   function openAboutSection(hostEl) {
-    if (!hostEl || hostEl.querySelector("[data-about-section]")) return;
+    if (!hostEl) return;
+    if (hostEl.querySelector("[data-about-section]") && hostEl.children.length === 1) return;
+    hostEl.innerHTML = "";
 
     var ACCENT = "#0b84ff";
     var BORDER = "rgba(127,127,127,.18)";
@@ -1166,7 +1172,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.0.2 · Standard";
+    appVer.textContent = "3.0.5";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1198,8 +1204,8 @@
       a.style.cssText = "font-size:13px;color:" + ACCENT + ";text-decoration:none;cursor:pointer;border-bottom:1px solid rgba(11,132,255,.3);padding-bottom:1px";
       return a;
     }
-    linksRow.appendChild(makeLink(T("Исходный код", "Source code"), "https://github.com/Leostrange/antigravity-android"));
-    linksRow.appendChild(makeLink(T("История изменений", "Changelog"), "https://github.com/Leostrange/antigravity-android/blob/main/CHANGELOG.md"));
+    linksRow.appendChild(makeLink(T("Исходный код", "Source code"), "https://github.com/Leostrange/Leostryx"));
+    linksRow.appendChild(makeLink(T("История изменений", "Changelog"), "https://github.com/Leostrange/Leostryx/blob/main/CHANGELOG.md"));
     c1.appendChild(linksRow);
 
     var credit = document.createElement("div");
@@ -1302,7 +1308,11 @@
         var m = /@@UPDATE (\S+) (\S+) (\S+)/.exec(r.log || "");
         if (m && m[1] && !m[1].startsWith("ERR")) {
           var tag = m[1], apkUrl = m[3];
-            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;var btnDl = document.createElement("button");
+          if (tag.replace(/^v/, "") === "3.0.5") {
+            updStatus.textContent = T("Установлена актуальная версия (3.0.5).", "Latest version is installed (3.0.5).");
+          } else {
+            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;
+            var btnDl = document.createElement("button");
             btnDl.style.cssText = "width:100%;margin-top:10px;padding:11px;border:1px solid " + ACCENT + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:14px;font-weight:500;cursor:pointer;transition:background .15s";
             btnDl.onmouseenter = function() { btnDl.style.background = "rgba(11,132,255,.1)"; };
             btnDl.onmouseleave = function() { btnDl.style.background = "transparent"; };
@@ -1346,7 +1356,9 @@
 
   /* AGY-FEEDBACK: Оставить отзыв — отправка по электронной почте */
   function openFeedbackSection(hostEl) {
-    if (!hostEl || hostEl.querySelector("[data-feedback-section]")) return;
+    if (!hostEl) return;
+    if (hostEl.querySelector("[data-feedback-section]") && hostEl.children.length === 1) return;
+    hostEl.innerHTML = "";
 
     var ACCENT = "#0b84ff";
     var BORDER = "rgba(127,127,127,.18)";
@@ -1491,7 +1503,8 @@
   window.__agyToolsMount = function (el) {
     if (!el) return;
     host = el;
-    if (root && root.parentElement === el) return;
+    if (root && root.parentElement === el && el.children.length === 1) return;
+    el.innerHTML = "";
     root = document.createElement("div");
     root.className = "agy-tools";
     root.setAttribute("data-agy-no-translate", "");

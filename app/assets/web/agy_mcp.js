@@ -1064,10 +1064,11 @@
   /* ------------------------------------------------------------ Mount */
   window.__agyMcpMount = function (el) {
     if (!el) return;
-    if (root && root.parentElement === el) {
+    if (root && root.parentElement === el && el.children.length === 1) {
       render();
       return;
     }
+    el.innerHTML = "";
     host = el;
     root = document.createElement("div");
     root.className = "agy-mcp";

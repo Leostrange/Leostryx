@@ -584,7 +584,8 @@
 
   window.__agyProvidersMount = function (el) {
     if (!el) return;
-    if (root && root.parentElement === el) { render(); return; }
+    if (root && root.parentElement === el && el.children.length === 1) { render(); return; }
+    el.innerHTML = "";
     root = document.createElement("div");
     root.className = "agy-providers";
     root.setAttribute("data-agy-no-translate", "");

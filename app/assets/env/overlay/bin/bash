@@ -5,6 +5,10 @@ export TERMUX__PREFIX="$PREFIX"
 export TERMUX_APP__DATA_DIR="$(dirname "$PREFIX")"
 export LD_LIBRARY_PATH="$PREFIX/lib"
 export PATH="$PREFIX/bin:/system/bin"
+export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
+case " ${JAVA_TOOL_OPTIONS:-} " in *" -Duser.home="*) ;; *) JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Duser.home=${HOME:-$TERMUX_APP__DATA_DIR}" ;; esac
+case " $JAVA_TOOL_OPTIONS " in *" -Djava.io.tmpdir="*) ;; *) JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Djava.io.tmpdir=$TMPDIR" ;; esac
+export JAVA_TOOL_OPTIONS
 trap '' 36 37 2>/dev/null || true
 if [ -f "$PREFIX/lib/libtermux-exec.so" ]; then
     export LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
