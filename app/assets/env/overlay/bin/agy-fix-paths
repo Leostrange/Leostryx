@@ -85,4 +85,78 @@ JVMPROF
     fi
 fi
 
+# 4. Keep the AGY bridges ($HOME/runtime/bin) first in PATH for non-login shells.
+shim="$PREFIX/bin/bash"
+if [ -f "$shim" ] && ! grep -q 'AGY-P1-2' "$shim" 2>/dev/null; then
+    tmp="$shim.agyfix.$$"
+    if "$PREFIX/bin/python3" - "$shim" "$tmp" <<'SHIMPATCH' 2>/dev/null
+import sys
+src = open(sys.argv[1], 'r', encoding='utf-8').read()
+old = 'export PATH="$PREFIX/bin:/system/bin"\n'
+new = ('# AGY-P1-2: keep $HOME/runtime/bin bridges first (JVM sandbox flags, node/java wrappers).\n'
+       '# Managed by agy-fix-paths step 4 -- do not remove.\n'
+       '_agy_rb="${HOME:-$(dirname "$PREFIX")}/runtime/bin"\n'
+       'if [ -d "$_agy_rb" ]; then\n'
+       '    export PATH="$_agy_rb:$PREFIX/bin:/system/bin"\n'
+       'else\n'
+       '    export PATH="$PREFIX/bin:/system/bin"\n'
+       'fi\n'
+       'unset _agy_rb\n')
+if src.count(old) != 1:
+    sys.exit(1)
+open(sys.argv[2], 'w', encoding='utf-8').write(src.replace(old, new))
+SHIMPATCH
+    then
+        chmod 755 "$tmp" 2>/dev/null
+        mv -f "$tmp" "$shim"
+        count=$((count + 1))
+        printf 'agy-fix-paths: patched %s (runtime/bin first in PATH)\n' "$shim"
+    else
+        rm -f "$tmp"
+    fi
+fi
+
+# 5. Rewrite hardcoded /data/data/com.termux/files/usr/bin/<cmd>\0 in ELF binaries
+#    to null-padded /bin/<cmd>\0 (same byte length, intercepted by libtermux-exec.so).
+if [ -x "$PREFIX/bin/python3" ]; then
+    elf_fixed="$("$PREFIX/bin/python3" - "$PREFIX/bin" "$PREFIX/libexec" <<'ELFPATCH' 2>/dev/null || echo 0
+import os, re, sys
+pat = re.compile(b"/data/data/com\\.termux/files/usr/bin/([a-zA-Z0-9_.-]+)\x00")
+def repl(m):
+    new = b"/bin/" + m.group(1) + b"\x00"
+    return new.ljust(len(m.group(0)), b"\x00") if len(new) <= len(m.group(0)) else m.group(0)
+fixed = 0
+for root_dir in sys.argv[1:]:
+    if not os.path.isdir(root_dir):
+        continue
+    for dirpath, _, files in os.walk(root_dir):
+        for fn in files:
+            p = os.path.join(dirpath, fn)
+            if os.path.islink(p) or not os.path.isfile(p):
+                continue
+            try:
+                with open(p, "rb") as f:
+                    if f.read(4) != b"\x7fELF":
+                        continue
+                    f.seek(0)
+                    data = f.read()
+                if b"/data/data/com.termux/files/usr/bin/" not in data:
+                    continue
+                new_data, n = pat.subn(repl, data)
+                if n and new_data != data:
+                    st = os.stat(p)
+                    tmp = p + ".agyelf." + str(os.getpid())
+                    with open(tmp, "wb") as f:
+                        f.write(new_data)
+                    os.chmod(tmp, st.st_mode & 0o7777)
+                    os.replace(tmp, p)
+                    fixed += 1
+            except Exception:
+                pass
+print(fixed)
+ELFPATCH
+)"
+    count=$((count + ${elf_fixed:-0}))
+fi
+
 printf 'agy-fix-paths: rewrote %d file(s) -> %s\n' "$count" "$PREFIX"
