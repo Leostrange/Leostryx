@@ -5,5 +5,7 @@
   "overlaySha256": "9d7d4941f2543dfedbdee840212b83a4dd9a6367c1839e244ae18a77a8a50e62",
   "pkgSha256": "aa512f21ceae7697e26ba8fe7c8623e1ad0ebec4d586707669b645ca1257c511",
   "schema": 1,
-  "seedPackages": []
+  "seedPackages": [
+    "python-pillow"
+  ]
 }

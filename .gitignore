@@ -1,6 +1,7 @@
 # Промежуточные артефакты сборки (готовые APK лежат в корне Antigravity Projects/, вне репозитория)
 dist/*-unsigned.apk
 dist/signed/
+dist/.brand/
 __pycache__/
 *.pyc
 *.tmp

@@ -1,27 +1,27 @@
-<p align="center"><img src="./assets/antigravity-bp-banner.svg" alt="Antigravity-BP — русская сборка Antigravity для Android" width="100%" /></p>
+<p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/antigravity-android/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0--ru-7C3AED?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.3-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-7C3AED?style=flat-square" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Antigravity для Android — русская сборка Antigravity-BP (v3.0).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.3).</b><br/>
 Полная русификация, щит безопасности агента, темы и компактный интерфейс, вложения, инструменты, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/antigravity-android/releases/tag/v3.0"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/antigravity-android/releases/tag/v3.0">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/antigravity-android/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 ---
 
-## Antigravity для Android 3.0.1
+## Leostryx для Android 3.0.3
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
-**Antigravity-BP** — русская сборка этого окружения с доработанным интерфейсом и настройками автономной работы агента. Сделана **на основе [werdio325-png/antigravity-android](https://github.com/werdio325-png/antigravity-android)** — этот репозиторий является его форком.
+**Leostryx** — русская сборка этого окружения с доработанным интерфейсом и настройками автономной работы агента. Сделана **на основе [werdio325-png/antigravity-android](https://github.com/werdio325-png/antigravity-android)** — этот репозиторий является его форком.
 
 ## Возможности
 
@@ -36,14 +36,15 @@
 - встроенные инструменты разработки (Tools) и бэкенд настроек с поддержкой **Flutter SDK в 1 клик**;
 - **MCP-серверы** (sequential-thinking, exa, github-mcp-server, StitchMCP) — в том числе с кастомными провайдерами;
 - **UTCP-серверы и OpenAPI 3.0** (Universal Tool Calling Protocol) — прямое подключение REST API и спецификаций без написания промежуточных прокси;
-- **кастомизация агента**: копирование, редактирование и создание навыков (Skills), каталог плагинов из Build With Google.
+- **кастомизация агента**: копирование, редактирование и создание навыков (Skills), каталог плагинов из Build With Google;
+- **кастомизация иконок и splash screen**: 4 набора значков (Сова, Рысь, LSX, Angular X) с переключением в настройках, логотип и сплэш-скрин меняются синхронно.
 
 ## Сборки
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Antigravity-BP-3.0-standard.apk`](https://github.com/Leostrange/antigravity-android/releases/tag/v3.0) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Antigravity-BP-3.0-bypass.apk`](https://github.com/Leostrange/antigravity-android/releases/tag/v3.0) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.3-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.3-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -52,12 +53,18 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0 **не устанавливается поверх** предыдущих версий (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления ключа подписи). Перед установкой 3.0 полностью удалите предыдущую версию приложения с устройства. Обязательно сохраните важные файлы и проекты из `/storage/emulated/0/Documents/` или папки проектов перед удалением!
 
-1. Скачайте APK из [релиза](https://github.com/Leostrange/antigravity-android/releases/tag/v3.0) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/antigravity-android/releases/download/v3.0/SHA256SUMS.txt).
+1. Скачайте APK из [релиза](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.3/SHA256SUMS.txt).
 2. Полностью удалите старую версию приложения `com.agyru.bp` с устройства.
-3. Установите скачанный APK 3.0 (`standard` или `bypass`) и запустите приложение.
+3. Установите скачанный APK 3.0.3 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.0.1
+## Что нового в 3.0.3
 
+- **проект переименован в Leostryx** (репозиторий: `Leostrange/Leostryx`);
+- **новый баннер и брендинг** в стиле Leostryx (цвет `#0b84ff`, маскот — рысь);
+- **по умолчанию стоит значок и лого в виде рыси** (pack `02_lynx`);
+- **кастомизация иконок и splash screen** добавлена в оформление: 4 набора (Сова, Рысь, LSX, Angular X), переключение в настройках;
+- **Pillow (PIL) интегрирован в приложение** — доступен в билде после сборки;
+- **иконки в SVG** загружены в архиве `Leostryx-4-SVG-logos.7z`;
 - переход на собственную мажорную нумерацию **3.0**;
 - интеграция **Flutter SDK** в «Настройки › Инструменты» (установка и удаление в 1 клик, bionic-патчинг `agy-fix-flutter`, верификация `flutter,dart`);
 - реализация поддержки **UTCP-серверов и спецификаций OpenAPI 3.0** (вкладка «🌐 UTCP & OpenAPI», каталог готовых бесплатных API, мост в ядро);
@@ -100,13 +107,19 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 
 ```text
 ├── README.md, CHANGELOG.md, LICENSE
-├── assets/antigravity-bp-banner.svg       баннер проекта (стилистика Leostrange)
+├── assets/leostryx-banner.svg       баннер проекта (стилистика Leostryx)
 ├── app/                                   ПОЛНОЕ дерево APK без подписи
 │   ├── AndroidManifest.xml, classes*.dex, resources.arsc, res/
 │   └── assets/
 │       ├── web/                           веб-интерфейс и мод (то, что правится)
 │       │   ├── generated/main.js          бандл React-приложения
 │       │   ├── agy_ru.css, agy_shield.js, agy_i18n.js, agy_tools.* …
+│       │   ├── brand/                     кастомизация иконок и splash
+│       │   │   ├── config.json            текущий пак (02_lynx по умолчанию)
+│       │   │   ├── 01_owl/                пак «Сова»
+│       │   │   ├── 02_lynx/               пак «Рысь» (по умолчанию)
+│       │   │   ├── 03_lsx/                пак «LSX»
+│       │   │   ├── 04_angular_x/          пак «Angular X»
 │       ├── runtime/                       Go-ядро (liblanguage_server.so) и рантайм
 │       └── env/                           bootstrap userspace, оверлей и пакеты
 ├── variants/bypass/                       дельта bypass-билда (manifest + патченое ядро)
@@ -114,11 +127,12 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 ├── compress-map.json                      файлы, хранимые в APK без сжатия
 ├── mcp_config.example.json                шаблон конфига MCP-серверов
 ├── tools/uber-apk-signer.jar              подпись + zipalign
-└── dist/antigravity-debug.keystore        ключ подписи (встаёт поверх установленного)
+├── tools/brand.py                         брендинг (иконки + label + dex strings)
+└── dist/antigravity-signing.p12           ключ подписи (встаёт поверх установленного)
 ```
 
 > [!NOTE]
-> Полный архив исходников — [`Antigravity-BP-repo.zip`](https://github.com/Leostrange/antigravity-android/releases/tag/v3.0) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
+> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
 
 ## Сборка APK
 
@@ -130,7 +144,7 @@ python3 rebuild.py standard   # только standard
 python3 rebuild.py bypass     # только bypass
 ```
 
-Готовые подписанные APK появятся в `dist/signed/`. Подпись — `dist/antigravity-debug.keystore`, поэтому APK встаёт **поверх** установленного `com.agyru.bp` без потери данных.
+Готовые подписанные APK появятся в `dist/signed/`. Подпись — `dist/antigravity-signing.p12`, поэтому APK встаёт **поверх** установленного `com.agyru.bp` без потери данных.
 
 Все правки интерфейса лежат в `app/assets/web/` — после изменений достаточно пересобрать.
 

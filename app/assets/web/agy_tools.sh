@@ -2257,6 +2257,322 @@ print("cleared", n)
 PYCLR
 }
 
+# AGY-BRAND: swap the login-screen logo for the chosen Leostryx pack.
+# Web-side assets live under $HOME/web/brand/<pack>/. The APK-bound resources
+# (splash drawable, mipmap launcher icon, app label) are recorded in
+# $HOME/web/brand/config.json for rebuild.py to pick up on the next build.
+op_brand() {
+    # ARG is "pack" or "pack@colour" (colour is optional and only recorded).
+    local raw="$ARG" pack="" colour=""
+    [ -n "$raw" ] || fail "brand: pack name required"
+    pack="${raw%%@*}"
+    case "$raw" in *@*) colour="${raw#*@}" ;; esac
+    case "$pack" in
+        01_owl|02_lynx|03_lsx|04_angular_x) ;;
+        *) fail "brand: unknown pack '$pack'" ;;
+    esac
+    if [ -n "$colour" ]; then
+        case "$colour" in
+            \#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
+            *) fail "brand: invalid colour '$colour'" ;;
+        esac
+    fi
+    local web="$HOME/web"
+    local src="$web/brand/$pack"
+    [ -d "$src" ] || fail "brand: pack assets missing at $src"
+    [ -f "$src/ic_launcher_logo.png" ] || fail "brand: ic_launcher_logo.png missing in pack"
+
+    step "Applying logo pack: $pack"
+    # Login screen logo (agy_firstrun.html references ./agy_firstrun_logo.png).
+    cp -f "$src/ic_launcher_logo.png" "$web/agy_firstrun_logo.png" \
+        || fail "brand: cannot write agy_firstrun_logo.png"
+    # Keep a copy the web UI can re-read for previews/verification.
+    cp -f "$src/ic_launcher_logo.png" "$web/brand/current_logo.png" 2>/dev/null || true
+
+    # Persist for the next APK build (splash + launcher icon + label + colour).
+    AGY_BRAND_PACK="$pack" AGY_BRAND_COLOUR="$colour" AGY_BRAND_WEB="$web" python3 - <<'PYBR'
+import json, os, pathlib
+web = pathlib.Path(os.environ["AGY_BRAND_WEB"])
+pack = os.environ["AGY_BRAND_PACK"]
+colour = os.environ.get("AGY_BRAND_COLOUR", "").strip()
+cfg = {"pack": pack, "name": "Leostryx"}
+try:
+    old = json.loads((web / "brand" / "config.json").read_text(encoding="utf-8"))
+    if isinstance(old, dict):
+        cfg.update(old)
+except Exception:
+    pass
+cfg["pack"] = pack
+cfg["name"] = "Leostryx"
+if colour:
+    cfg["color"] = colour
+(web / "brand" / "config.json").write_text(
+    json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+print("brand: recorded pack=%s color=%s" % (pack, cfg.get("color", "-")))
+PYBR
+    say "@@done brand $pack"
+}
+
+# AGY-BACKUP: экспорт всех данных приложения (провайдеры, MCP, настройки, чаты, фото)
+op_backup() {
+    AGY_BACKUP_ARG="$ARG" python3 - << 'PYBK'
+import os, json, time, zipfile, shutil
+
+home = os.environ["HOME"]
+ts = time.strftime("%Y%m%d-%H%M%S")
+# Parse ARG: path@items (items = comma-separated: providers,mcp,settings,chats,attachments)
+raw = os.environ.get("AGY_BACKUP_ARG", "").strip()
+if "@" in raw:
+    custom, items_str = raw.split("@", 1)
+else:
+    custom, items_str = raw, ""
+items = set(x.strip() for x in items_str.split(",") if x.strip())
+if not items:
+    items = {"providers", "mcp", "settings", "chats", "attachments"}
+ext = "/storage/emulated/0"
+default_dir = os.path.join(ext, "Antigravity Backup") if os.path.isdir(ext) and os.access(ext, os.W_OK) else os.path.join(home, "agy-backup")
+outdir = custom.strip() if custom.strip() else default_dir
+os.makedirs(outdir, exist_ok=True)
+outpath = os.path.join(outdir, f"agy-backup-{ts}.zip")
+
+z = zipfile.ZipFile(outpath, "w")
+count = 0
+
+# Binary files (databases, images, audio) don't compress well - use STORED (fast)
+# Text configs are small - use DEFLATED (compact)
+import zipfile as _zf
+def _add(z, src, dst):
+    ext = os.path.splitext(dst)[1].lower()
+    if ext in ('.db', '.db-wal', '.db-shm', '.jpg', '.jpeg', '.png', '.webp', '.mp3', '.so', '.bin', '.tflite'):
+        info = zipfile.ZipInfo(dst)
+        info.compress_type = zipfile.ZIP_STORED
+        with open(src, 'rb') as f:
+            z.writestr(info, f.read())
+    else:
+        z.write(src, dst, compress_type=zipfile.ZIP_DEFLATED)
+
+# providers
+if "providers" in items:
+    src = os.path.join(home, "agy-providers", "providers.json")
+    if os.path.isfile(src):
+        _add(z, src, "providers.json")
+        count += 1
+
+# config (mcp + settings)
+if "mcp" in items:
+    src = os.path.join(home, ".gemini", "config", "mcp_config.json")
+    if os.path.isfile(src):
+        _add(z, src, "config/mcp_config.json")
+        count += 1
+if "settings" in items:
+    src = os.path.join(home, ".gemini", "config", "config.json")
+    if os.path.isfile(src):
+        _add(z, src, "config/config.json")
+        count += 1
+
+# conversations (SQLite DBs)
+if "chats" in items:
+    conv_dir = os.path.join(home, ".gemini/antigravity-app/conversations")
+    if os.path.isdir(conv_dir):
+        for f in os.listdir(conv_dir):
+            if f.endswith(".db") or f.endswith(".db-wal") or f.endswith(".db-shm"):
+                _add(z, os.path.join(conv_dir, f), f"conversations/{f}")
+                count += 1
+
+# brain data (attachments, artifacts, user uploads)
+if "attachments" in items:
+    brain_dir = os.path.join(home, ".gemini/antigravity-app/brain")
+    if os.path.isdir(brain_dir):
+        for dirpath, dirs, files in os.walk(brain_dir):
+            for f in files:
+                full = os.path.join(dirpath, f)
+                rel = os.path.relpath(full, brain_dir)
+                _add(z, full, f"brain/{rel}")
+                count += 1
+
+# manifest
+manifest = {
+    "version": 1,
+    "created": ts,
+    "files": count,
+    "items": sorted(items),
+    "app_version": "3.0.1",
+}
+z.writestr("manifest.json", json.dumps(manifest, indent=2))
+z.close()
+
+size = os.path.getsize(outpath)
+print(f"@@BACKUP {outpath} {size} {count}")
+PYBK
+}
+
+# AGY-BACKUP: восстановление данных из архива
+op_restore() {
+    AGY_RESTORE="$ARG" python3 - << 'PYRS'
+import os, sys, json, zipfile, shutil
+
+home = os.environ["HOME"]
+src = os.environ.get("AGY_RESTORE", "")
+if not src or not os.path.isfile(src):
+    print("@@RESTORE ERR: file not found:", src); sys.exit(1)
+
+try:
+    z = zipfile.ZipFile(src)
+except Exception as e:
+    print("@@RESTORE ERR: bad zip:", e); sys.exit(1)
+
+# manifest
+try:
+    m = json.loads(z.read("manifest.json"))
+    print("@@RESTORE manifest version=%s files=%s" % (m.get("version"), m.get("files")))
+except Exception:
+    pass
+
+restored = 0
+
+# providers
+if "providers.json" in z.namelist():
+    dst = os.path.join(home, "agy-providers", "providers.json")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    with open(dst, "wb") as f:
+        f.write(z.read("providers.json"))
+    restored += 1
+
+# config files
+for name in z.namelist():
+    if name.startswith("config/"):
+        dst = os.path.join(home, ".gemini", name)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "wb") as f:
+            f.write(z.read(name))
+        restored += 1
+
+# conversations
+conv_dir = os.path.join(home, ".gemini/antigravity-app/conversations")
+os.makedirs(conv_dir, exist_ok=True)
+for name in z.namelist():
+    if name.startswith("conversations/"):
+        dst = os.path.join(conv_dir, os.path.basename(name))
+        with open(dst, "wb") as f:
+            f.write(z.read(name))
+        restored += 1
+
+# brain
+brain_dir = os.path.join(home, ".gemini/antigravity-app/brain")
+for name in z.namelist():
+    if name.startswith("brain/"):
+        rel = name[6:]  # strip "brain/"
+        if not rel or rel.endswith("/"): continue
+        dst = os.path.join(brain_dir, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "wb") as f:
+            f.write(z.read(name))
+        restored += 1
+
+z.close()
+print(f"@@RESTORE OK {restored}")
+PYRS
+}
+
+# AGY-BACKUP: список бэкапов по времени (новые первые)
+op_bklist() {
+    python3 - << 'PYBL'
+import os, glob, time
+outdir = "/storage/emulated/0/Antigravity Backup"
+if not os.path.isdir(outdir):
+    outdir = os.path.join(os.environ["HOME"], "agy-backup")
+files = sorted(glob.glob(os.path.join(outdir, "agy-backup-*.zip")), key=os.path.getmtime, reverse=True)
+for f in files[:30]:
+    sz = os.path.getsize(f)
+    ts = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(f)))
+    print("@@BKFILE %s %d %s" % (os.path.basename(f), sz, ts))
+PYBL
+}
+
+# AGY-BACKUP: удаление одного бэкапа
+op_bkdelete() {
+    AGY_BKDEL="$ARG" python3 - << 'PYBD'
+import os, sys
+name = os.environ.get("AGY_BKDEL", "").strip()
+if not name or "/" in name or ".." in name:
+    print("@@BKDEL ERR:bad name"); sys.exit(1)
+outdir = "/storage/emulated/0/Antigravity Backup"
+if not os.path.isdir(outdir):
+    outdir = os.path.join(os.environ["HOME"], "agy-backup")
+path = os.path.join(outdir, name)
+if not os.path.isfile(path):
+    print("@@BKDEL ERR:not found"); sys.exit(1)
+os.unlink(path)
+print("@@BKDEL OK", name)
+PYBD
+}
+
+# AGY-UPDATE: проверка обновления на GitHub
+op_updatecheck() {
+    python3 - << 'PYUC'
+import json, urllib.request, ssl
+ctx = ssl._create_unverified_context()
+try:
+    req = urllib.request.Request(
+        "https://api.github.com/repos/Leostrange/antigravity-android/releases/latest",
+        headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "Antigravity-App"}
+    )
+    data = json.loads(urllib.request.urlopen(req, timeout=10, context=ctx).read())
+    tag = data.get("tag_name", "")
+    name = data.get("name", "")
+    apk_url = ""
+    for a in data.get("assets", []):
+        if a["name"].endswith("-standard.apk"):
+            apk_url = a["browser_download_url"]
+            break
+    if not apk_url:
+        for a in data.get("assets", []):
+            if a["name"].endswith(".apk"):
+                apk_url = a["browser_download_url"]
+                break
+    print("@@UPDATE %s %s %s" % (tag, name, apk_url))
+except Exception as e:
+    print("@@UPDATE ERR", e)
+PYUC
+}
+
+# AGY-UPDATE: скачивание и установка APK
+op_updatedownload() {
+    AGY_APKURL="$ARG" python3 - << 'PYUD'
+import os, sys, subprocess, urllib.request, ssl
+url = os.environ.get("AGY_APKURL", "").strip()
+if not url.startswith("https://"):
+    print("@@UPD ERR:bad url"); sys.exit(1)
+dst = "/storage/emulated/0/Download/update-temp.apk"
+print("@@UPD downloading...")
+ctx = ssl._create_unverified_context()
+try:
+    req = urllib.request.Request(url, headers={"User-Agent": "Antigravity-App"})
+    with urllib.request.urlopen(req, timeout=120, context=ctx) as r, open(dst, "wb") as f:
+        total = int(r.headers.get("Content-Length", 0))
+        done = 0
+        while True:
+            chunk = r.read(262144)
+            if not chunk: break
+            f.write(chunk)
+            done += len(chunk)
+            if total > 0:
+                print("@@UPDPROGRESS %d %d" % (done, total))
+    sz = os.path.getsize(dst)
+    print("@@UPD downloaded %d" % sz)
+    # install via pm (requires Shizuku or root)
+    r = subprocess.run(["pm", "install", "-r", dst], capture_output=True, text=True, timeout=60)
+    out = (r.stdout + r.stderr).strip()
+    if r.returncode == 0 or "Success" in out:
+        print("@@UPDOK installed")
+    else:
+        print("@@UPD install result:", out[:200])
+        print("@@UPD manual: %s" % dst)
+except Exception as e:
+    print("@@UPD ERR", e)
+PYUD
+}
+
 case "$OP" in
     termopen)       op_termopen ;;
     terminput)      op_terminput ;;
@@ -2264,6 +2580,13 @@ case "$OP" in
     termrun)        op_termrun ;;   # AGY-P2-20
     histread)       op_histread ;;
     histclear)      op_histclear ;;  # AGY-P2-20
+    brand)          op_brand ;;      # AGY-BRAND
+    backup)         op_backup ;;    # AGY-BACKUP
+    restore)        op_restore ;;   # AGY-BACKUP
+    bklist)         op_bklist ;;    # AGY-BACKUP
+    bkdelete)       op_bkdelete ;;  # AGY-BACKUP
+    updatecheck)    op_updatecheck ;; # AGY-UPDATE
+    updatedownload) op_updatedownload ;; # AGY-UPDATE
     pdfin)          op_pdfin ;;  # AGY-P2-19
     pdf)            op_pdf ;;    # AGY-P2-19
     status)         op_status ;;

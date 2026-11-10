@@ -88,6 +88,14 @@
       { id: "ripgrep", kind: "pkg", ru: "ripgrep (rg)", en: "ripgrep (rg)", dru: "", den: "" },
       { id: "fd", kind: "pkg", ru: "fd", en: "fd", dru: "", den: "" },
       { id: "tree", kind: "pkg", ru: "tree", en: "tree", dru: "", den: "" }
+    ] },
+    { id: "archives", ru: "Архивы", en: "Archives", items: [
+      { id: "7zip", kind: "pkg", ru: "7zip (7z, tar, gz, bz2, xz, iso)", en: "7zip (7z, tar, gz, bz2, xz, iso)", dru: "Основной пакет для открытия остальных форматов архивов.", den: "Main package for opening the remaining archive formats.", verify: "7z" },
+      { id: "unrar", kind: "pkg", ru: "unrar (RAR)", en: "unrar (RAR)", dru: "Распаковка архивов RAR.", den: "Extracts RAR archives.", verify: "unrar" },
+      { id: "zstd", kind: "pkg", ru: "zstd (.zst)", en: "zstd (.zst)", dru: "Сжатие и распаковка .zst.", den: "Compresses and extracts .zst.", verify: "zstd" },
+      { id: "lz4", kind: "pkg", ru: "lz4", en: "lz4", dru: "Сжатие .lz4.", den: "Compresses .lz4.", verify: "lz4" },
+      { id: "lhasa", kind: "pkg", ru: "lhasa (.lzh)", en: "lhasa (.lzh)", dru: "Архивы LHA/LZH.", den: "LHA/LZH archives.", verify: "lha" },
+      { id: "lrzip", kind: "pkg", ru: "lrzip (.lrz)", en: "lrzip (.lrz)", dru: "Долгое сжатие .lrz.", den: "Long-range .lrz compression.", verify: "lrzip" }
     ] }
   ];
   var PRESETS = [
@@ -638,6 +646,16 @@
     if (tries>600) { done({rc:"1",log:"Timeout"}); return; }
     setTimeout(function(){pollAux(id,done,tries+1);},150);
   }
+  /* AGY-BACKUP: poll without modal dependency, no artificial timeout */
+  function pollStandalone(id, done, tries) {
+    var b = bridge();
+    if (!b) { done({rc:"1",log:"Bridge unavailable"}); return; }
+    var r = {};
+    try { r = JSON.parse(b.read(id) || "{}"); } catch (_) {}
+    if (r.rc !== undefined && r.rc !== "") { done(r); return; }
+    if (tries > 20000) { done({rc:"1",log:"Timeout after 50 min"}); return; }
+    setTimeout(function () { pollStandalone(id, done, tries + 1); }, 250);
+  }
   /* AGY-P2-18: clipboard API first (execCommand мёртв в Android WebView) */
   function copyText(txt) {
     var fail=function(){ alert(T("Не удалось скопировать; выделите текст вручную.", "Copy failed; select the text manually.")); };
@@ -814,6 +832,665 @@
     input.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); send(); } };
     input.focus();
   }
+
+  /* AGY-BACKUP: экспорт/импорт всех данных (провайдеры, MCP, настройки, чаты) */
+  function openBackupSection(hostEl) {
+    if (!hostEl || hostEl.querySelector("[data-backup-section]")) return;
+    var wrap = document.createElement("div");
+    wrap.className = "agy-tools";
+    wrap.setAttribute("data-backup-section", "");
+    wrap.setAttribute("data-agy-no-translate", "");
+
+    var sec = document.createElement("div");
+    sec.className = "agy-t-sec";
+    sec.textContent = T("Резервное копирование", "Backup && Restore");
+    wrap.appendChild(sec);
+
+    var note = document.createElement("div");
+    note.className = "agy-t-note";
+    note.textContent = T(
+      "Отметьте, что сохранить, и укажите путь. По умолчанию — папка «Antigravity Backup» на телефоне. Включает провайдеры, ключи MCP, настройки и историю чатов с фото.",
+      "Check what to save and set the path. Default folder: Antigravity Backup on the phone. Includes providers, MCP keys, settings and chat history with photos."
+    );
+    wrap.appendChild(note);
+
+    /* AGY-BACKUP: поле выбора пути сохранения */
+    var pathRow = document.createElement("div");
+    pathRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:10px";
+    var pathLabel = document.createElement("span");
+    pathLabel.style.cssText = "font-size:12px;color:#888;white-space:nowrap";
+    pathLabel.textContent = T("Путь:", "Path:");
+    pathRow.appendChild(pathLabel);
+    var pathInput = document.createElement("input");
+    pathInput.type = "text";
+    pathInput.value = "/storage/emulated/0/Antigravity Backup";
+    pathInput.style.cssText = "flex:1;min-width:0;background:#101012;color:#eee;border:1px solid #555;border-radius:8px;padding:8px;font-size:12px";
+    pathInput.setAttribute("data-backup-path", "");
+    pathRow.appendChild(pathInput);
+    wrap.appendChild(pathRow);
+
+    /* AGY-BACKUP: галочки выбора данных */
+    var checkData = [
+      { id: "providers", label: T("Провайдеры и API-ключи", "Providers & API keys"), checked: true },
+      { id: "mcp", label: T("Ключи MCP-серверов", "MCP server keys"), checked: true },
+      { id: "settings", label: T("Настройки приложения", "App settings"), checked: true },
+      { id: "chats", label: T("История чатов", "Chat history"), checked: true },
+      { id: "attachments", label: T("Фото и вложения", "Photos & attachments"), checked: true },
+    ];
+    var checkWrap = document.createElement("div");
+    checkWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-bottom:12px";
+    var checkLabel = document.createElement("div");
+    checkLabel.style.cssText = "font-size:12px;color:#888;margin-bottom:2px";
+    checkLabel.textContent = T("Что резервировать:", "What to back up:");
+    checkWrap.appendChild(checkLabel);
+    checkData.forEach(function (item) {
+      var row = document.createElement("label");
+      row.style.cssText = "display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = item.checked;
+      cb.setAttribute("data-bk-item", item.id);
+      cb.style.cssText = "width:18px;height:18px;accent-color:#0b84ff";
+      row.appendChild(cb);
+      var span = document.createElement("span");
+      span.textContent = item.label;
+      row.appendChild(span);
+      checkWrap.appendChild(row);
+    });
+    wrap.appendChild(checkWrap);
+
+    var card = document.createElement("div");
+    card.className = "agy-t-card";
+
+    var main = document.createElement("div");
+    main.className = "agy-t-main";
+    var name = document.createElement("div");
+    name.className = "agy-t-name";
+    name.textContent = T("Экспорт / Импорт данных", "Export / Import data");
+    main.appendChild(name);
+
+    var desc = document.createElement("div");
+    desc.className = "agy-t-desc";
+    desc.setAttribute("data-desc", "");
+    desc.textContent = T("Файл сохраняется в папку «Загрузки» на телефоне.", "File is saved to the Downloads folder on the phone.");
+    main.appendChild(desc);
+
+    card.appendChild(main);
+
+    var actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:8px;flex-shrink:0";
+
+    var btnExport = document.createElement("button");
+    btnExport.className = "agy-t-btn";
+    btnExport.textContent = T("Экспорт", "Export");
+    var progressBar = document.createElement("div");
+    progressBar.style.cssText = "display:none;align-items:center;gap:8px;margin-top:8px";
+    var pbarOuter = document.createElement("div");
+    pbarOuter.style.cssText = "flex:1;height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden";
+    var pbarFill = document.createElement("div");
+    pbarFill.style.cssText = "height:100%;width:0%;border-radius:6px;background:#0b84ff;transition:width .3s";
+    pbarOuter.appendChild(pbarFill);
+    var pbarTime = document.createElement("span");
+    pbarTime.style.cssText = "font-size:11px;color:#888;white-space:nowrap;font-variant-numeric:tabular-nums";
+    progressBar.appendChild(pbarOuter);
+    progressBar.appendChild(pbarTime);
+    card.appendChild(progressBar);
+    btnExport.onclick = function () {
+      var items = [];
+      wrap.querySelectorAll("[data-bk-item]").forEach(function (cb) {
+        if (cb.checked) items.push(cb.getAttribute("data-bk-item"));
+      });
+      if (!items.length) { alert(T("Отметьте хотя бы один пункт.", "Check at least one item.")); return; }
+      var path = (pathInput.value || "").trim();
+      var arg = path + "@" + items.join(",");
+      btnExport.disabled = true;
+      btnExport.textContent = T("Сохранение…", "Saving…");
+      progressBar.style.display = "flex";
+      pbarFill.style.width = "5%";
+      var t0 = Date.now();
+      var timer = setInterval(function () {
+        var s = Math.round((Date.now() - t0) / 1000);
+        var min = Math.floor(s / 60), sec = s % 60;
+        pbarTime.textContent = (min > 0 ? min + T(" мин ", " min ") : "") + sec + T(" с", " s");
+        /* indeterminate: oscillate between 5% and 90% */
+        var pct = 5 + (Math.sin(Date.now() / 600) + 1) * 42.5;
+        pbarFill.style.width = pct.toFixed(0) + "%";
+      }, 400);
+      var b = bridge();
+      if (!b) { clearInterval(timer); progressBar.style.display = "none"; alert(T("Мост недоступен.", "Bridge unavailable.")); btnExport.disabled = false; return; }
+      var id = b.start("backup", arg);
+      if (!id || /^ERR/.test(id)) { clearInterval(timer); progressBar.style.display = "none"; alert(String(id)); btnExport.disabled = false; return; }
+      pollStandalone(id, function (r) {
+        clearInterval(timer);
+        pbarFill.style.width = "100%";
+        setTimeout(function () { progressBar.style.display = "none"; pbarFill.style.width = "0%"; }, 800);
+        btnExport.disabled = false;
+        btnExport.textContent = T("Экспорт", "Export");
+        var elapsed = Math.round((Date.now() - t0) / 1000);
+        var emin = Math.floor(elapsed / 60), esec = elapsed % 60;
+        var timeStr = (emin > 0 ? emin + T(" мин ", " min ") : "") + esec + T(" с", " s");
+        var m = /@@BACKUP (\S+) (\d+) (\d+)/.exec(r.log || "");
+        if (String(r.rc) === "0" && m) {
+          var mb = Math.round(parseInt(m[2], 10) / 1048576);
+          desc.textContent = T(
+            "Готово за " + timeStr + ": " + mb + " МБ, " + m[3] + " файлов → " + m[1],
+            "Done in " + timeStr + ": " + mb + " MB, " + m[3] + " files → " + m[1]
+          );
+          agyToast11(T("Бэкап за ", "Backup done in ") + timeStr);
+        } else {
+          desc.textContent = T("Ошибка экспорта: ", "Export error: ") + (r.log || "");
+        }
+      }, 0);
+    };
+    actions.appendChild(btnExport);
+
+    var btnImport = document.createElement("button");
+    btnImport.className = "agy-t-btn sec";
+    btnImport.textContent = T("Импорт", "Import");
+    btnImport.onclick = function () {
+      var b = bridge();
+      if (!b) { alert(T("Мост недоступен.", "Bridge unavailable.")); return; }
+      var lsId = b.start("termrun", btoa("ls -1t /storage/emulated/0/Antigravity\\ Backup/agy-backup-*.zip 2>/dev/null | head -10"));
+      if (!lsId || /^ERR/.test(lsId)) { alert(String(lsId)); return; }
+      pollStandalone(lsId, function (r) {
+        var lines = (r.log || "").split("\n").filter(function (l) { return l.trim() && l.indexOf(".zip") >= 0; });
+        if (!lines.length) { alert(T("Нет файлов бэкапа в папке Antigravity Backup.", "No backup files found.")); return; }
+        var overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px";
+        var box = document.createElement("div");
+        box.style.cssText = "background:#1c1c1e;border:1px solid #555;border-radius:16px;padding:16px;width:min(100%,500px);max-height:80vh;overflow-y:auto";
+        var title = document.createElement("div");
+        title.style.cssText = "margin-bottom:10px;font-weight:600";
+        title.textContent = T("Выберите бэкап:", "Choose backup:");
+        box.appendChild(title);
+        lines.forEach(function (line) {
+          var name = line.trim().split("/").pop();
+          var btn = document.createElement("button");
+          btn.textContent = name;
+          btn.style.cssText = "display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;border:1px solid #444;border-radius:8px;background:#222;color:#eee;cursor:pointer;font-size:12px";
+          btn.onclick = function () {
+            overlay.remove();
+            btnImport.disabled = true;
+            btnImport.textContent = T("Восстановление…", "Restoring…");
+            var id = b.start("restore", line.trim());
+            if (!id || /^ERR/.test(id)) { alert(String(id)); btnImport.disabled = false; btnImport.textContent = T("Импорт", "Import"); return; }
+            pollStandalone(id, function (r2) {
+              btnImport.disabled = false;
+              btnImport.textContent = T("Импорт", "Import");
+              var ok = /@@RESTORE OK (\d+)/.exec(r2.log || "");
+              if (String(r2.rc) === "0" && ok) {
+                desc.textContent = T("Восстановлено файлов: " + ok[1] + ". Перезапустите приложение.", "Restored: " + ok[1] + " files. Restart the app.");
+                agyToast11(T("Данные восстановлены. Перезапустите приложение.", "Data restored. Restart the app."));
+              } else {
+                desc.textContent = T("Ошибка импорта: ", "Import error: ") + (r2.log || "");
+              }
+            }, 0);
+          };
+          box.appendChild(btn);
+        });
+        var cancel = document.createElement("button");
+        cancel.textContent = T("Отмена", "Cancel");
+        cancel.style.cssText = "display:block;width:100%;padding:10px;margin:10px 0 0;border:1px solid #555;border-radius:8px;background:transparent;color:#aaa;cursor:pointer";
+        cancel.onclick = function () { overlay.remove(); };
+        box.appendChild(cancel);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+      }, 0);
+    };
+    actions.appendChild(btnImport);
+
+    card.appendChild(actions);
+    wrap.appendChild(card);
+
+    /* AGY-BACKUP: список существующих бэкапов */
+    var listSec = document.createElement("div");
+    listSec.className = "agy-t-sec";
+    listSec.textContent = T("Сохранённые бэкапы", "Saved backups");
+    wrap.appendChild(listSec);
+
+    var listWrap = document.createElement("div");
+    listWrap.setAttribute("data-bk-list", "");
+    listWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-bottom:16px";
+    wrap.appendChild(listWrap);
+
+    function refreshBkList() {
+      listWrap.innerHTML = "";
+      var b = bridge();
+      if (!b) return;
+      var id = b.start("bklist", "");
+      if (!id || /^ERR/.test(id)) return;
+      pollStandalone(id, function (r) {
+        var lines = (r.log || "").split("\n").filter(function (l) { return l.indexOf("@@BKFILE") === 0; });
+        if (!lines.length) {
+          var empty = document.createElement("div");
+          empty.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;border:1px dashed rgba(127,127,127,.25);border-radius:12px;color:#888;font-size:12px;text-align:center";
+          empty.innerHTML = '<svg width="24" height="24" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>' +
+            '<div>' + T("Пока нет сохранённых бэкапов.", "No saved backups yet.") + '</div>';
+          listWrap.appendChild(empty);
+          return;
+        }
+        lines.forEach(function (line, idx) {
+          var parts = line.split(" ");
+          if (parts.length < 4) return;
+          var fname = parts[1], sz = parseInt(parts[2], 10), ts = parts.slice(3).join(" ");
+          var mb = (sz / 1048576).toFixed(1);
+          var row = document.createElement("div");
+          row.style.cssText = "display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid rgba(127,127,127,.15);border-radius:12px;background:rgba(255,255,255,.02);transition:background .15s,border-color .15s";
+          row.onmouseenter = function() { row.style.borderColor = "rgba(127,127,127,.35)"; row.style.background = "rgba(255,255,255,.05)"; };
+          row.onmouseleave = function() { row.style.borderColor = "rgba(127,127,127,.15)"; row.style.background = "rgba(255,255,255,.02)"; };
+
+          /* icon */
+          var icon = document.createElement("div");
+          icon.style.cssText = "width:36px;height:36px;border-radius:10px;background:rgba(11,132,255,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0";
+          icon.innerHTML = '<svg width="18" height="18" fill="none" stroke="#0b84ff" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>';
+          row.appendChild(icon);
+
+          /* info */
+          var info = document.createElement("div");
+          info.style.cssText = "flex:1;min-width:0";
+          var nameEl = document.createElement("div");
+          nameEl.style.cssText = "font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#eee";
+          nameEl.textContent = fname.replace("agy-backup-", "").replace(".zip", "");
+          var meta = document.createElement("div");
+          meta.style.cssText = "font-size:11px;color:#888;margin-top:2px;display:flex;gap:8px;align-items:center";
+          var dateIcon = '<svg width="12" height="12" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+          var sizeIcon = '<svg width="12" height="12" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
+          meta.innerHTML = dateIcon + ' ' + ts + ' <span style="opacity:.5">·</span> ' + sizeIcon + ' ' + mb + ' МБ';
+          info.appendChild(nameEl);
+          info.appendChild(meta);
+          row.appendChild(info);
+
+          /* delete button */
+          var btnDel = document.createElement("button");
+          btnDel.title = T("Удалить", "Delete");
+          btnDel.style.cssText = "width:32px;height:32px;border-radius:8px;background:transparent;border:1px solid rgba(214,69,69,.2);color:#d64545;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0";
+          btnDel.innerHTML = '<svg width="14" height="14" fill="none" stroke="#d64545" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14M10 11v6M14 11v6"/></svg>';
+          btnDel.onmouseenter = function() { btnDel.style.background = "rgba(214,69,69,.15)"; };
+          btnDel.onmouseleave = function() { btnDel.style.background = "transparent"; };
+          btnDel.onclick = function () {
+            if (!confirm(T("Удалить бэкап от ", "Delete backup from ") + ts + "?")) return;
+            row.style.opacity = "0.4";
+            var did = b.start("bkdelete", fname);
+            if (!did || /^ERR/.test(did)) { row.style.opacity = "1"; alert(String(did)); return; }
+            pollStandalone(did, function () { refreshBkList(); }, 0);
+          };
+          row.appendChild(btnDel);
+          listWrap.appendChild(row);
+        });
+      }, 0);
+    }
+    refreshBkList();
+
+    hostEl.appendChild(wrap);
+  }
+  window.__agyBackupMount = openBackupSection;
+
+  /* AGY-ABOUT: О приложении — три карточки: приложение, разработчик, обновления */
+  function openAboutSection(hostEl) {
+    if (!hostEl || hostEl.querySelector("[data-about-section]")) return;
+
+    var ACCENT = "#0b84ff";
+    var BORDER = "rgba(127,127,127,.18)";
+    var BG = "rgba(255,255,255,.025)";
+
+    var wrap = document.createElement("div");
+    wrap.setAttribute("data-about-section", "");
+    wrap.style.cssText = "padding:20px;max-width:560px;overflow-y:auto;height:100%;box-sizing:border-box";
+
+    /* ── fixed header ── */
+    var header = document.createElement("div");
+    header.style.cssText = "position:sticky;top:0;z-index:2;background:var(--background,#111);display:flex;align-items:center;padding:0 0 14px 0;margin-bottom:12px";
+    var hTitle = document.createElement("div");
+    hTitle.style.cssText = "font-size:18px;font-weight:600;color:var(--foreground,#eee)";
+    hTitle.textContent = T("О приложении", "About");
+    header.appendChild(hTitle);
+    wrap.appendChild(header);
+
+    function makeCard() {
+      var c = document.createElement("div");
+      c.style.cssText = "background:" + BG + ";border:1px solid " + BORDER + ";border-radius:16px;padding:16px;margin-bottom:12px";
+      return c;
+    }
+
+    /* ── Card 1: Приложение ── */
+    var c1 = makeCard();
+    var appRow = document.createElement("div");
+    appRow.style.cssText = "display:flex;align-items:center;gap:12px;margin-bottom:12px";
+    var appIcon = document.createElement("div");
+    appIcon.style.cssText = "width:40px;height:40px;border-radius:12px;background:rgba(11,132,255,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0";
+    appIcon.innerHTML = '<svg width="22" height="22" fill="none" stroke="' + ACCENT + '" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>';
+    appRow.appendChild(appIcon);
+    var appInfo = document.createElement("div");
+    var appName = document.createElement("div");
+    appName.style.cssText = "font-size:17px;font-weight:600;color:var(--foreground,#eee)";
+    appName.textContent = "Antigravity-BP";
+    var appVer = document.createElement("div");
+    appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
+    appVer.textContent = "3.0.2 · Standard";
+    appInfo.appendChild(appName);
+    appInfo.appendChild(appVer);
+    appRow.appendChild(appInfo);
+    c1.appendChild(appRow);
+
+    var appDesc = document.createElement("div");
+    appDesc.style.cssText = "font-size:14px;line-height:1.55;color:var(--foreground,#ddd);margin-bottom:6px";
+    appDesc.textContent = T(
+      "Среда разработки с ИИ-агентом для Android. Позволяет работать с кодом, редактировать файлы и запускать инструменты прямо на устройстве.",
+      "AI agent development environment for Android. Work with code, edit files and run tools right on your device."
+    );
+    c1.appendChild(appDesc);
+
+    var appDesc2 = document.createElement("div");
+    appDesc2.style.cssText = "font-size:13px;line-height:1.5;color:#999;margin-bottom:14px";
+    appDesc2.textContent = T(
+      "Сборка Leostrange: русский интерфейс, пользовательские ИИ-провайдеры, настройки безопасности, MCP и инструменты разработки.",
+      "Leostrange build: Russian UI, custom AI providers, security settings, MCP and developer tools."
+    );
+    c1.appendChild(appDesc2);
+
+    var linksRow = document.createElement("div");
+    linksRow.style.cssText = "display:flex;gap:16px;flex-wrap:wrap";
+    function makeLink(text, url) {
+      var a = document.createElement("a");
+      a.textContent = text;
+      a.href = url;
+      a.target = "_blank";
+      a.style.cssText = "font-size:13px;color:" + ACCENT + ";text-decoration:none;cursor:pointer;border-bottom:1px solid rgba(11,132,255,.3);padding-bottom:1px";
+      return a;
+    }
+    linksRow.appendChild(makeLink(T("Исходный код", "Source code"), "https://github.com/Leostrange/antigravity-android"));
+    linksRow.appendChild(makeLink(T("История изменений", "Changelog"), "https://github.com/Leostrange/antigravity-android/blob/main/CHANGELOG.md"));
+    c1.appendChild(linksRow);
+
+    var credit = document.createElement("div");
+    credit.style.cssText = "margin-top:12px;font-size:11px;color:#666;line-height:1.4";
+    credit.innerHTML = T("На основе проекта ", "Based on ") + '<a href="https://github.com/werdio325-png/antigravity-android" target="_blank" style="color:#888;text-decoration:underline">werdio325-png/antigravity-android</a>';
+    c1.appendChild(credit);
+    wrap.appendChild(c1);
+
+    /* ── Card 2: Разработчик ── */
+    var c2 = makeCard();
+    var devTitle = document.createElement("div");
+    devTitle.style.cssText = "font-size:16px;font-weight:600;color:var(--foreground,#eee);margin-bottom:10px";
+    devTitle.textContent = T("О разработчике", "About the developer");
+    c2.appendChild(devTitle);
+
+    var devName = document.createElement("div");
+    devName.style.cssText = "font-size:15px;font-weight:500;color:var(--foreground,#eee);margin-bottom:6px";
+    devName.textContent = "Leostrange";
+    c2.appendChild(devName);
+
+    var devDesc = document.createElement("div");
+    devDesc.style.cssText = "font-size:14px;line-height:1.55;color:var(--foreground,#ddd);margin-bottom:14px";
+    devDesc.textContent = T(
+      "Создаю приложения для Android и компьютеров, инструменты с ИИ и русификации программ. Развиваю открытые проекты, стараясь делать технологии удобнее и доступнее. Пишу книгу, увлекаюсь музыкой и фотографией.",
+      "Creating apps for Android and desktop, AI tools and software localization. Building open-source projects to make technology more accessible. Writing a book, passionate about music and photography."
+    );
+    c2.appendChild(devDesc);
+
+    var contacts = [
+      { icon: '<svg width="15" height="15" fill="#888" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>',
+        text: "GitHub · Leostrange", url: "https://github.com/Leostrange" },
+      { icon: '<svg width="15" height="15" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>',
+        text: "xmetalcore@outlook.com", url: "mailto:xmetalcore@outlook.com" },
+      { icon: '<svg width="15" height="15" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>',
+        text: "chester.god.alive@gmail.com", url: "mailto:chester.god.alive@gmail.com" }
+    ];
+    contacts.forEach(function (ct) {
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid " + BORDER + ";cursor:pointer;transition:opacity .15s";
+      row.onmouseenter = function() { row.style.opacity = "0.7"; };
+      row.onmouseleave = function() { row.style.opacity = "1"; };
+      row.onclick = function() { window.open(ct.url, "_blank"); };
+      /* long-press to copy */
+      var lpTimer = null;
+      row.onmousedown = function() { lpTimer = setTimeout(function() { copyText(ct.text); }, 600); };
+      row.onmouseup = function() { clearTimeout(lpTimer); };
+      row.onmouseleave = function() { clearTimeout(lpTimer); row.style.opacity = "1"; };
+      var ic = document.createElement("div");
+      ic.style.cssText = "width:28px;height:28px;border-radius:8px;background:rgba(127,127,127,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0";
+      ic.innerHTML = ct.icon;
+      row.appendChild(ic);
+      var tx = document.createElement("div");
+      tx.style.cssText = "font-size:13px;color:var(--foreground,#ddd);word-break:break-all;flex:1;min-width:0";
+      tx.textContent = ct.text;
+      row.appendChild(tx);
+      c2.appendChild(row);
+    });
+    wrap.appendChild(c2);
+
+    /* ── Card 3: Обновления ── */
+    var c3 = makeCard();
+    var updTitle = document.createElement("div");
+    updTitle.style.cssText = "font-size:16px;font-weight:600;color:var(--foreground,#eee);margin-bottom:6px";
+    updTitle.textContent = T("Обновления", "Updates");
+    c3.appendChild(updTitle);
+
+    var updStatus = document.createElement("div");
+    updStatus.style.cssText = "font-size:13px;color:#888;margin-bottom:12px;min-height:20px";
+    updStatus.textContent = T("Нажмите для проверки наличия обновлений.", "Tap to check for updates.");
+    c3.appendChild(updStatus);
+
+    var btnUpd = document.createElement("button");
+    btnUpd.style.cssText = "width:100%;padding:12px;border:0;border-radius:12px;background:" + ACCENT + ";color:#fff;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s";
+    btnUpd.onmouseenter = function() { btnUpd.style.opacity = "0.85"; };
+    btnUpd.onmouseleave = function() { btnUpd.style.opacity = "1"; };
+    btnUpd.textContent = T("Проверить обновления", "Check for updates");
+    c3.appendChild(btnUpd);
+
+    btnUpd.onclick = function () {
+      btnUpd.disabled = true;
+      btnUpd.textContent = "";
+      var spin = document.createElement("div");
+      spin.style.cssText = "width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:agy-usage-spin .7s linear infinite";
+      btnUpd.appendChild(spin);
+      var stx = document.createElement("span");
+      stx.textContent = T(" Проверяем…", " Checking…");
+      btnUpd.appendChild(stx);
+      updStatus.textContent = "";
+      var b = bridge();
+      if (!b) { updStatus.textContent = T("Мост недоступен.", "Bridge unavailable."); btnUpd.disabled = false; btnUpd.textContent = T("Проверить обновления", "Check for updates"); return; }
+      var id = b.start("updatecheck", "");
+      if (!id || /^ERR/.test(id)) {
+        updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
+        btnUpd.disabled = false; btnUpd.textContent = T("Проверить обновления", "Check for updates");
+        return;
+      }
+      pollStandalone(id, function (r) {
+        btnUpd.disabled = false;
+        btnUpd.textContent = T("Проверить обновления", "Check for updates");
+        var m = /@@UPDATE (\S+) (\S+) (\S+)/.exec(r.log || "");
+        if (m && m[1] && !m[1].startsWith("ERR")) {
+          var tag = m[1], apkUrl = m[3];
+          if (tag.replace("v", "") === "3.0.2") {
+            updStatus.textContent = T("Установлена актуальная версия (3.0.2).", "Latest version installed (3.0.2).");
+          } else {
+            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;
+            var btnDl = document.createElement("button");
+            btnDl.style.cssText = "width:100%;margin-top:10px;padding:11px;border:1px solid " + ACCENT + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:14px;font-weight:500;cursor:pointer;transition:background .15s";
+            btnDl.onmouseenter = function() { btnDl.style.background = "rgba(11,132,255,.1)"; };
+            btnDl.onmouseleave = function() { btnDl.style.background = "transparent"; };
+            btnDl.textContent = T("Скачать обновление", "Download update");
+            btnDl.onclick = function () {
+              btnDl.disabled = true;
+              btnDl.textContent = T("Скачивание…", "Downloading…");
+              var dlId = b.start("updatedownload", apkUrl);
+              if (!dlId || /^ERR/.test(dlId)) {
+                updStatus.textContent = T("Не удалось начать загрузку.", "Download failed to start.");
+                btnDl.disabled = false; btnDl.textContent = T("Скачать обновление", "Download update");
+                return;
+              }
+              pollStandalone(dlId, function (r2) {
+                var log = r2.log || "";
+                if (log.indexOf("@@UPDOK") >= 0) {
+                  updStatus.textContent = T("Обновление установлено! Перезапустите приложение.", "Update installed! Restart the app.");
+                  btnDl.remove();
+                } else if (log.indexOf("@@UPD manual") >= 0) {
+                  updStatus.textContent = T("APK сохранён в «Загрузки». Установите вручную.", "APK saved to Downloads. Install manually.");
+                  btnDl.remove();
+                } else {
+                  updStatus.textContent = T("Ошибка загрузки.", "Download error.");
+                  btnDl.disabled = false;
+                  btnDl.textContent = T("Скачать обновление", "Download update");
+                }
+              }, 0);
+            };
+            c3.appendChild(btnDl);
+          }
+        } else {
+          updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
+        }
+      }, 0);
+    };
+
+    wrap.appendChild(c3);
+    hostEl.appendChild(wrap);
+  }
+  window.__agyAboutMount = openAboutSection;
+
+  /* AGY-FEEDBACK: Оставить отзыв — отправка по электронной почте */
+  function openFeedbackSection(hostEl) {
+    if (!hostEl || hostEl.querySelector("[data-feedback-section]")) return;
+
+    var ACCENT = "#0b84ff";
+    var BORDER = "rgba(127,127,127,.18)";
+    var BG = "rgba(255,255,255,.025)";
+
+    var wrap = document.createElement("div");
+    wrap.setAttribute("data-feedback-section", "");
+    wrap.style.cssText = "padding:20px;max-width:560px;overflow-y:auto;height:100%;box-sizing:border-box";
+
+    /* header */
+    var header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;padding:0 0 14px 0;margin-bottom:12px";
+    var hTitle = document.createElement("div");
+    hTitle.style.cssText = "font-size:18px;font-weight:600;color:var(--foreground,#eee)";
+    hTitle.textContent = T("Обратная связь", "Feedback");
+    header.appendChild(hTitle);
+    wrap.appendChild(header);
+
+    var intro = document.createElement("div");
+    intro.style.cssText = "font-size:14px;line-height:1.55;color:#999;margin-bottom:16px";
+    intro.textContent = T(
+      "Отзывы и предложения отправляются напрямую на почту разработчика. Опишите проблему или идею — ответ приходит в течение нескольких дней.",
+      "Feedback and suggestions go directly to the developer's email. Describe a problem or idea — you'll get a reply within a few days."
+    );
+    wrap.appendChild(intro);
+
+    /* card: form */
+    var card = document.createElement("div");
+    card.style.cssText = "background:" + BG + ";border:1px solid " + BORDER + ";border-radius:16px;padding:16px;margin-bottom:12px";
+
+    /* category */
+    var catLabel = document.createElement("div");
+    catLabel.style.cssText = "font-size:13px;color:#888;margin-bottom:8px";
+    catLabel.textContent = T("Тип обращения:", "Category:");
+    card.appendChild(catLabel);
+
+    var catRow = document.createElement("div");
+    catRow.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px";
+    var categories = [
+      { id: "bug", label: T("Ошибка", "Bug report"), icon: "🐛" },
+      { id: "idea", label: T("Предложение", "Suggestion"), icon: "💡" },
+      { id: "other", label: T("Другое", "Other"), icon: "✉️" }
+    ];
+    var selectedCat = "idea";
+    categories.forEach(function (cat) {
+      var chip = document.createElement("button");
+      chip.style.cssText = "padding:8px 14px;border-radius:10px;border:1px solid " + (cat.id === selectedCat ? ACCENT : BORDER) + ";background:" + (cat.id === selectedCat ? "rgba(11,132,255,.12)" : "transparent") + ";color:" + (cat.id === selectedCat ? ACCENT : "#aaa") + ";font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px";
+      chip.innerHTML = cat.icon + " " + cat.label;
+      chip.onclick = function () {
+        selectedCat = cat.id;
+        catRow.querySelectorAll("button").forEach(function (b, i) {
+          var active = categories[i].id === selectedCat;
+          b.style.borderColor = active ? ACCENT : BORDER;
+          b.style.background = active ? "rgba(11,132,255,.12)" : "transparent";
+          b.style.color = active ? ACCENT : "#aaa";
+        });
+      };
+      catRow.appendChild(chip);
+    });
+    card.appendChild(catRow);
+
+    /* message */
+    var msgLabel = document.createElement("div");
+    msgLabel.style.cssText = "font-size:13px;color:#888;margin-bottom:6px";
+    msgLabel.textContent = T("Сообщение:", "Message:");
+    card.appendChild(msgLabel);
+
+    var textarea = document.createElement("textarea");
+    textarea.style.cssText = "width:100%;min-height:120px;padding:12px;border:1px solid " + BORDER + ";border-radius:12px;background:rgba(0,0,0,.2);color:var(--foreground,#eee);font-size:14px;line-height:1.5;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit";
+    textarea.placeholder = T("Опишите проблему или предложение...", "Describe a problem or suggestion...");
+    textarea.onfocus = function() { textarea.style.borderColor = ACCENT; };
+    textarea.onblur = function() { textarea.style.borderColor = BORDER; };
+    card.appendChild(textarea);
+
+    /* email to send from */
+    var emailLabel = document.createElement("div");
+    emailLabel.style.cssText = "font-size:13px;color:#888;margin:12px 0 6px";
+    emailLabel.textContent = T("Ваш email для ответа (необязательно):", "Your email for reply (optional):");
+    card.appendChild(emailLabel);
+
+    var emailInput = document.createElement("input");
+    emailInput.type = "email";
+    emailInput.style.cssText = "width:100%;padding:10px 12px;border:1px solid " + BORDER + ";border-radius:12px;background:rgba(0,0,0,.2);color:var(--foreground,#eee);font-size:14px;box-sizing:border-box;outline:none";
+    emailInput.placeholder = "email@example.com";
+    emailInput.onfocus = function() { emailInput.style.borderColor = ACCENT; };
+    emailInput.onblur = function() { emailInput.style.borderColor = BORDER; };
+    card.appendChild(emailInput);
+
+    /* send button */
+    var btnSend = document.createElement("button");
+    btnSend.style.cssText = "width:100%;margin-top:16px;padding:12px;border:0;border-radius:12px;background:" + ACCENT + ";color:#fff;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s";
+    btnSend.onmouseenter = function() { btnSend.style.opacity = "0.85"; };
+    btnSend.onmouseleave = function() { btnSend.style.opacity = "1"; };
+    btnSend.innerHTML = '<svg width="18" height="18" fill="none" stroke="#fff" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> ' + T("Отправить", "Send");
+    card.appendChild(btnSend);
+
+    wrap.appendChild(card);
+
+    /* recipients info */
+    var info = document.createElement("div");
+    info.style.cssText = "font-size:12px;color:#666;line-height:1.5";
+    info.innerHTML = T("Письмо откроется в вашем почтовом приложении. Также можно написать напрямую: ", "The email will open in your mail app. You can also write directly: ") +
+      '<a href="mailto:xmetalcore@outlook.com" style="color:#888;text-decoration:underline">xmetalcore@outlook.com</a>';
+    wrap.appendChild(info);
+
+    /* send action — через Intent, т.к. window.open(mailto:) не работает в WebView */
+    btnSend.onclick = function () {
+      var text = textarea.value.trim();
+      if (!text) {
+        textarea.style.borderColor = "#d64545";
+        textarea.focus();
+        setTimeout(function() { textarea.style.borderColor = BORDER; }, 2000);
+        return;
+      }
+      var catName = categories.filter(function(c) { return c.id === selectedCat; })[0];
+      var subject = "[Antigravity-BP] " + (catName ? catName.label : "");
+      var body = text;
+      if (emailInput.value.trim()) {
+        body += "\n\n---\n" + T("Ответить на: ", "Reply to: ") + emailInput.value.trim();
+      }
+      var mailto = "mailto:xmetalcore@outlook.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+      /* Method 1: anchor click (WebView may handle mailto) */
+      var a = document.createElement("a");
+      a.href = mailto;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      /* Method 2: rish (Shizuku) → am start Intent */
+      setTimeout(function () {
+        var b = bridge();
+        if (b) {
+          var cmd = "rish -c \"am start -a android.intent.action.SENDTO -d '" + mailto.replace(/'/g, "'\\''") + "'\"";
+          b.start("termrun", btoa(cmd));
+        }
+      }, 400);
+    };
+
+    hostEl.appendChild(wrap);
+  }
+  window.__agyFeedbackMount = openFeedbackSection;
 
   window.__agyToolsMount = function (el) {
     if (!el) return;

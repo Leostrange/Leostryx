@@ -24,6 +24,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "tools"))
+import brand  # noqa: E402  (Leostryx icon pack + display name overlay)
 APP = ROOT / "app"
 MAP = json.loads((ROOT / "compress-map.json").read_text(encoding="utf-8"))
 BYPASS = {
@@ -159,9 +161,22 @@ def main():
     if not jobs:
         print("usage: python3 rebuild.py [standard|bypass|both]")
         return 2
+    # Leostryx branding: icon pack + display name, driven by
+    # app/assets/web/brand/config.json. Sits on top of the variant delta so a
+    # bypass build is branded the same way as standard.
+    brand_cfg = brand.load_brand(ROOT)
+    if brand_cfg:
+        print("brand: pack=%s name=%s color=%s"
+              % (brand_cfg["pack"], brand_cfg["name"], brand_cfg["color"]))
+    else:
+        print("brand: no valid app/assets/web/brand/config.json — building unbranded")
+
     for name, overlay in jobs:
+        merged = dict(overlay)
+        if brand_cfg:
+            merged.update(brand.build_overlay(ROOT, brand_cfg, ROOT / "dist" / ".brand"))
         unsigned = ROOT / "dist" / f"{name}-unsigned.apk"
-        pack(unsigned, overlay)
+        pack(unsigned, merged)
         zipalign4(unsigned)
         sign(unsigned)
     print("ready in", ROOT / "dist/signed")
