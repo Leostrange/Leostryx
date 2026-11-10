@@ -1,23 +1,23 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.6-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.7-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.6).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.7).</b><br/>
 Полная русификация, щит безопасности агента, вкладка субагентов, уведомления в шторке с прямым ответом, оптимизация памяти, темы и компактный интерфейс, смена иконки и цвета на лету, вложения, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 ---
 
-## Leostryx для Android 3.0.6
+## Leostryx для Android 3.0.7
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -29,9 +29,10 @@
 - **субагенты (Subagents)**: вкладка субагентов в кастомизации, готовый каталог (Code Reviewer, Android Debugger, Security Auditor и др.), создание и вызов субагентов в чате, fallback-роутинг моделей в AgyGateway;
 - **уведомления в шторке Android**: интерактивные уведомления с кнопкой прямого ответа (`RemoteInput`) и быстрого подтверждения «Разрешить / Продолжить»;
 - **оптимизация энергопотребления и RAM**: отключение предрастеризации WebView, возврат страниц RAM ядром Go (`madvdontneed=1`, `GOMEMLIMIT=384MiB`), выгрузка моделей Vosk и очистка памяти при нехватке;
+- **темы и frosted glass**: адаптация селектора моделей и всех выпадающих списков/попапов к тёмной и светлой теме с истинной прозрачностью и размытием;
+- **плавность и быстродействие**: мгновенное открытие проводника медиа/файлов без чёрных экранов, плавное опускание чата при скрытии клавиатуры;
 - **щит безопасности** в чате: профиль безопасности, доступ к файлам и интернету, автовыполнение команд терминала, песочница и JavaScript — с реально сохраняющимися выборами;
 - **автономный режим агента**: «Не спрашивать» (EAGER) — агент работает без лишних подтверждений;
-- **темы** списков и окон, светлая и тёмная схемы, компактные меню, попапы и выпадающие списки;
 - **компактный чат** с вложениями до 10 файлов (просмотр и удаление прикреплённого);
 - настройки диктовки, режимы мышления, экспорт сессий (Markdown, PDF и изображения);
 - **консоль приложения** (Tools → Консоль) для снятия логов: отдельные запуски команд, кнопки копирования и очистки, быстрый `logcat`;
@@ -46,8 +47,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.6-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.6-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.7-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.7-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -56,8 +57,15 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.0.6](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.6/SHA256SUMS.txt).
-2. Установите скачанный APK 3.0.6 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.0.7](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.7/SHA256SUMS.txt).
+2. Установите скачанный APK 3.0.7 (`standard` или `bypass`) и запустите приложение.
+
+## Что нового в 3.0.7
+
+- **адаптация селектора выбора моделей к темам и прозрачности** — панель выбора модели теперь оформлена в стиле матового стекла (frosted glass) с `backdrop-filter: blur(22px) saturate(190%)` и плавно вписывается как в тёмную, так и в светлую тему;
+- **истинная прозрачность выпадающих списков и попапов в светлой теме** — убраны непрозрачные белые подложки внутри всплывающих списков, контекстных меню и Radix Popper контейнеров;
+- **мгновенное и плавное открытие проводника файлов (+ / Медиа)** — устранён посредник `Intent.createChooser`, убраны рывки, полоса сбоку и чёрный экран при вызове выбора файлов;
+- **плавное опускание чата при скрытии клавиатуры** — устранена задержка и цветной заполнитель на месте закрывающейся клавиатуры за счёт мгновенной синхронизации `100%` высоты и отключения задержек `nudgeSeries`.
 
 ## Что нового в 3.0.6
 
@@ -152,7 +160,7 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 ```
 
 > [!NOTE]
-> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.6) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
+> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
 
 ## Сборка APK
 

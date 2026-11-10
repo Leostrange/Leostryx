@@ -21,13 +21,16 @@ function installTaps(doc) {
 function installViewport(global, doc) {
   try {
     if (global.visualViewport) {
-      global.visualViewport.addEventListener('resize', function () {
+      function syncVv() {
         var vv = global.visualViewport;
         if (vv && vv.height && doc.documentElement) {
           doc.documentElement.style.setProperty(
             '--agy-vvh', Math.round(vv.height) + 'px');
         }
-      }, { passive: true });
+      }
+      global.visualViewport.addEventListener('resize', syncVv, { passive: true });
+      global.visualViewport.addEventListener('scroll', syncVv, { passive: true });
+      syncVv();
     }
   } catch (e) {}
 }

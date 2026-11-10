@@ -508,26 +508,23 @@
     var vvTimer = 0;
     window.visualViewport.addEventListener("resize", function () {
       clearTimeout(vvTimer);
-      // Keyboard shown/hidden anywhere: nudge the focused chat input, the page,
-      // and the focused settings field's container.
+      var ae = document.activeElement;
+      var isInput = (ae && ae !== document.body && ae.matches && ae.matches("input:not([type='checkbox']):not([type='radio']),textarea,[contenteditable='true']"));
+      if (!isInput) {
+        // Keyboard is closing/closed: don't delay or jiggle scroll, let chat drop down smoothly
+        return;
+      }
       vvTimer = setTimeout(function () {
         var active = document.activeElement;
         if (active && active.closest && active.closest('.agy-providers')) { revealProviderSeries(active); return; }
-        nudgeSeries(); nudgePageSeries();
-        var ae = document.activeElement;
-        if (ae && ae.matches && ae.matches("input:not([type='checkbox']):not([type='radio']),textarea,select,[contenteditable='true']") && !ae.closest(BOX)) nudgeFieldSeries(ae);
-      }, 60);
+        nudgeSeries();
+        var e = document.activeElement;
+        if (e && e.matches && e.matches("input:not([type='checkbox']):not([type='radio']),textarea,select,[contenteditable='true']") && !e.closest(BOX)) nudgeFieldSeries(e);
+      }, 50);
     }, { passive: true });
   }
 
-  /* ---- Compact menus instead of bottom sheets (ТЗ 6.3, 6.4, B-15) ---------
-   * 2.4.1 opens the "+" menu and the projects menu (New Project / Quick Start)
-   * as a full-width bottom sheet. Only for those two sheets we pin the sheet
-   * itself next to the button that opened it (≈240 px wide). The shared
-   * fullscreen container is never styled; the backdrop of THAT sheet only
-   * becomes transparent (it still closes the menu on an outside tap and is
-   * removed by React together with the sheet). Model selector sheets are
-   * never matched. */
+  /* ---- Compact menus & Glass Popovers (Release 3.0.7) --------------------- */
   var lastTrigger = null;
   var sheetTriggers = new WeakMap();
   document.addEventListener("pointerdown", function (e) {
@@ -537,14 +534,12 @@
 
   var ITEM = "[role='menuitem'],[role='menuitemradio'],[role='menuitemcheckbox'],[role='option']";
   function sheetKind(sheet, trigger) {
-    // Original model selector / Usage stay exactly as in 2.4.1.
-    if (sheet.querySelector("[data-testid^='model-selector'],[data-testid='model-quota-refreshing']")) return null;
-    if (trigger && trigger.closest && trigger.closest("[data-testid='model-selector-trigger']")) return null;
+    if (sheet.querySelector("[data-testid^='model-selector']")) return "model-menu";
+    if (trigger && trigger.closest && trigger.closest("[data-testid='model-selector-trigger']")) return "model-menu";
+    if (sheet.querySelector("[data-testid='model-quota-refreshing']")) return null;
     if (sheet.querySelector("input:not([type='checkbox']):not([type='radio']),textarea,[contenteditable='true']")) return null;
     if (sheet.querySelector("[role='option'],[role='menuitemradio']")) return "select";
     if (sheet.querySelector(ITEM)) return "menu";
-    // Plain-button menus (e.g. New Project / Quick Start). Full screens such as
-    // Settings are opened with an explicit sheet height and are skipped.
     var btns = sheet.querySelectorAll("button");
     if (!sheet.style.height && btns.length > 0 && btns.length <= 8 && (sheet.textContent || "").length < 300) return "menu";
     return null;
@@ -564,13 +559,14 @@
       if (!kind) {
         sheetTriggers.delete(sh);
         if (sh.classList.contains("agy-compact-sheet")) {
-          sh.classList.remove("agy-compact-sheet", "agy-tight-menu");
+          sh.classList.remove("agy-compact-sheet", "agy-tight-menu", "agy-model-menu");
           ["left", "top", "bottom", "width"].forEach(function (k) { sh.style.removeProperty(k); });
         }
         continue;
       }
       if (!sheetTriggers.has(sh) && lastTrigger && lastTrigger.isConnected) sheetTriggers.set(sh, lastTrigger);
       sh.classList.add("agy-compact-sheet");
+      sh.classList.toggle("agy-model-menu", kind === "model-menu");
       var layer = sh.parentElement;
       var z = layer ? parseInt(getComputedStyle(layer).zIndex, 10) : NaN;
       for (var k = 0; k < backs.length; k++) {
@@ -581,11 +577,11 @@
       var trigger = sheetTriggers.get(sh);
       var r = trigger && trigger.isConnected ? trigger.getBoundingClientRect() : null;
       var tw = r ? r.width : 0;
-      // Width like Out27: short menus min(188, max(trigger, 124)); selects = trigger width; else content width.
       var ls = lines(sh);
       var short = ls.length > 0 && ls.every(function (x) { return x.length <= 26; });
       var w;
-      if (kind === "select" && tw >= 60) w = tw;
+      if (kind === "model-menu") w = Math.round(Math.min(340, vw - 20));
+      else if (kind === "select" && tw >= 60) w = tw;
       else if (short) w = Math.round(Math.min(188, Math.max(tw, 124)));
       else w = 0;
       sh.classList.toggle("agy-tight-menu", short);

@@ -60,24 +60,66 @@ html[data-agy-language="ru"] .capitalize {
   transition: none !important;
 }
 
-/* Compact menus (agy_ru.js marks only menu/select sheets, never the model
-   selector). Look follows Out27: glass surface, 14px radius, tight items. */
+/* ---- Unified Glass & Theme Variables (Release 3.0.7) -------------------- */
+:root,
+html.light,
+html:not(.dark) {
+  --agy-glass-surface: rgba(255, 255, 255, 0.82) !important;
+  --agy-glass-border: rgba(0, 0, 0, 0.10) !important;
+  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+  --agy-glass-item-hover: rgba(0, 0, 0, 0.06) !important;
+  --agy-glass-item-active: rgba(0, 0, 0, 0.10) !important;
+  --popover: #ffffff !important;
+}
+
+html.dark {
+  --agy-glass-surface: rgba(26, 26, 30, 0.84) !important;
+  --agy-glass-border: rgba(255, 255, 255, 0.12) !important;
+  --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  --agy-glass-item-hover: rgba(255, 255, 255, 0.09) !important;
+  --agy-glass-item-active: rgba(255, 255, 255, 0.15) !important;
+  --popover: #1c1c1e !important;
+}
+
+/* Fix keyboard hide filling & delay (Задача 4) */
+html,
+body,
+#root,
+.h-\[100dvh\],
+[class*="h-[100dvh]"] {
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+}
+
+[data-testid="chat-container"],
+[data-testid="agent-input-box"] {
+  transition: transform 0ms linear, height 0ms linear !important;
+}
+
+/* Compact menus & Glass Popovers (Задачи 1 и 2) */
 [data-testid="bottom-sheet"].agy-compact-sheet {
   position: fixed !important;
   right: auto !important;
   height: auto !important;
   width: max-content;
-  max-width: min(320px, calc(100vw - 16px)) !important;
+  max-width: min(340px, calc(100vw - 16px)) !important;
   min-width: 0 !important;
-  padding: 4px !important;
-  border: 1px solid color-mix(in srgb, var(--foreground, #888) 14%, transparent) !important;
+  padding: 6px !important;
+  border: 1px solid var(--agy-glass-border) !important;
   border-radius: 14px !important;
-  background: color-mix(in srgb, var(--popover, var(--card, var(--background, #1c1c1e))) 90%, transparent) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .28) !important;
+  background: var(--agy-glass-surface) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
   transform: none !important;
   transition: opacity 120ms ease-out !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
+}
+[data-testid="bottom-sheet"].agy-compact-sheet.agy-model-menu {
+  max-width: min(340px, calc(100vw - 20px)) !important;
+  max-height: min(480px, calc(100vh - 100px)) !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet[data-starting-style],
 [data-testid="bottom-sheet"].agy-compact-sheet[data-ending-style] { opacity: 0; }
@@ -99,23 +141,65 @@ html[data-agy-language="ru"] .capitalize {
   font-size: 13px !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet :is([aria-selected="true"], [data-highlighted], [data-state="checked"], [aria-checked="true"]) {
-  background-color: rgba(127, 127, 127, .22) !important;
+  background-color: var(--agy-glass-item-hover) !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet :is(svg, img) { width: 15px; height: 15px; }
 [data-testid="bottom-sheet-backdrop"].agy-compact-backdrop {
   background: transparent !important;
 }
 
-/* Stage 2: anchored popovers (menus / selects / popovers) styled like Out27.
-   Scoped to the popup elements inside the z-[6000] positioner only — no global
-   [role=menu]/[role=listbox] rules and nothing on shared containers. */
-.z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]) {
-  background: color-mix(in srgb, var(--popover, var(--card, #1c1c1e)) 90%, transparent) !important;
-  border-radius: 12px !important;
-  border-color: color-mix(in srgb, var(--foreground, #888) 14%, transparent) !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .26) !important;
-  padding: 4px !important;
+/* Universal Glass Popovers: model selector, menus, selects, radix poppers */
+:is(
+  [data-testid="model-selector-panel"],
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content],
+  [data-select-popup],
+  .z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]),
+  .z-\[6000\] > *
+) {
+  background: var(--agy-glass-surface) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--agy-glass-border) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
+  padding: 6px !important;
   max-width: calc(100vw - 16px) !important;
+}
+
+/* Clear opaque backgrounds inside popovers in light & dark themes */
+:is(
+  [data-testid="model-selector-panel"],
+  [data-testid="bottom-sheet"],
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content],
+  [data-select-popup],
+  [role="menu"],
+  [role="listbox"],
+  .agy-compact-sheet,
+  #typeahead-menu
+) :is(div, ul, section, header, nav):not([role="menuitem"]):not([role="option"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]) {
+  background-color: transparent !important;
+}
+
+/* Model selector panel specific glass layout */
+[data-testid="model-selector-panel"] {
+  max-height: min(460px, calc(100vh - 120px)) !important;
+  overflow-y: auto !important;
+}
+
+[data-testid="model-selector-panel"] [data-testid="model-selector-item"] {
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  transition: background-color 100ms ease !important;
+}
+
+[data-testid="model-selector-panel"] [data-testid="model-selector-item"]:hover,
+[data-testid="model-selector-panel"] [data-testid="model-selector-item"][data-highlighted],
+[data-testid="model-selector-panel"] [data-testid="model-selector-item"][aria-selected="true"] {
+  background-color: var(--agy-glass-item-hover) !important;
 }
 /* Sort menu popover: main.js uses .agy-narrow-menu instead of Tailwind !w-56
    to control width. Content-hugging, capped at 210px. */
