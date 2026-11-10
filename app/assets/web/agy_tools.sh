@@ -1610,8 +1610,360 @@ for pdir in sorted(glob.glob(f"{cfg_dir}/plugins/*")):
     clean_desc = desc.replace("|", " ").replace("\n", " ")
     print("@@cust_plugin %s|%s|%s|%s|%s|%s|%s" % (pname, title, is_enabled, skills_count, has_rules, has_mcp, clean_desc))
 
+disabled_agents = set(cfg_data.get("disabledAgents", []))
+
+builtin_agents = [
+    ("builtin", "self", "Полный агент (Self)", "inherit", "1", "1", "1", "1", "builtin://self",
+     "Универсальный субагент с полным набором инструментов родительского агента (чтение/запись файлов, терминал, браузер, MCP) в отдельном контексте."),
+    ("builtin", "research", "Исследователь (Research)", "flash", "0", "1", "0", "1", "builtin://research",
+     "Быстрый субагент только для чтения: исследование кодовой базы, поиск по файлам, документации и веб-поиск без изменения файлов."),
+    ("builtin", "image-generator", "Генератор графики (Image)", "inherit", "1", "0", "0", "1", "builtin://image-generator",
+     "Специализированный субагент для генерации и редактирования изображений, иконок и визуальных ассетов по текстовому ТЗ.")
+]
+for ba in builtin_agents:
+    print("@@cust_agent %s" % "|".join(ba))
+
+agents_dir = os.path.join(cfg_dir, "agents")
+os.makedirs(agents_dir, exist_ok=True)
+enabled_custom_agents = []
+
+for ap in sorted(glob.glob(f"{agents_dir}/*.md")):
+    aname = os.path.splitext(os.path.basename(ap))[0]
+    atitle = aname
+    adesc = ""
+    amodel = "inherit"
+    awrite = "1"
+    amcp = "1"
+    asub = "0"
+    abody = ""
+    try:
+        with open(ap, encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        abody = content
+        m = re.search(r"^---\s*\n(.*?)\n---(.*)", content, re.DOTALL)
+        if m:
+            fm = m.group(1)
+            abody = m.group(2).strip()
+            nm = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
+            if nm: aname = nm.group(1).strip()
+            tm = re.search(r"^title:\s*(.+)$", fm, re.MULTILINE)
+            if tm: atitle = tm.group(1).strip()
+            mm = re.search(r"^model:\s*(.+)$", fm, re.MULTILINE)
+            if mm: amodel = mm.group(1).strip()
+            wm = re.search(r"^enable_write_tools:\s*(.+)$", fm, re.MULTILINE)
+            if wm: awrite = "1" if wm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+            cm = re.search(r"^enable_mcp_tools:\s*(.+)$", fm, re.MULTILINE)
+            if cm: amcp = "1" if cm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+            sm = re.search(r"^enable_subagent_tools:\s*(.+)$", fm, re.MULTILINE)
+            if sm: asub = "1" if sm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+            dm = re.search(r"^description:\s*(?:>-\s*|\s*)(.+?)(?=\n[a-zA-Z0-9_-]+:|\Z)", fm, re.DOTALL | re.MULTILINE)
+            if dm: adesc = " ".join(dm.group(1).split())
+    except:
+        pass
+    aen = "0" if aname in disabled_agents else "1"
+    clean_adesc = adesc.replace("|", " ").replace("\n", " ")[:250]
+    clean_atitle = atitle.replace("|", " ").replace("\n", " ")[:80]
+    print("@@cust_agent user|%s|%s|%s|%s|%s|%s|%s|%s|%s" % (
+        aname, clean_atitle, amodel, awrite, amcp, asub, aen, ap, clean_adesc
+    ))
+    if aen == "1":
+        enabled_custom_agents.append((aname, clean_atitle, amodel, awrite == "1", amcp == "1", asub == "1", clean_adesc, ap))
+
+# Sync active custom subagents into ~/.gemini/config/rules/custom_subagents.md
+rules_dir = os.path.join(cfg_dir, "rules")
+os.makedirs(rules_dir, exist_ok=True)
+rule_file = os.path.join(rules_dir, "custom_subagents.md")
+if enabled_custom_agents:
+    lines = [
+        "# Custom User Subagents Registry",
+        "",
+        "The user has configured the following custom subagents in `~/.gemini/config/agents/`.",
+        "To use any of these custom subagents, first register it in the current conversation with `define_subagent` (reading its full system prompt from the file path or using the summary below) and then launch it with `invoke_subagent`:",
+        ""
+    ]
+    for aname, atitle, amodel, awrite, amcp, asub, adesc, ap in enabled_custom_agents:
+        lines.append(f"- **`{aname}`** ({atitle}): {adesc}")
+        lines.append(f"  - Model: `{amodel}` | `enable_write_tools={awrite}` | `enable_mcp_tools={amcp}` | `enable_subagent_tools={asub}`")
+        lines.append(f"  - System prompt file: `{ap}`")
+    try:
+        with open(rule_file, "w", encoding="utf-8") as rf:
+            rf.write("\n".join(lines) + "\n")
+    except:
+        pass
+elif os.path.exists(rule_file):
+    try:
+        os.remove(rule_file)
+    except:
+        pass
+
 instr_len = os.path.getsize(agents_file) if os.path.exists(agents_file) else 0
 print("@@cust_instr_size %d" % instr_len)
+PY
+            say "@@done"
+            ;;
+        add-agent)
+            python3 - "$cfg_dir" "$rest" <<'PY' || fail "add-agent failed"
+import sys, base64, os
+
+cfg_dir, raw = sys.argv[1], sys.argv[2]
+parts = raw.split("|")
+name = parts[0].strip()
+title = base64.b64decode(parts[1]).decode("utf-8").strip() if len(parts) > 1 and parts[1] else name
+desc = base64.b64decode(parts[2]).decode("utf-8").strip() if len(parts) > 2 and parts[2] else ""
+model = parts[3].strip() if len(parts) > 3 and parts[3].strip() else "inherit"
+write_en = "true" if (len(parts) <= 4 or parts[4].strip() == "1") else "false"
+mcp_en = "true" if (len(parts) <= 5 or parts[5].strip() == "1") else "false"
+sub_en = "true" if (len(parts) > 6 and parts[6].strip() == "1") else "false"
+body = base64.b64decode(parts[7]).decode("utf-8").strip() if len(parts) > 7 and parts[7] else ""
+
+agents_dir = os.path.join(cfg_dir, "agents")
+os.makedirs(agents_dir, exist_ok=True)
+agent_md = os.path.join(agents_dir, f"{name}.md")
+
+file_content = f"""---
+name: {name}
+title: {title}
+model: {model}
+enable_write_tools: {write_en}
+enable_mcp_tools: {mcp_en}
+enable_subagent_tools: {sub_en}
+description: >-
+  {desc}
+---
+
+{body}
+"""
+tmp = agent_md + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    f.write(file_content)
+os.replace(tmp, agent_md)
+print("Subagent saved:", agent_md)
+PY
+            say "@@done"
+            ;;
+        read-agent)
+            python3 - "$rest" <<'PY' || fail "read-agent failed"
+import sys, os, re, base64
+
+apath = sys.argv[1].strip()
+if apath.startswith("builtin://"):
+    bname = apath.split("builtin://", 1)[1]
+    builtins = {
+        "self": ("Полный агент (Self)", "Универсальный субагент с полным набором инструментов родительского агента в отдельном контексте.", "inherit", "1", "1", "1",
+                 "# Системный субагент `self`\n\nНаследует полный системный промпт, модель и все инструменты основного агента (чтение и запись файлов, выполнение команд в терминале, работа с git и MCP).\n\nИспользуйте его для параллельного выполнения независимых задач разработки или глубокой отладки в изолированном контексте."),
+        "research": ("Исследователь (Research)", "Быстрый субагент только для чтения: исследование кодовой базы, поиск по файлам и веб-поиск.", "flash", "0", "1", "0",
+                     "# Системный субагент `research`\n\nОснащён только безопасными инструментами чтения (`view_file`, `grep_search`, `find_by_name`, `search_web`, `read_url_content`).\n\nИдеально подходит для быстрого обзора архитектуры проекта, поиска причин багов или изучения документации без риска изменения файлов."),
+        "image-generator": ("Генератор графики (Image)", "Специализированный субагент для генерации и редактирования изображений по описанию.", "inherit", "1", "0", "0",
+                            "# Системный субагент `image-generator`\n\nГенерирует или редактирует изображения, иконки и баннеры по текстовому заданию и возвращает пути к сохранённым файлам.")
+    }
+    title, desc, model, wr, mcp, sub, body = builtins.get(bname, (bname, "", "inherit", "1", "1", "0", ""))
+    print("@@cust_agent_data %s|%s|%s|%s|%s|%s|%s|%s" % (
+        bname,
+        base64.b64encode(title.encode("utf-8")).decode("ascii"),
+        base64.b64encode(desc.encode("utf-8")).decode("ascii"),
+        model, wr, mcp, sub,
+        base64.b64encode(body.encode("utf-8")).decode("ascii")
+    ))
+    sys.exit(0)
+
+if not os.path.exists(apath):
+    print("Error: agent file not found:", apath)
+    sys.exit(1)
+
+with open(apath, encoding="utf-8", errors="replace") as f:
+    content = f.read()
+
+name = os.path.splitext(os.path.basename(apath))[0]
+title = name
+desc = ""
+model = "inherit"
+wr = "1"
+mcp = "1"
+sub = "0"
+body = content
+
+m = re.search(r"^---\s*\n(.*?)\n---(.*)", content, re.DOTALL)
+if m:
+    fm = m.group(1)
+    body = m.group(2).strip()
+    nm = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
+    if nm: name = nm.group(1).strip()
+    tm = re.search(r"^title:\s*(.+)$", fm, re.MULTILINE)
+    if tm: title = tm.group(1).strip()
+    mm = re.search(r"^model:\s*(.+)$", fm, re.MULTILINE)
+    if mm: model = mm.group(1).strip()
+    wm = re.search(r"^enable_write_tools:\s*(.+)$", fm, re.MULTILINE)
+    if wm: wr = "1" if wm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+    cm = re.search(r"^enable_mcp_tools:\s*(.+)$", fm, re.MULTILINE)
+    if cm: mcp = "1" if cm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+    sm = re.search(r"^enable_subagent_tools:\s*(.+)$", fm, re.MULTILINE)
+    if sm: sub = "1" if sm.group(1).strip().lower() in ("true", "1", "yes") else "0"
+    dm = re.search(r"^description:\s*(?:>-\s*|\s*)(.+?)(?=\n[a-zA-Z0-9_-]+:|\Z)", fm, re.DOTALL | re.MULTILINE)
+    if dm: desc = " ".join(dm.group(1).split())
+
+print("@@cust_agent_data %s|%s|%s|%s|%s|%s|%s|%s" % (
+    name,
+    base64.b64encode(title.encode("utf-8")).decode("ascii"),
+    base64.b64encode(desc.encode("utf-8")).decode("ascii"),
+    model, wr, mcp, sub,
+    base64.b64encode(body.encode("utf-8")).decode("ascii")
+))
+PY
+            say "@@done"
+            ;;
+        delete-agent)
+            local aname="$rest"
+            local afile="$cfg_dir/agents/$aname.md"
+            if [ -f "$afile" ]; then
+                rm -f "$afile"
+                say "Subagent deleted: $aname"
+            else
+                fail "Subagent not found: $aname"
+            fi
+            say "@@done"
+            ;;
+        toggle-agent)
+            local aname="${rest%% *}"
+            local val="${rest#* }"
+            python3 - "$cfg_dir/config.json" "$aname" "$val" <<'PY' || fail "toggle-agent failed"
+import json, sys, os
+cfg_file, name, val = sys.argv[1], sys.argv[2], sys.argv[3]
+data = {}
+if os.path.exists(cfg_file):
+    try:
+        with open(cfg_file) as f:
+            data = json.load(f)
+    except:
+        pass
+disabled = set(data.get("disabledAgents", []))
+if val == "1":
+    disabled.discard(name)
+else:
+    disabled.add(name)
+data["disabledAgents"] = sorted(list(disabled))
+tmp = cfg_file + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+os.replace(tmp, cfg_file)
+print("Subagent toggle saved:", name, val)
+PY
+            say "@@done"
+            ;;
+        install-agent)
+            python3 - "$cfg_dir" "$rest" <<'PY' || fail "install-agent failed"
+import sys, os
+
+cfg_dir, aid = sys.argv[1], sys.argv[2].strip()
+agents_dir = os.path.join(cfg_dir, "agents")
+os.makedirs(agents_dir, exist_ok=True)
+
+PRESET_AGENTS = {
+    "code-reviewer": {
+        "title": "Ревьюер кода (Code Reviewer)",
+        "model": "pro",
+        "write": "false",
+        "mcp": "true",
+        "sub": "false",
+        "desc": "Глубокое код-ревью изменений, поиск багов, гонок данных, утечек памяти и нарушений архитектуры без модификации файлов.",
+        "body": """# Роль: Старший ревьюер кода (Code Reviewer)
+
+Ты — специализированный субагент для проведения строгого и конструктивного ревью кода.
+
+## Алгоритм работы:
+1. Проанализируй изменённые или указанные файлы (`git diff`, `git status`, чтение файлов).
+2. Проверь код на:
+   - Логические ошибки, граничные случаи (`null`/`undefined`, переполнения, гонки потоков).
+   - Утечки памяти, незакрытые дескрипторы/потоки и неоптимальные алгоритмы.
+   - Соответствие архитектуре и стилю проекта.
+3. Сформируй чёткий отчёт с приоритетами (`Критично`, `Важно`, `Рекомендация`), точными ссылками на строки и готовыми фрагментами исправлений."""
+    },
+    "android-debugger": {
+        "title": "Android-отладчик (Logcat & APK)",
+        "model": "inherit",
+        "write": "true",
+        "mcp": "true",
+        "sub": "false",
+        "desc": "Диагностика крашей Android, анализ logcat/stacktrace, проверка манифестов, Gradle, JNI и декомпиляция через jadx-agy/apktool.",
+        "body": """# Роль: Инженер отладки Android (Android Debugger)
+
+Ты — специализированный субагент по отладке Android-приложений, нативных библиотек (JNI/NDK) и сборке APK в среде Leostryx (ARM64).
+
+## Правила и инструменты:
+1. При анализе APK всегда используй `jadx-agy -j 2 --no-res` (вместо обычного `jadx`) и `apktool`.
+2. При наличии Shizuku (`rish -c "..."`) проверяй живой `logcat -d -t 200`, `dumpsys package` и `am start`.
+3. Находи первопричину исключений (`NullPointerException`, `UnsatisfiedLinkError`, `SecurityException`, `OutOfMemoryError`) и предлагай или вноси точечный фикс."""
+    },
+    "security-auditor": {
+        "title": "Аудитор безопасности (Security Auditor)",
+        "model": "pro",
+        "write": "false",
+        "mcp": "true",
+        "sub": "false",
+        "desc": "Аудит безопасности по OWASP Top 10, поиск инъекций, XSS/CSRF, небезопасных прав Android и утечек API-ключей/секретов.",
+        "body": """# Роль: Аудитор информационной безопасности (Security Auditor)
+
+Ты — субагент по безопасности приложений и анализу защищённости кода.
+
+## Задачи аудита:
+1. Поиск захардкоженных токенов, приватных ключей и паролей в коде и истории коммитов.
+2. Проверка командных вызовов, SQL-запросов, WebView (`addJavascriptInterface`, `setAllowFileAccess`), Intent-фильтров и сетевых политик.
+3. Выдача структурированного отчёта с оценкой риска (CVSS / High / Medium / Low) и безопасным патчем для каждой находки."""
+    },
+    "test-engineer": {
+        "title": "Инженер тестирования (QA & Tests)",
+        "model": "inherit",
+        "write": "true",
+        "mcp": "true",
+        "sub": "false",
+        "desc": "Написание и запуск модульных и интеграционных тестов (pytest, vitest, jest, JUnit, go test) и проверка покрытия.",
+        "body": """# Роль: Инженер по автоматизации тестирования (Test Engineer)
+
+Ты — субагент, отвечающий за написание, запуск и починку автотестов.
+
+## Алгоритм работы:
+1. Определи используемый фреймворк тестирования в проекте (`pytest`, `jest`/`vitest`, `go test`, `cargo test`, `gradle test`).
+2. Напиши компактные, детерминированные тесты, покрывающие основную функциональность и граничные случаи (edge cases).
+3. Запусти тестовый раннер в терминале, убедись в зелёном статусе всех тестов и верни сводку результатов."""
+    },
+    "docs-architect": {
+        "title": "Архитектор документации (Docs & README)",
+        "model": "flash",
+        "write": "true",
+        "mcp": "true",
+        "sub": "false",
+        "desc": "Генерация и актуализация README.md, CHANGELOG.md, архитектурных Mermaid-диаграмм и документации API.",
+        "body": """# Роль: Архитектор технической документации (Docs Architect)
+
+Ты — субагент по документированию кодовой базы и поддержанию актуальности `README.md` и `CHANGELOG.md`.
+
+## Правила:
+1. Изучи реальную структуру модулей, CLI-флаги, публичные API и конфигурационные файлы перед написанием документации.
+2. Оформляй документацию лаконично: таблицы параметров, примеры команд, схемы `mermaid` (`flowchart LR`/`sequenceDiagram`) и кликабельные ссылки на файлы."""
+    }
+}
+
+p = PRESET_AGENTS.get(aid)
+if not p:
+    print("Unknown preset subagent:", aid)
+    sys.exit(1)
+
+agent_md = os.path.join(agents_dir, f"{aid}.md")
+content = f"""---
+name: {aid}
+title: {p['title']}
+model: {p['model']}
+enable_write_tools: {p['write']}
+enable_mcp_tools: {p['mcp']}
+enable_subagent_tools: {p['sub']}
+description: >-
+  {p['desc']}
+---
+
+{p['body']}
+"""
+with open(agent_md, "w", encoding="utf-8") as f:
+    f.write(content)
+print("Preset subagent installed:", agent_md)
 PY
             say "@@done"
             ;;
@@ -2279,6 +2631,7 @@ op_brand() {
     esac
     if [ -n "$colour" ]; then
         case "$colour" in
+            [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) colour="#$colour" ;;
             \#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
             *) fail "brand: invalid colour '$colour'" ;;
         esac
@@ -2364,17 +2717,27 @@ if "providers" in items:
         _add(z, src, "providers.json")
         count += 1
 
-# config (mcp + settings)
+# config (mcp + settings + agents + skills + AGENTS.md)
 if "mcp" in items:
     src = os.path.join(home, ".gemini", "config", "mcp_config.json")
     if os.path.isfile(src):
         _add(z, src, "config/mcp_config.json")
         count += 1
 if "settings" in items:
-    src = os.path.join(home, ".gemini", "config", "config.json")
-    if os.path.isfile(src):
-        _add(z, src, "config/config.json")
-        count += 1
+    for fn in ("config.json", "AGENTS.md"):
+        src = os.path.join(home, ".gemini", "config", fn)
+        if os.path.isfile(src):
+            _add(z, src, f"config/{fn}")
+            count += 1
+    for sub in ("agents", "skills", "rules"):
+        sdir = os.path.join(home, ".gemini", "config", sub)
+        if os.path.isdir(sdir):
+            for dirpath, dirs, files in os.walk(sdir):
+                for f in files:
+                    full = os.path.join(dirpath, f)
+                    rel = os.path.relpath(full, os.path.join(home, ".gemini"))
+                    _add(z, full, rel)
+                    count += 1
 
 # conversations (SQLite DBs)
 if "chats" in items:
@@ -2402,7 +2765,7 @@ manifest = {
     "created": ts,
     "files": count,
     "items": sorted(items),
-    "app_version": "3.0.5",
+    "app_version": "3.0.6",
 }
 z.writestr("manifest.json", json.dumps(manifest, indent=2))
 z.close()

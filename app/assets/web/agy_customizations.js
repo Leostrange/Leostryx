@@ -36,7 +36,7 @@
   }
 
   var host = null, root = null;
-  var activeTab = "skills"; // "skills" | "instructions" | "plugins"
+  var activeTab = "skills"; // "skills" | "subagents" | "instructions" | "plugins"
   var skillFilter = "all";  // "all" | "user" | "plugin" | "builtin"
   var searchQuery = "";
 
@@ -44,15 +44,56 @@
   var skillModal = { open: false, mode: "create", name: "", desc: "", body: "" };
   var viewModal = { open: false, skill: null, loading: false };
   var addPluginModal = { open: false, name: "", desc: "" };
+  var agentModal = { open: false, mode: "create", name: "", title: "", desc: "", model: "inherit", write: true, mcp: true, sub: false, body: "" };
+  var viewAgentModal = { open: false, agent: null, loading: false };
 
   var skills = [];
   var plugins = [];
+  var agents = [];
   var instructionsText = "";
   var instructionsLoaded = false;
 
   var activeJobs = 0;       // number of running bridge ops (busy indicator)
   var pollTimers = {};      // jobId -> setTimeout handle (per-job polling)
   var logText = "";
+
+  var CATALOG_AGENTS = [
+    {
+      id: "code-reviewer",
+      title: T("Ревьюер кода (Code Reviewer)", "Code Reviewer"),
+      model: "pro",
+      desc: T("Глубокое код-ревью изменений, поиск багов, гонок данных, утечек памяти и нарушений архитектуры без модификации файлов.", "Deep code review for bugs, data races, memory leaks and architecture issues (read-only)."),
+      tags: ["Ревью", "Read-only", "Pro"]
+    },
+    {
+      id: "android-debugger",
+      title: T("Android-отладчик (Logcat & APK)", "Android Debugger (Logcat & APK)"),
+      model: "inherit",
+      desc: T("Диагностика крашей Android, анализ logcat/stacktrace, проверка манифестов, Gradle, JNI и декомпиляция через jadx-agy/apktool.", "Android crash diagnostics, logcat/stacktrace analysis, Gradle, JNI and jadx-agy/apktool."),
+      tags: ["Android", "Logcat", "APK"]
+    },
+    {
+      id: "security-auditor",
+      title: T("Аудитор безопасности (Security Auditor)", "Security Auditor"),
+      model: "pro",
+      desc: T("Аудит безопасности по OWASP Top 10, поиск инъекций, XSS/CSRF, небезопасных прав Android и утечек API-ключей/секретов.", "OWASP Top 10 security audit, injection checks, Android permissions and secret leak detection."),
+      tags: ["OWASP", "Безопасность", "Read-only"]
+    },
+    {
+      id: "test-engineer",
+      title: T("Инженер тестирования (QA & Tests)", "Test Engineer (QA & Tests)"),
+      model: "inherit",
+      desc: T("Написание и запуск модульных и интеграционных тестов (pytest, vitest, jest, JUnit, go test) и проверка покрытия.", "Writing and running unit/integration tests (pytest, vitest, jest, JUnit, go test)."),
+      tags: ["Тесты", "QA", "Автоматизация"]
+    },
+    {
+      id: "docs-architect",
+      title: T("Архитектор документации (Docs & README)", "Docs Architect"),
+      model: "flash",
+      desc: T("Генерация и актуализация README.md, CHANGELOG.md, архитектурных Mermaid-диаграмм и документации API.", "Generating and updating README.md, CHANGELOG.md, Mermaid architecture diagrams and API docs."),
+      tags: ["Документация", "Mermaid", "Flash"]
+    }
+  ];
 
   // Curated Android-compatible plugin catalog (1-click install).
   // Only packs that fully work on Android without Docker/Postgres/etc.
@@ -177,8 +218,8 @@
 
   function syncProviders() {
     toggleProviderTools(true);
-    alert(T("Инструменты, навыки и инструкции синхронизированы со всеми кастомными провайдерами!",
-            "Tools, skills and instructions synchronized with all custom providers!"));
+    alert(T("Инструменты, навыки, субагенты и инструкции синхронизированы со всеми кастомными провайдерами!",
+            "Tools, skills, subagents and instructions synchronized with all custom providers!"));
   }
 
   /* ------------------------------------------------------------ Native bridge */
@@ -261,8 +302,44 @@
       return;
     }
 
+    if (cmd === "read-agent") {
+      var mAg = /^@@cust_agent_data (.*)$/m.exec(txt);
+      if (mAg) {
+        var aParts = mAg[1].split("|");
+        var aName = aParts[0];
+        var aTitle = fromB64(aParts[1] || "");
+        var aDesc = fromB64(aParts[2] || "");
+        var aModel = aParts[3] || "inherit";
+        var aWrite = aParts[4] === "1";
+        var aMcp = aParts[5] === "1";
+        var aSub = aParts[6] === "1";
+        var aBody = fromB64(aParts[7] || "");
+        if (viewAgentModal.open && viewAgentModal.agent) {
+          viewAgentModal.agent.title = aTitle || viewAgentModal.agent.title;
+          viewAgentModal.agent.desc = aDesc || viewAgentModal.agent.desc;
+          viewAgentModal.agent.model = aModel;
+          viewAgentModal.agent.write = aWrite;
+          viewAgentModal.agent.mcp = aMcp;
+          viewAgentModal.agent.sub = aSub;
+          viewAgentModal.agent.body = aBody;
+          viewAgentModal.loading = false;
+        }
+        if (agentModal.open) {
+          agentModal.title = aTitle || agentModal.title;
+          agentModal.desc = aDesc || agentModal.desc;
+          agentModal.model = aModel;
+          agentModal.write = aWrite;
+          agentModal.mcp = aMcp;
+          agentModal.sub = aSub;
+          agentModal.body = aBody;
+        }
+      }
+      return;
+    }
+
     var newSkills = [];
     var newPlugins = [];
+    var newAgents = [];
 
     txt.split("\n").forEach(function (line) {
       var m;
@@ -291,11 +368,28 @@
             desc: parts[6]
           });
         }
+      } else if ((m = /^@@cust_agent (.*)$/.exec(line))) {
+        var parts = m[1].split("|");
+        if (parts.length >= 10) {
+          newAgents.push({
+            type: parts[0],
+            name: parts[1],
+            title: parts[2] || parts[1],
+            model: parts[3] || "inherit",
+            write: parts[4] === "1",
+            mcp: parts[5] === "1",
+            sub: parts[6] === "1",
+            enabled: parts[7] === "1",
+            path: parts[8],
+            desc: parts[9]
+          });
+        }
       }
     });
 
     if (newSkills.length > 0) skills = newSkills;
     if (newPlugins.length > 0) plugins = newPlugins;
+    if (newAgents.length > 0) agents = newAgents;
   }
 
   function refreshStatus(done) {
@@ -304,6 +398,30 @@
 
   function loadInstructions(done) {
     runOp("read-instructions", "", done);
+  }
+
+  function invokeSubagentInChat(ag) {
+    if (!ag) return;
+    var promptText;
+    if (ag.type === "builtin") {
+      promptText = T(
+        "Вызови субагента `" + ag.name + "` (роль: \"" + (ag.title || ag.name) + "\") через `invoke_subagent` для следующей задачи: ",
+        "Invoke subagent `" + ag.name + "` (role: \"" + (ag.title || ag.name) + "\") via `invoke_subagent` for the following task: "
+      );
+    } else {
+      promptText = T(
+        "Используй кастомного субагента `" + ag.name + "` (" + (ag.title || ag.name) + ", инструкция в `" + ag.path + "`, модель `" + ag.model + "`): зарегистрируй его через `define_subagent` и запусти через `invoke_subagent` для задачи: ",
+        "Use custom subagent `" + ag.name + "` (" + (ag.title || ag.name) + ", prompt in `" + ag.path + "`, model `" + ag.model + "`): register via `define_subagent` and invoke via `invoke_subagent` for task: "
+      );
+    }
+    if (typeof window.__agyInsertIntoChat === "function") {
+      window.__agyInsertIntoChat(promptText, false);
+      return;
+    }
+    try {
+      navigator.clipboard.writeText(promptText);
+    } catch (e) {}
+    alert(T("Команда вызова субагента скопирована и подготовлена:\n\n" + promptText, "Subagent invocation prompt copied:\n\n" + promptText));
   }
 
   /* ------------------------------------------------------------ Filtering */
@@ -335,14 +453,14 @@
     // Header
     html += '<div class="agy-cust-header">';
     html += '  <div class="agy-cust-title">' + esc(T("Настройки пользователя и кастомизация", "User Customizations & Skills")) + '</div>';
-    html += '  <div class="agy-cust-sub">' + esc(T("Управление процедурными навыками (Skills), глобальными инструкциями (AGENTS.md), плагинами и каталогом расширений.", "Manage procedural skills, global agent rules (AGENTS.md), plugins and extension catalog.")) + '</div>';
+    html += '  <div class="agy-cust-sub">' + esc(T("Управление процедурными навыками (Skills), субагентами (Subagents), глобальными инструкциями (AGENTS.md) и плагинами.", "Manage procedural skills, subagents, global agent rules (AGENTS.md) and plugins.")) + '</div>';
     html += '</div>';
 
     // Provider Integration Banner
     html += '<div class="agy-cust-banner">';
     html += '  <div class="agy-cust-banner-info">';
     html += '    <div class="agy-cust-banner-title">' + esc(T("Сквозная поддержка в кастомных провайдерах", "Custom Providers Integration")) + '</div>';
-    html += '    <div class="agy-cust-banner-desc">' + esc(T("Передавать навыки, инструкции и инструменты в сторонние нейросети (OpenAI, Claude, DeepSeek).", "Forward active skills, rules and tools to third-party LLMs (OpenAI, Claude, DeepSeek).")) + '</div>';
+    html += '    <div class="agy-cust-banner-desc">' + esc(T("Передавать навыки, субагентов, инструкции и инструменты в сторонние нейросети (OpenAI, Claude, DeepSeek).", "Forward active skills, subagents, rules and tools to third-party LLMs (OpenAI, Claude, DeepSeek).")) + '</div>';
     html += '  </div>';
     html += '  <div style="display: flex; align-items: center; gap: 8px;">';
     html += '    <button class="agy-cust-btn sm secondary" data-act="sync-providers">' + esc(T("Синхронизировать", "Sync All")) + '</button>';
@@ -357,6 +475,9 @@
     html += '<div class="agy-cust-tabs">';
     html += '  <button class="agy-cust-tab ' + (activeTab === "skills" ? "active" : "") + '" data-tab="skills">';
     html += '    ' + esc(T("Навыки (" + skills.length + ")", "Skills (" + skills.length + ")"));
+    html += '  </button>';
+    html += '  <button class="agy-cust-tab ' + (activeTab === "subagents" ? "active" : "") + '" data-tab="subagents">';
+    html += '    ' + esc(T("Субагенты (" + agents.length + ")", "Subagents (" + agents.length + ")"));
     html += '  </button>';
     html += '  <button class="agy-cust-tab ' + (activeTab === "instructions" ? "active" : "") + '" data-tab="instructions">';
     html += '    ' + esc(T("Инструкции (AGENTS.md)", "Instructions (AGENTS.md)"));
@@ -472,7 +593,129 @@
       html += '</div>';
     }
 
-    // ------------------------------------------------------------ TAB 2: Instructions (AGENTS.md)
+    // ------------------------------------------------------------ TAB 2: Subagents (Субагенты)
+    if (activeTab === "subagents") {
+      html += '<div class="agy-cust-section">';
+
+      html += '<div style="margin-bottom: 10px;">';
+      html += '  <div style="font-weight:600; font-size:13px; color:var(--foreground);">' + esc(T("Автономные субагенты (Subagents)", "Autonomous Subagents")) + '</div>';
+      html += '  <div style="font-size:11.5px; color:var(--muted-foreground,#888); margin-top:2px; line-height:1.4;">' + esc(T("Субагенты работают в собственном контексте параллельно с основным агентом. Основной агент может вызывать как встроенных субагентов (self, research, image-generator), так и ваших специализированных субагентов из ~/.gemini/config/agents/.", "Subagents run in isolated contexts in parallel with the main agent. Supports both built-in subagents and custom roles stored in ~/.gemini/config/agents/.")) + '</div>';
+      html += '</div>';
+
+      // Create Custom Subagent Card Button
+      html += '<div class="agy-cust-add-card" data-act="open-add-agent">';
+      html += '  <div>';
+      html += '    <div class="agy-cust-add-title">+ ' + esc(T("Создать своего субагента", "Create Custom Subagent")) + '</div>';
+      html += '    <div class="agy-cust-add-desc">' + esc(T("Задайте имя роли, модель (inherit / pro / flash), права доступа к инструментам (запись файлов, терминал, MCP) и системный промпт.", "Define role ID, model (inherit / pro / flash), tool permissions (write/terminal, MCP) and system prompt.")) + '</div>';
+      html += '  </div>';
+      html += '</div>';
+
+      var agentGroups = [
+        { type: "user", label: T("Пользовательские субагенты", "Custom Subagents") },
+        { type: "builtin", label: T("Встроенные системные субагенты", "Built-in System Subagents") }
+      ];
+      var firstAgGroup = true;
+      agentGroups.forEach(function (grp) {
+        var items = agents.filter(function (a) { return a.type === grp.type; });
+        if (items.length === 0) return;
+
+        html += '<div class="agy-cust-group-label"' + (firstAgGroup ? ' style="margin-top:0;"' : '') + '>';
+        html += '  <span>' + esc(grp.label) + '</span>';
+        html += '  <span class="agy-cust-group-count">' + items.length + '</span>';
+        html += '</div>';
+        firstAgGroup = false;
+
+        html += '<div class="agy-cust-group">';
+        items.forEach(function (ag) {
+          var isBuiltin = ag.type === "builtin";
+          html += '<div class="agy-cust-row">';
+          html += '  <div class="agy-cust-card-main">';
+          html += '    <div class="agy-cust-card-title">';
+          html += '      <span>' + esc(ag.title || ag.name) + '</span>';
+          html += '      <span class="agy-cust-badge ' + (isBuiltin ? "builtin" : "user") + '" style="font-family:monospace;">' + esc(ag.name) + '</span>';
+          html += '      <span class="agy-cust-badge ' + (ag.enabled ? "on" : "off") + '">' + (ag.enabled ? esc(T("Активен", "Active")) : esc(T("Отключен", "Disabled"))) + '</span>';
+          html += '    </div>';
+          html += '    <div class="agy-cust-card-desc">' + esc(ag.desc || T("Описание роли отсутствует", "No role description")) + '</div>';
+          html += '    <div class="agy-cust-card-meta" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">';
+          html += '      <span class="agy-cust-badge plugin">' + esc(T("Модель: ", "Model: ") + ag.model) + '</span>';
+          html += '      <span class="agy-cust-badge ' + (ag.write ? "on" : "builtin") + '">' + esc(ag.write ? T("Запись и терминал", "Write & Terminal") : T("Только чтение", "Read-only")) + '</span>';
+          if (ag.mcp) {
+            html += '    <span class="agy-cust-badge user">MCP</span>';
+          }
+          if (ag.sub) {
+            html += '    <span class="agy-cust-badge plugin">' + esc(T("Вложенные субагенты", "Nested Subagents")) + '</span>';
+          }
+          html += '    </div>';
+
+          html += '    <div class="agy-cust-card-footer" style="margin-top:8px; justify-content:flex-end;">';
+          html += '      <div class="agy-cust-action-group">';
+          html += '        <button class="agy-cust-btn sm primary" data-act="invoke-agent" data-agent-name="' + esc(ag.name) + '">';
+          html += '          ' + esc(T("Вызвать в чате", "Invoke in Chat"));
+          html += '        </button>';
+          html += '        <button class="agy-cust-btn sm secondary" data-act="view-agent" data-agent-name="' + esc(ag.name) + '" data-agent-path="' + esc(ag.path) + '">';
+          html += '          ' + esc(T("Просмотр", "View"));
+          html += '        </button>';
+          if (!isBuiltin) {
+            html += '      <button class="agy-cust-btn sm secondary" data-act="edit-agent" data-agent-name="' + esc(ag.name) + '" data-agent-path="' + esc(ag.path) + '">';
+            html += '        ' + esc(T("Редактировать", "Edit"));
+            html += '      </button>';
+            html += '      <button class="agy-cust-btn sm danger" data-act="delete-agent" data-agent-name="' + esc(ag.name) + '">';
+            html += '        ' + esc(T("Удалить", "Delete"));
+            html += '      </button>';
+          }
+          html += '      </div>';
+          html += '    </div>';
+          html += '  </div>';
+
+          if (!isBuiltin) {
+            html += '  <label class="agy-mcp-switch">';
+            html += '    <input type="checkbox" data-act="toggle-agent" data-agent="' + esc(ag.name) + '" ' + (ag.enabled ? "checked" : "") + ' ' + (isBusy ? "disabled" : "") + '>';
+            html += '    <span class="agy-mcp-slider"></span>';
+            html += '  </label>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+
+      // 1-Click Subagent Preset Catalog
+      html += '<div style="margin-top: 22px; margin-bottom: 8px;">';
+      html += '  <div style="font-weight:600; font-size:13px; color:var(--foreground);">' + esc(T("Каталог готовых субагентов (1-клик установка)", "Subagent Role Catalog (1-Click Install)")) + '</div>';
+      html += '  <div style="font-size:11.5px; color:var(--muted-foreground,#888); margin-top:2px; line-height:1.4;">' + esc(T("Готовые специализированные субагенты для код-ревью, отладки Android, аудита безопасности, тестов и документации.", "Pre-configured specialized subagents for code review, Android debugging, security auditing, testing and documentation.")) + '</div>';
+      html += '</div>';
+
+      html += '<div class="agy-cust-preset-grid">';
+      CATALOG_AGENTS.forEach(function (pa) {
+        var isInstalled = agents.some(function (a) { return a.name === pa.id; });
+        html += '<div class="agy-cust-preset-card">';
+        html += '  <div>';
+        html += '    <div class="agy-cust-preset-header">';
+        html += '      <div class="agy-cust-preset-title">' + esc(pa.title) + '</div>';
+        if (isInstalled) {
+          html += '    <span class="agy-cust-badge on">' + esc(T("Установлен", "Installed")) + '</span>';
+        }
+        html += '    </div>';
+        html += '    <div class="agy-cust-preset-desc">' + esc(pa.desc) + '</div>';
+        html += '    <div class="agy-cust-preset-tags">';
+        pa.tags.forEach(function (t) {
+          html += '    <span class="agy-cust-preset-tag">' + esc(t) + '</span>';
+        });
+        html += '    </div>';
+        html += '  </div>';
+        html += '  <div class="agy-cust-preset-footer">';
+        html += '    <span style="font-size:11px; font-family:monospace; color:var(--muted-foreground,#888);">' + esc(pa.id) + '</span>';
+        html += '    <button class="agy-cust-btn sm ' + (isInstalled ? "secondary" : "primary") + '" data-act="install-preset-agent" data-agent-id="' + esc(pa.id) + '" ' + (isBusy ? "disabled" : "") + '>';
+        html += '      ' + esc(isInstalled ? T("Переустановить", "Reinstall") : T("Установить", "Install"));
+        html += '    </button>';
+        html += '  </div>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      html += '</div>';
+    }
+
+    // ------------------------------------------------------------ TAB 3: Instructions (AGENTS.md)
     if (activeTab === "instructions") {
       html += '<div class="agy-cust-section">';
 
@@ -517,7 +760,7 @@
       html += '</div>';
     }
 
-    // ------------------------------------------------------------ TAB 3: Plugins
+    // ------------------------------------------------------------ TAB 4: Plugins
     if (activeTab === "plugins") {
       html += '<div class="agy-cust-section">';
 
@@ -703,6 +946,92 @@
       html += '</div>';
     }
 
+    // ------------------------------------------------------------ MODAL: View Subagent
+    if (viewAgentModal.open && viewAgentModal.agent) {
+      var vAg = viewAgentModal.agent;
+      html += '<div class="agy-cust-modal-overlay">';
+      html += '  <div class="agy-cust-modal agy-cust-preview-modal">';
+      html += '    <div class="agy-cust-modal-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">';
+      html += '      <span>' + esc(vAg.title || vAg.name) + '</span>';
+      html += '      <span class="agy-cust-badge ' + (vAg.type === "builtin" ? "builtin" : "user") + '" style="font-family:monospace;">' + esc(vAg.name) + '</span>';
+      html += '    </div>';
+      html += '    <div class="agy-cust-modal-desc" style="font-family:monospace; font-size:11px; opacity:.85;">' + esc(vAg.path) + '</div>';
+      if (vAg.desc) {
+        html += '  <div style="font-size:12px; color:var(--foreground); background:color-mix(in srgb, var(--foreground,#888) 4%, transparent); padding:8px 10px; border-radius:7px; border:1px solid var(--border,rgba(127,127,127,.2));">';
+        html += '    <strong>' + esc(T("Назначение:", "Role:")) + '</strong> ' + esc(vAg.desc);
+        html += '  </div>';
+      }
+      html += '    <div style="display:flex; flex-direction:column; gap:5px; margin-top:4px;">';
+      html += '      <div style="font-size:11px; font-weight:600; color:var(--muted-foreground,#888);">' + esc(T("Системный промпт субагента:", "Subagent System Prompt:")) + '</div>';
+      if (viewAgentModal.loading) {
+        html += '    <div class="agy-cust-code-preview" style="text-align:center; color:var(--muted-foreground,#888); padding:32px;">' + esc(T("Загрузка конфигурации субагента...", "Loading subagent configuration...")) + '</div>';
+      } else {
+        html += '    <div class="agy-cust-code-preview">' + esc(vAg.body || T("(Пустой промпт)", "(Empty prompt)")) + '</div>';
+      }
+      html += '    </div>';
+      html += '    <div class="agy-cust-modal-actions" style="margin-top:10px;">';
+      html += '      <button class="agy-cust-btn primary" data-act="invoke-agent" data-agent-name="' + esc(vAg.name) + '">' + esc(T("Вызвать в чате", "Invoke in Chat")) + '</button>';
+      if (vAg.type !== "builtin") {
+        html += '    <button class="agy-cust-btn secondary" data-act="edit-from-view-agent" data-agent-name="' + esc(vAg.name) + '" data-agent-path="' + esc(vAg.path) + '">' + esc(T("Редактировать", "Edit")) + '</button>';
+      }
+      html += '      <button class="agy-cust-btn secondary" data-act="close-view-agent">' + esc(T("Закрыть", "Close")) + '</button>';
+      html += '    </div>';
+      html += '  </div>';
+      html += '</div>';
+    }
+
+    // ------------------------------------------------------------ MODAL: Add / Edit Subagent
+    if (agentModal.open) {
+      var isAgEdit = agentModal.mode === "edit";
+      html += '<div class="agy-cust-modal-overlay">';
+      html += '  <div class="agy-cust-modal agy-cust-preview-modal">';
+      html += '    <div class="agy-cust-modal-title">' + (isAgEdit ? esc(T("Редактировать субагента", "Edit Subagent")) : esc(T("Создать своего субагента", "Create Custom Subagent"))) + '</div>';
+      html += '    <div class="agy-cust-modal-desc">' + esc(T("Субагент сохраняется в ~/.gemini/config/agents/<id>.md и автоматически синхронизируется с правилами агента.", "Subagent is saved in ~/.gemini/config/agents/<id>.md and synced with agent rules.")) + '</div>';
+      html += '    <div class="agy-cust-modal-form">';
+      html += '      <div class="agy-cust-field">';
+      html += '        <label>' + esc(T("ID субагента (латиница, дефисы, например: code-reviewer)", "Subagent ID (lowercase, hyphens, e.g. code-reviewer)")) + '</label>';
+      html += '        <input type="text" id="cust-agent-name" value="' + esc(agentModal.name) + '" placeholder="my-subagent" ' + (isAgEdit ? "readonly style='opacity:.75;'" : "") + '>';
+      html += '      </div>';
+      html += '      <div class="agy-cust-field">';
+      html += '        <label>' + esc(T("Отображаемое название (Роль)", "Display Title (Role)")) + '</label>';
+      html += '        <input type="text" id="cust-agent-title" value="' + esc(agentModal.title) + '" placeholder="' + esc(T("Архитектор БД / Ревьюер кода", "DB Architect / Code Reviewer")) + '">';
+      html += '      </div>';
+      html += '      <div class="agy-cust-field">';
+      html += '        <label>' + esc(T("Краткое описание (когда вызывать этого субагента)", "Description (when to delegate to this subagent)")) + '</label>';
+      html += '        <input type="text" id="cust-agent-desc" value="' + esc(agentModal.desc) + '" placeholder="' + esc(T("Вызывать для проверки кода, написания тестов...", "Delegate to this subagent when...")) + '">';
+      html += '      </div>';
+      html += '      <div class="agy-cust-field">';
+      html += '        <label>' + esc(T("Модель субагента", "Subagent Model")) + '</label>';
+      html += '        <select id="cust-agent-model" style="padding:7px 10px; border-radius:7px; border:1px solid var(--border,rgba(127,127,127,.25)); background:var(--background,#1e1e1e); color:var(--foreground,#fff); font-size:12px;">';
+      [
+        ["inherit", T("inherit — Наследовать текущую модель чата (Рекомендуется)", "inherit — Use current chat model (Recommended)")],
+        ["pro", T("pro — Глубокое рассуждение и сложный рефакторинг", "pro — Deep reasoning & complex tasks")],
+        ["flash", T("flash — Быстрый поиск, анализ и документация", "flash — Fast research, reading & docs")],
+        ["flash_lite", T("flash_lite — Сверхлёгкая модель для простых проверок", "flash_lite — Ultra-light model")]
+      ].forEach(function (opt) {
+        html += '          <option value="' + esc(opt[0]) + '"' + (agentModal.model === opt[0] ? " selected" : "") + '>' + esc(opt[1]) + '</option>';
+      });
+      html += '        </select>';
+      html += '      </div>';
+      html += '      <div class="agy-cust-field" style="display:flex; flex-direction:column; gap:6px;">';
+      html += '        <label>' + esc(T("Разрешённые группы инструментов", "Allowed Tool Groups")) + '</label>';
+      html += '        <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:normal;"><input type="checkbox" id="cust-agent-write" ' + (agentModal.write ? "checked" : "") + '> ' + esc(T("Разрешить запись файлов и выполнение команд терминала (enable_write_tools)", "Allow file edits & terminal commands (enable_write_tools)")) + '</label>';
+      html += '        <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:normal;"><input type="checkbox" id="cust-agent-mcp" ' + (agentModal.mcp ? "checked" : "") + '> ' + esc(T("Разрешить использование серверов MCP (enable_mcp_tools)", "Allow MCP server tools (enable_mcp_tools)")) + '</label>';
+      html += '        <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:normal;"><input type="checkbox" id="cust-agent-sub" ' + (agentModal.sub ? "checked" : "") + '> ' + esc(T("Разрешить порождать вложенных субагентов (enable_subagent_tools)", "Allow spawning nested subagents (enable_subagent_tools)")) + '</label>';
+      html += '      </div>';
+      html += '      <div class="agy-cust-field">';
+      html += '        <label>' + esc(T("Системный промпт субагента (Markdown)", "Subagent System Prompt (Markdown)")) + '</label>';
+      html += '        <textarea id="cust-agent-body" style="min-height:190px;" placeholder="# ' + esc(T("Роль субагента\n\nТы — специализированный субагент...\n\n## Правила работы:\n1. ...", "Subagent Role\n\nYou are a specialized subagent...")) + '">' + esc(agentModal.body) + '</textarea>';
+      html += '      </div>';
+      html += '    </div>';
+      html += '    <div class="agy-cust-modal-actions">';
+      html += '      <button class="agy-cust-btn secondary" data-act="close-agent-modal">' + esc(T("Отмена", "Cancel")) + '</button>';
+      html += '      <button class="agy-cust-btn primary" data-act="submit-agent-modal">' + (isAgEdit ? esc(T("Сохранить субагента", "Save Subagent")) : esc(T("Создать субагента", "Create Subagent"))) + '</button>';
+      html += '    </div>';
+      html += '  </div>';
+      html += '</div>';
+    }
+
     // ------------------------------------------------------------ MODAL: Add Custom Plugin
     if (addPluginModal.open) {
       html += '<div class="agy-cust-modal-overlay">';
@@ -777,6 +1106,137 @@
 
     if (act === "sync-providers") {
       syncProviders();
+      return;
+    }
+
+    // Subagent actions
+    if (act === "open-add-agent") {
+      agentModal = { open: true, mode: "create", name: "", title: "", desc: "", model: "inherit", write: true, mcp: true, sub: false, body: "" };
+      render();
+      return;
+    }
+
+    if (act === "close-agent-modal") {
+      agentModal.open = false;
+      render();
+      return;
+    }
+
+    if (act === "view-agent") {
+      var aPath = btn.getAttribute("data-agent-path");
+      var aName = btn.getAttribute("data-agent-name");
+      var aFound = agents.find(function (a) { return a.name === aName; });
+      viewAgentModal = {
+        open: true,
+        loading: true,
+        agent: aFound ? Object.assign({}, aFound, { body: "" }) : { name: aName, title: aName, path: aPath, type: "user", desc: "", body: "" }
+      };
+      render();
+      runOp("read-agent", aPath, function () {
+        render();
+      });
+      return;
+    }
+
+    if (act === "close-view-agent") {
+      viewAgentModal.open = false;
+      viewAgentModal.agent = null;
+      render();
+      return;
+    }
+
+    if (act === "edit-agent" || act === "edit-from-view-agent") {
+      var eaPath = btn.getAttribute("data-agent-path");
+      var eaName = btn.getAttribute("data-agent-name");
+      viewAgentModal.open = false;
+      var eaFound = agents.find(function (a) { return a.name === eaName; });
+      agentModal = {
+        open: true,
+        mode: "edit",
+        name: eaName,
+        title: eaFound ? eaFound.title : eaName,
+        desc: eaFound ? eaFound.desc : "",
+        model: eaFound ? eaFound.model : "inherit",
+        write: eaFound ? eaFound.write : true,
+        mcp: eaFound ? eaFound.mcp : true,
+        sub: eaFound ? eaFound.sub : false,
+        body: ""
+      };
+      render();
+      runOp("read-agent", eaPath, function () {
+        render();
+      });
+      return;
+    }
+
+    if (act === "submit-agent-modal") {
+      var anInp = root.querySelector("#cust-agent-name");
+      var atInp = root.querySelector("#cust-agent-title");
+      var adInp = root.querySelector("#cust-agent-desc");
+      var amInp = root.querySelector("#cust-agent-model");
+      var awInp = root.querySelector("#cust-agent-write");
+      var acInp = root.querySelector("#cust-agent-mcp");
+      var asInp = root.querySelector("#cust-agent-sub");
+      var abInp = root.querySelector("#cust-agent-body");
+
+      var agName = anInp ? anInp.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") : "";
+      var agTitle = atInp ? atInp.value.trim() : agName;
+      var agDesc = adInp ? adInp.value.trim() : "";
+      var agModel = amInp ? amInp.value : "inherit";
+      var agWrite = (awInp && awInp.checked) ? "1" : "0";
+      var agMcp = (acInp && acInp.checked) ? "1" : "0";
+      var agSub = (asInp && asInp.checked) ? "1" : "0";
+      var agBody = abInp ? abInp.value.trim() : "";
+
+      if (!agName || !agDesc) {
+        alert(T("Укажите ID субагента и его описание!", "Please enter subagent ID and description!"));
+        return;
+      }
+      agentModal.open = false;
+      var agRaw = [
+        agName,
+        toB64(agTitle || agName),
+        toB64(agDesc),
+        agModel,
+        agWrite,
+        agMcp,
+        agSub,
+        toB64(agBody || ("# " + (agTitle || agName) + "\n\n" + agDesc))
+      ].join("|");
+      runOp("add-agent", agRaw, function () {
+        refreshStatus(function () {
+          alert(T("Субагент " + agName + " сохранён и добавлен в реестр агента!", "Subagent " + agName + " saved!"));
+        });
+      });
+      return;
+    }
+
+    if (act === "delete-agent") {
+      var delAg = btn.getAttribute("data-agent-name");
+      if (delAg && confirm(T("Удалить субагента " + delAg + "?", "Delete subagent " + delAg + "?"))) {
+        runOp("delete-agent", delAg, function () {
+          refreshStatus();
+        });
+      }
+      return;
+    }
+
+    if (act === "install-preset-agent") {
+      var paId = btn.getAttribute("data-agent-id");
+      if (!paId) return;
+      runOp("install-agent", paId, function () {
+        refreshStatus(function () {
+          alert(T("Субагент " + paId + " установлен и готов к вызову!", "Subagent " + paId + " installed and ready!"));
+        });
+      });
+      return;
+    }
+
+    if (act === "invoke-agent") {
+      var invName = btn.getAttribute("data-agent-name");
+      var invAg = agents.find(function (a) { return a.name === invName; });
+      viewAgentModal.open = false;
+      invokeSubagentInChat(invAg || { name: invName, title: invName, type: "user", model: "inherit", path: "~/.gemini/config/agents/" + invName + ".md" });
       return;
     }
 
@@ -1039,6 +1499,15 @@
       var sName = e.target.getAttribute("data-skill");
       var en = e.target.checked ? "1" : "0";
       runOp("toggle-skill", sName + " " + en, function () {
+        refreshStatus();
+      });
+      return;
+    }
+
+    if (e.target.matches("[data-act='toggle-agent']")) {
+      var aName = e.target.getAttribute("data-agent");
+      var aEn = e.target.checked ? "1" : "0";
+      runOp("toggle-agent", aName + " " + aEn, function () {
         refreshStatus();
       });
       return;

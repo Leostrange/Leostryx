@@ -71,5 +71,52 @@ installGpu(doc);
 
 global.__agWebOptimizations = { installed: true };
 
+/**
+ * AgyShade bridge for Android shade notifications + action buttons.
+ */
+try {
+  var _shadeClickCbs = [];
+  global.nativeNotifications = {
+    send: function(opts) {
+      try {
+        if (!opts) return Promise.resolve();
+        var cascadeId = (opts.payload && opts.payload.cascadeId) || opts.id || "";
+        var title = opts.title || "Leostryx";
+        var body = opts.body || "";
+        var needsAction = (opts.payload && (opts.payload.type === "request_action" || opts.payload.needsAction)) || true;
+        if (window.AgyShade && typeof window.AgyShade.notify === "function") {
+          window.AgyShade.notify(cascadeId, title, body, !!needsAction);
+        }
+      } catch(e) {
+        console.warn("[AgyShade] send failed", e);
+      }
+      return Promise.resolve();
+    },
+    onClicked: function(cb) {
+      if (typeof cb === "function") _shadeClickCbs.push(cb);
+    },
+    openSystemPreferences: function() {
+      try {
+        if (window.AgyShade && typeof window.AgyShade.openSystemPreferences === "function") {
+          window.AgyShade.openSystemPreferences();
+        }
+      } catch(e) {}
+      return Promise.resolve();
+    },
+    clearNotifications: function() {
+      try {
+        if (window.AgyShade && typeof window.AgyShade.cancelAll === "function") {
+          window.AgyShade.cancelAll();
+        }
+      } catch(e) {}
+      return Promise.resolve();
+    }
+  };
+  global.__agyTriggerNotificationClick = function(cascadeId) {
+    for (var i = 0; i < _shadeClickCbs.length; i++) {
+      try { _shadeClickCbs[i]({ cascadeId: cascadeId }); } catch(e) {}
+    }
+  };
+} catch(e) {}
 
 })();

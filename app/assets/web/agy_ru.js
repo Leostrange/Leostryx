@@ -881,3 +881,102 @@
   }
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start, {once:true});
 })();
+
+/* -------------------------------------------------------------------------- */
+/* Agent Shade Reply & Chat Insertion Bridge (Release 3.0.6)                  */
+/* -------------------------------------------------------------------------- */
+(function() {
+  var BOX = "[data-testid='agent-input-box']";
+
+  function getEditor() {
+    var box = document.querySelector(BOX);
+    if (!box) return document.querySelector("[contenteditable='true']");
+    return box.querySelector("[contenteditable='true']") || box.querySelector("textarea") || box;
+  }
+
+  function placeCaretAtEnd(ed) {
+    try {
+      var sel = window.getSelection();
+      if (!sel) return;
+      if (!sel.rangeCount || !ed.contains(sel.anchorNode)) {
+        var r = document.createRange();
+        r.selectNodeContents(ed);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+    } catch (e) {}
+  }
+
+  window.__agyInsertIntoChat = function(text, send) {
+    if (!text) return false;
+    var ed = getEditor();
+    if (!ed) return false;
+    try { ed.focus(); } catch (e) {}
+    placeCaretAtEnd(ed);
+
+    var ok = false;
+    try {
+      ok = document.execCommand("insertText", false, text);
+    } catch (e) {}
+    if (!ok) {
+      try {
+        ed.dispatchEvent(new InputEvent("beforeinput", { inputType: "insertText", data: text, bubbles: true, cancelable: true }));
+        ed.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: text, bubbles: true }));
+        ok = true;
+      } catch (e2) {}
+    }
+
+    if (send) {
+      setTimeout(function() {
+        var box = document.querySelector(BOX);
+        var sendBtn = box ? (box.querySelector("button[data-testid='send-button']") || box.querySelector("button[aria-label*='Send']")) : null;
+        if (!sendBtn) sendBtn = document.querySelector("button[data-testid='send-button']") || document.querySelector("button[aria-label*='Send']");
+        if (sendBtn && !sendBtn.disabled) {
+          sendBtn.click();
+        }
+      }, 100);
+    }
+    return ok;
+  };
+
+  window.__agyOnShadeReply = function(payload) {
+    if (!payload) return;
+    var text = payload.text || "";
+    var isApprove = (payload.type === "approve" || text === "__AGY_APPROVE__");
+
+    if (isApprove) {
+      var btns = Array.from(document.querySelectorAll("button"));
+      var approveBtn = btns.find(function(b) {
+        if (!b.offsetParent) return false;
+        var tid = b.getAttribute("data-testid") || "";
+        if (tid === "run-button" || tid === "accept-action-button" || tid === "approve-button") return true;
+        var t = (b.textContent || "").trim().toLowerCase();
+        return /^(разрешить|выполнить|продолжить|run|allow|always allow|accept)$/i.test(t);
+      });
+      if (approveBtn) {
+        approveBtn.click();
+        return;
+      }
+      text = "Разрешить / Продолжить";
+    }
+
+    if (text) {
+      window.__agyInsertIntoChat(text, true);
+    }
+  };
+
+  setInterval(function() {
+    try {
+      if (window.AgyShade && typeof window.AgyShade.pollReplies === "function") {
+        var res = window.AgyShade.pollReplies();
+        if (res && res !== "[]") {
+          var arr = JSON.parse(res);
+          for (var i = 0; i < arr.length; i++) {
+            window.__agyOnShadeReply(arr[i]);
+          }
+        }
+      }
+    } catch(e) {}
+  }, 1500);
+})();

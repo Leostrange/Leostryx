@@ -119,6 +119,25 @@
         "  --color-primary-foreground: " + fg + " !important;\n" +
         "  --accent: " + hex + " !important;\n" +
         "  --brand-accent: " + hex + " !important;\n" +
+        "}\n" +
+        ".google-symbols,\n" +
+        "[data-testid=\"app-icon-new-conversation-button\"] svg,\n" +
+        "[data-testid=\"sidebar-header-logo\"] svg,\n" +
+        ".floating-icon,\n" +
+        ".animated-logo-container svg,\n" +
+        "button[aria-selected=\"true\"] svg,\n" +
+        "button[data-state=\"active\"] svg,\n" +
+        "[role=\"tab\"][aria-selected=\"true\"] svg,\n" +
+        "nav button svg,\n" +
+        "header button svg {\n" +
+        "  color: " + hex + " !important;\n" +
+        "}\n" +
+        "[data-testid=\"app-icon-new-conversation-button\"] svg path,\n" +
+        ".floating-icon path {\n" +
+        "  fill: " + hex + " !important;\n" +
+        "}\n" +
+        ".ripple-container .ripple {\n" +
+        "  border-color: " + hex + " !important;\n" +
         "}\n";
     } catch (e) {}
   }
@@ -130,7 +149,7 @@
   function applyLogo(packId, after) {
     var b = bridge();
     if (!b) { if (after) after(false); return; }
-    var id = b.start("brand", packId + "@" + cfg.color);
+    var id = b.start("brand", packId + "@" + String(cfg.color || "").replace("#", ""));
     if (!id || /^ERR/.test(String(id))) { if (after) after(false); return; }
     var tries = 0;
     (function tick() {
@@ -150,7 +169,7 @@
     try {
       var b = bridge();
       if (!b) return;
-      b.start("brand", cfg.pack + "@" + cfg.color);
+      b.start("brand", cfg.pack + "@" + String(cfg.color || "").replace("#", ""));
     } catch (e) {}
   }
 
