@@ -1,23 +1,23 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.3-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.5-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.3).</b><br/>
-Полная русификация, щит безопасности агента, темы и компактный интерфейс, вложения, инструменты, Flutter SDK, MCP- и UTCP-серверы.</p>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.5).</b><br/>
+Полная русификация, щит безопасности агента, темы и компактный интерфейс, смена иконки и акцентного цвета на лету, вложения, инструменты, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 ---
 
-## Leostryx для Android 3.0.3
+## Leostryx для Android 3.0.5
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -25,46 +25,53 @@
 
 ## Возможности
 
-- **полная русификация** интерфейса: словарь EN → RU, статусы действий агента, живой индикатор рассуждений, русская плюрализация;
+- **полная русификация** интерфейса: словарь EN → RU, статусы действий агента, живой индикатор рассуждений, русская плюрализация, полный перевод раздела «Бэкап»;
 - **щит безопасности** в чате: профиль безопасности, доступ к файлам и интернету, автовыполнение команд терминала, песочница и JavaScript — с реально сохраняющимися выборами;
 - **автономный режим агента**: «Не спрашивать» (EAGER) — агент работает без лишних подтверждений;
 - **темы** списков и окон, светлая и тёмная схемы, компактные меню, попапы и выпадающие списки;
 - **компактный чат** с вложениями до 10 файлов (просмотр и удаление прикреплённого);
-- настройки диктовки, режимы мышления, экспорт сессий (Markdown и изображения);
+- настройки диктовки, режимы мышления, экспорт сессий (Markdown, PDF и изображения);
 - **консоль приложения** (Tools → Консоль) для снятия логов: отдельные запуски команд, кнопки копирования и очистки, быстрый `logcat`;
 - **история ошибок** с фильтром реальных сбоев, прокруткой и кнопкой «Копировать всё»;
 - встроенные инструменты разработки (Tools) и бэкенд настроек с поддержкой **Flutter SDK в 1 клик**;
 - **MCP-серверы** (sequential-thinking, exa, github-mcp-server, StitchMCP) — в том числе с кастомными провайдерами;
 - **UTCP-серверы и OpenAPI 3.0** (Universal Tool Calling Protocol) — прямое подключение REST API и спецификаций без написания промежуточных прокси;
 - **кастомизация агента**: копирование, редактирование и создание навыков (Skills), каталог плагинов из Build With Google;
-- **кастомизация иконок и splash screen**: 4 набора значков (Сова, Рысь, LSX, Angular X) с переключением в настройках, логотип и сплэш-скрин меняются синхронно.
+- **кастомизация иконок, логотипа и акцентного цвета на лету**: 4 набора значков (Сова, Рысь, LSX, Angular X) с мгновенным переключением иконки на рабочем столе (через `activity-alias`), логотипа в шапке и на экране входа, сплэш-скрина и акцентного цвета кнопок.
 
 ## Сборки
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.3-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.3-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.5-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.5-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
 ## Установка
 
 > [!WARNING]
-> **Чистая установка (только с нуля):** Сборка 3.0 **не устанавливается поверх** предыдущих версий (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления ключа подписи). Перед установкой 3.0 полностью удалите предыдущую версию приложения с устройства. Обязательно сохраните важные файлы и проекты из `/storage/emulated/0/Documents/` или папки проектов перед удалением!
+> **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.3/SHA256SUMS.txt).
-2. Полностью удалите старую версию приложения `com.agyru.bp` с устройства.
-3. Установите скачанный APK 3.0.3 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.0.5](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.5/SHA256SUMS.txt).
+2. Установите скачанный APK 3.0.5 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.0.3
+## Что нового в 3.0.5
 
-- **проект переименован в Leostryx** (репозиторий: `Leostrange/Leostryx`);
-- **новый баннер и брендинг** в стиле Leostryx (цвет `#0b84ff`, маскот — рысь);
-- **по умолчанию стоит значок и лого в виде рыси** (pack `02_lynx`);
-- **кастомизация иконок и splash screen** добавлена в оформление: 4 набора (Сова, Рысь, LSX, Angular X), переключение в настройках;
-- **Pillow (PIL) интегрирован в приложение** — доступен в билде после сборки;
-- **иконки в SVG** загружены в архиве `Leostryx-4-SVG-logos.7z`;
+- **смена иконки на рабочем столе на лету (без пересборки APK)** — 4 `activity-alias` (`IconPack1Activity`..`IconPack4Activity`) и нативный мост `IconPackSwitcher`;
+- **живой SVG-логотип и динамический акцентный цвет** — выбор логотипа и цвета в «Настройки › Оформление» мгновенно перекрашивает логотип на экране входа, в шапке, в превью настроек и все акцентные кнопки (`--primary`);
+- **экран входа «Добро пожаловать в Leostryx»** и полный перевод раздела резервного копирования («Бэкап»);
+- **непрерывная работа в фоне и долгих задач** — отключён ложный 120-секундный сторож `AGY-P2-16` на канале `StreamCascadeReactiveUpdates`, а также отключена заморозка таймеров и памяти WebView при сворачивании приложения;
+- **чистый старт без мелькания экрана диагностики** и автоочистка манифестов плагинов (`plugin.json`);
+- **разделители провайдеров в селекторе моделей** — модели из разных провайдеров (OpenAI, Anthropic, Gemini) сгруппированы с заголовками;
+- **проверка отображения всех выбранных моделей** — все модели из настроек провайдеров корректно появляются в селекторе;
+- **папка бэкапа: Leostryx Backup**, рабочая папка: **Leostryx Projects** (в интерфейсе и путях по умолчанию);
+- проект переименован в Leostryx (репозиторий: `Leostrange/Leostryx`);
+- новый баннер и брендинг в стиле Leostryx (цвет `#0b84ff`, маскот — рысь);
+- по умолчанию стоит значок и лого в виде рыси (pack `02_lynx`);
+- кастомизация иконок и splash screen добавлена в оформление: 4 набора (Сова, Рысь, LSX, Angular X), переключение в настройках;
+- Pillow (PIL) интегрирован в приложение — доступен в билде после сборки;
+- иконки в SVG загружены в архиве `Leostryx-4-SVG-logos.7z`;
 - переход на собственную мажорную нумерацию **3.0**;
 - интеграция **Flutter SDK** в «Настройки › Инструменты» (установка и удаление в 1 клик, bionic-патчинг `agy-fix-flutter`, верификация `flutter,dart`);
 - реализация поддержки **UTCP-серверов и спецификаций OpenAPI 3.0** (вкладка «🌐 UTCP & OpenAPI», каталог готовых бесплатных API, мост в ядро);
@@ -132,7 +139,7 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 ```
 
 > [!NOTE]
-> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.3) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
+> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.5) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
 
 ## Сборка APK
 

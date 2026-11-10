@@ -1582,6 +1582,10 @@ for pdir in sorted(glob.glob(f"{cfg_dir}/plugins/*")):
                 pdata = json.load(f)
                 title = pdata.get("name", pname)
                 desc = pdata.get("description", "")
+            if "skills" in pdata:
+                del pdata["skills"]
+                with open(pmanifest, "w", encoding="utf-8") as fw:
+                    json.dump(pdata, fw, ensure_ascii=False, indent=2)
         except:
             pass
     if not desc:
@@ -1964,8 +1968,7 @@ os.makedirs(target_dir, exist_ok=True)
 manifest = {
     "name": pdata["name"],
     "version": "1.0.0",
-    "description": pdata["desc"],
-    "skills": list(pdata["skills"].keys())
+    "description": pdata["desc"]
 }
 with open(os.path.join(target_dir, "plugin.json"), "w", encoding="utf-8") as f:
     json.dump(manifest, f, ensure_ascii=False, indent=2)
@@ -2514,8 +2517,8 @@ import json, urllib.request, ssl
 ctx = ssl._create_unverified_context()
 try:
     req = urllib.request.Request(
-        "https://api.github.com/repos/Leostrange/antigravity-android/releases/latest",
-        headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "Antigravity-App"}
+        "https://api.github.com/repos/Leostrange/Leostryx/releases/latest",
+        headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "Leostryx-App"}
     )
     data = json.loads(urllib.request.urlopen(req, timeout=10, context=ctx).read())
     tag = data.get("tag_name", "")

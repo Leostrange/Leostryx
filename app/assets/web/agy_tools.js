@@ -849,8 +849,8 @@
     var note = document.createElement("div");
     note.className = "agy-t-note";
     note.textContent = T(
-      "Отметьте, что сохранить, и укажите путь. По умолчанию — папка «Antigravity Backup» на телефоне. Включает провайдеры, ключи MCP, настройки и историю чатов с фото.",
-      "Check what to save and set the path. Default folder: Antigravity Backup on the phone. Includes providers, MCP keys, settings and chat history with photos."
+      "Отметьте, что сохранить, и укажите путь. По умолчанию — папка «Leostryx Backup» на телефоне. Включает провайдеры, ключи MCP, настройки и историю чатов с фото.",
+      "Check what to save and set the path. Default folder: Leostryx Backup on the phone. Includes providers, MCP keys, settings and chat history with photos."
     );
     wrap.appendChild(note);
 
@@ -863,7 +863,7 @@
     pathRow.appendChild(pathLabel);
     var pathInput = document.createElement("input");
     pathInput.type = "text";
-    pathInput.value = "/storage/emulated/0/Antigravity Backup";
+    pathInput.value = "/storage/emulated/0/Leostryx Backup";
     pathInput.style.cssText = "flex:1;min-width:0;background:#101012;color:#eee;border:1px solid #555;border-radius:8px;padding:8px;font-size:12px";
     pathInput.setAttribute("data-backup-path", "");
     pathRow.appendChild(pathInput);
@@ -994,7 +994,7 @@
       if (!lsId || /^ERR/.test(lsId)) { alert(String(lsId)); return; }
       pollStandalone(lsId, function (r) {
         var lines = (r.log || "").split("\n").filter(function (l) { return l.trim() && l.indexOf(".zip") >= 0; });
-        if (!lines.length) { alert(T("Нет файлов бэкапа в папке Antigravity Backup.", "No backup files found.")); return; }
+        if (!lines.length) { alert(T("Нет файлов бэкапа в папке Leostryx Backup.", "No backup files found.")); return; }
         var overlay = document.createElement("div");
         overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px";
         var box = document.createElement("div");
@@ -1163,7 +1163,7 @@
     var appInfo = document.createElement("div");
     var appName = document.createElement("div");
     appName.style.cssText = "font-size:17px;font-weight:600;color:var(--foreground,#eee)";
-    appName.textContent = "Antigravity-BP";
+    appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
     appVer.textContent = "3.0.2 · Standard";
@@ -1302,11 +1302,7 @@
         var m = /@@UPDATE (\S+) (\S+) (\S+)/.exec(r.log || "");
         if (m && m[1] && !m[1].startsWith("ERR")) {
           var tag = m[1], apkUrl = m[3];
-          if (tag.replace("v", "") === "3.0.2") {
-            updStatus.textContent = T("Установлена актуальная версия (3.0.2).", "Latest version installed (3.0.2).");
-          } else {
-            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;
-            var btnDl = document.createElement("button");
+            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;var btnDl = document.createElement("button");
             btnDl.style.cssText = "width:100%;margin-top:10px;padding:11px;border:1px solid " + ACCENT + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:14px;font-weight:500;cursor:pointer;transition:background .15s";
             btnDl.onmouseenter = function() { btnDl.style.background = "rgba(11,132,255,.1)"; };
             btnDl.onmouseleave = function() { btnDl.style.background = "transparent"; };
@@ -1466,7 +1462,7 @@
         return;
       }
       var catName = categories.filter(function(c) { return c.id === selectedCat; })[0];
-      var subject = "[Antigravity-BP] " + (catName ? catName.label : "");
+      var subject = "[Leostryx] " + (catName ? catName.label : "");
       var body = text;
       if (emailInput.value.trim()) {
         body += "\n\n---\n" + T("Ответить на: ", "Reply to: ") + emailInput.value.trim();

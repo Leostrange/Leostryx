@@ -598,8 +598,8 @@
       html += '    <span class="agy-mcp-badge on">v1.0 Standard</span>';
       html += '  </div>';
       html += '  <div class="agy-mcp-utcp-hero-desc">' + esc(T(
-        "Универсальный протокол прямого вызова API и внешних сервисов без создания промежуточных серверов. Поддерживает спецификации OpenAPI/Swagger 3.0 и нативные JSON-мануалы. Мост @utcp/mcp-bridge транслирует все доступные функции в инструменты MCP для Antigravity и кастомных моделей (OpenAI, Claude, DeepSeek).",
-        "Universal protocol for direct tool and API calling without intermediate proxy servers. Connects OpenAPI/Swagger 3.0 specs and native JSON manuals. The @utcp/mcp-bridge exports tools to Antigravity and custom models (OpenAI, Claude, DeepSeek)."
+        "Универсальный протокол прямого вызова API и внешних сервисов без создания промежуточных серверов. Поддерживает спецификации OpenAPI/Swagger 3.0 и нативные JSON-мануалы. Мост @utcp/mcp-bridge транслирует все доступные функции в инструменты MCP для Leostryx и кастомных моделей (OpenAI, Claude, DeepSeek).",
+        "Universal protocol for direct tool and API calling without intermediate proxy servers. Connects OpenAPI/Swagger 3.0 specs and native JSON manuals. The @utcp/mcp-bridge exports tools to Leostryx and custom models (OpenAI, Claude, DeepSeek)."
       )) + '</div>';
       html += '  <div class="agy-mcp-utcp-hero-meta">';
       html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мост UTCP ↔ MCP: ", "UTCP ↔ MCP Bridge: ")) + (isUtcpActive && comps.utcp_bridge.ok ? '<b style="color:#10b981;">' + esc(T("Включён", "Enabled")) + '</b>' : '<b style="color:#f59e0b;">' + esc(comps.utcp_bridge.ok ? T("Установлен", "Installed") : T("Не установлен", "Not installed")) + '</b>') + '</span>';
@@ -765,7 +765,7 @@
       html += '<div class="agy-mcp-modal-overlay">';
       html += '  <div class="agy-mcp-modal">';
       html += '    <div class="agy-mcp-modal-title">' + esc(T("Новый UTCP мануал / OpenAPI сервис", "New UTCP Manual / OpenAPI Service")) + '</div>';
-      html += '    <div class="agy-mcp-modal-desc">' + esc(T("Подключите любую спецификацию OpenAPI 3.0 (URL) или локальный JSON-мануал UTCP. Инструменты станут доступны ядру Antigravity и всем сторонним нейросетям.", "Connect any OpenAPI 3.0 specification (URL) or local JSON UTCP manual. Tools become immediately available to Antigravity core and all LLMs.")) + '</div>';
+      html += '    <div class="agy-mcp-modal-desc">' + esc(T("Подключите любую спецификацию OpenAPI 3.0 (URL) или локальный JSON-мануал UTCP. Инструменты станут доступны ядру Leostryx и всем сторонним нейросетям.", "Connect any OpenAPI 3.0 specification (URL) or local JSON UTCP manual. Tools become immediately available to Leostryx core and all LLMs.")) + '</div>';
       html += '    <div class="agy-mcp-modal-form">';
       html += '      <div class="agy-mcp-field"><label>' + esc(T("Имя мануала / сервиса (ID)", "Manual / Service ID")) + '</label><input type="text" id="utcp-modal-name" placeholder="weather-service"></div>';
       html += '      <div class="agy-mcp-field"><label>' + esc(T("Тип источника", "Source Type")) + '</label>';

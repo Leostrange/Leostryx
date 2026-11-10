@@ -37,18 +37,12 @@ try {
     var full = '[JS Error ' + src + '] ' + msg;
     startupErrors.push(full);
     console.error(full);
-    if (!state.signalled && global.Android && typeof global.Android.onUiError === 'function') {
-      global.Android.onUiError(global.__AG_NATIVE_BRIDGE_TOKEN__, full);
-    }
   });
   global.addEventListener('unhandledrejection', function (ev) {
     var reason = ev && ev.reason ? (ev.reason.stack || ev.reason.message || String(ev.reason)) : 'unknown rejection';
     var full = '[Unhandled Rejection] ' + reason;
     startupErrors.push(full);
     console.error(full);
-    if (!state.signalled && global.Android && typeof global.Android.onUiError === 'function') {
-      global.Android.onUiError(global.__AG_NATIVE_BRIDGE_TOKEN__, full);
-    }
   });
 } catch (e) {}
 
@@ -141,10 +135,14 @@ function arm() {
     }
   }, 40);
 
-  // Fallback: 5.5 seconds maximum waiting time
+  // Fallback: 8 seconds maximum waiting time
   global.setTimeout(function () {
     global.clearInterval(poller);
     if (isUiRendered()) {
+      return;
+    }
+    if (!state.signalled && startupErrors.length > 0 && global.Android && typeof global.Android.onUiError === 'function') {
+      global.Android.onUiError(global.__AG_NATIVE_BRIDGE_TOKEN__, startupErrors[0]);
       return;
     }
     signal('fallback-timeout');

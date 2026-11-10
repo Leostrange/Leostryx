@@ -97,7 +97,7 @@
 
   /* Best-effort transcript.md from transcript_full.jsonl lines. */
   function transcriptMd(lines, sourceName) {
-    var md = ["# Сессия Antigravity", "", "Источник: " + sourceName, ""];
+    var md = ["# Сессия Leostryx", "", "Источник: " + sourceName, ""];
     var filePaths = [], mediaUris = [];
     lines.forEach(function (line, idx) {
       if (!line.trim()) return;

@@ -59,8 +59,8 @@ try {
  * CONFIG so later fragments see the resolved values.
  */
 var appConfig = {
-  productName: 'Antigravity',
-  appName: 'AGY',
+  productName: 'Leostryx',
+  appName: 'Leostryx',
   appVersion: VERSION,
   version: VERSION,
   isStandalone: true,
@@ -437,92 +437,15 @@ try { console.log('[AGY bridge.core] ready (endpoints: ' + Object.keys(ENDPOINTS
   try { console.log('[AGY DownloadBridge] installed, native ready =', ready()); } catch (e) {}
 })();
 
-/* AGY-P2-16-APPENDER: narrowed to generation URLs (P2-22). stream stall watchdog (see fixes/p2_16_stream_watchdog.sh).
- * Wraps window.fetch; streaming responses get an idle watchdog that errors the
- * stream after 'first' ms without any data (before first chunk) or 'idle' ms
- * between chunks. Prevents the UI from waiting forever on a dead stream. */
+/* AGY-P2-16-APPENDER: disabled because matching /cascade/i killed long-lived
+ * ConnectRPC StreamCascadeReactiveUpdates streams during background tasks and
+ * when the app was minimized. */
 (function () {
   'use strict';
-  if (window.__agStreamWatchdog) return;
-  var cfg = { first: 180000, idle: 120000, on: true };
-  try {
-    var raw = window.localStorage && window.localStorage.getItem('agyStreamWatchdog');
-    if (raw) {
-      var c = JSON.parse(raw) || {};
-      if (c.first) cfg.first = +c.first;
-      if (c.idle) cfg.idle = +c.idle;
-      if (c.on === false) cfg.on = false;
-    }
-  } catch (e) {}
-  function watchdogStream(body) {
-    var reader = body.getReader();
-    var seen = false;
-    return new ReadableStream({
-      pull: function (ctrl) {
-        return new Promise(function (resolve) {
-          var gap = seen ? cfg.idle : cfg.first;
-          var timer = setTimeout(function () {
-            try { ctrl.error(new Error('AGY-P2-16: поток завис (нет данных ' + Math.round(gap / 1000) + 'с) — соединение разорвано')); } catch (e) {}
-            try { reader.cancel(); } catch (e) {}
-            resolve();
-          }, gap);
-          reader.read().then(function (r) {
-            clearTimeout(timer);
-            if (r.done) { try { ctrl.close(); } catch (e) {} resolve(); return; }
-            seen = true;
-            try { ctrl.enqueue(r.value); } catch (e) {}
-            resolve();
-          }, function (err) {
-            clearTimeout(timer);
-            try { ctrl.error(err); } catch (e) {}
-            resolve();
-          });
-        });
-      },
-      cancel: function (reason) { try { return reader.cancel(reason); } catch (e) {} }
-    });
-  }
-  function isStreamish(resp) {
-    try {
-      var ct = '', cl = '';
-      try { ct = String(resp.headers.get('content-type') || '').toLowerCase(); } catch (e) {}
-      try { cl = resp.headers.get('content-length'); } catch (e) {}
-      return !cl || /grpc|event-stream|ndjson|octet-stream|chunked/.test(ct);
-    } catch (e) { return false; }
-  }
-  var orig = window.fetch;
-  if (typeof orig !== 'function') return;
-  function urlOf(input) {
-    try {
-      if (typeof input === 'string') return input;
-      if (input && input.url) return String(input.url);
-    } catch (e) {}
-    return '';
-  }
-  function isGeneration(input) {
-    return /generat|cascade|completion|inference|chat/i.test(urlOf(input));
-  }
-  function wrapped(input, init) {
-    var p = orig.call(this, input, init);
-    return p.then(function (resp) {
-      if (!cfg.on || !isGeneration(input)) return resp;
-      if (!resp || !resp.body || typeof resp.body.getReader !== 'function') return resp;
-      if (!isStreamish(resp)) return resp;
-      try {
-        return new Response(watchdogStream(resp.body), {
-          status: resp.status, statusText: resp.statusText, headers: resp.headers
-        });
-      } catch (e) {
-        try { console.warn('[AGY P2-16] wrap failed:', e); } catch (_) {}
-        return resp;
-      }
-    });
-  }
-  window.fetch = wrapped;
   window.__agStreamWatchdog = {
     __installed: true,
-    config: cfg,
-    rewrap: function () { window.fetch = wrapped; }
+    config: { first: 0, idle: 0, on: false },
+    rewrap: function () {}
   };
-  try { console.log('[AGY P2-16] stream watchdog installed (first=' + cfg.first + ' idle=' + cfg.idle + ')'); } catch (e) {}
 })();
+
