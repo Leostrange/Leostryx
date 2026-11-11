@@ -30,6 +30,7 @@ Usage (from rebuild.py):
     overlay = brand.build_overlay(ROOT, cfg, ROOT/"dist"/".brand")
 """
 import json
+import os
 import struct
 from pathlib import Path
 
@@ -64,23 +65,46 @@ DEX_TEMPLATES = [
 def load_brand(root):
     """Read brand config; returns dict or None when absent/invalid."""
     cfg = Path(root) / "app/assets/web/brand/config.json"
-    if not cfg.exists():
-        return None
-    try:
-        data = json.loads(cfg.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    data = {}
+    if cfg.exists():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+
+    home_cfg = Path(os.environ.get("HOME", "/data/user/0/com.agyru.t2/files")) / "web/brand/config.json"
+    if home_cfg.exists():
+        try:
+            home_data = json.loads(home_cfg.read_text(encoding="utf-8"))
+            if isinstance(home_data, dict):
+                data.update(home_data)
+        except Exception:
+            pass
+
     if not isinstance(data, dict):
         return None
     pack = data.get("pack")
     if pack not in PACK_IDS:
         return None
     name = data.get("name") or "Leostryx"
+    color = data.get("color") or "#ec4899"
+    recolor = bool(data.get("recolorLogo", True))
+
+    try:
+        cfg.write_text(json.dumps({
+            "pack": pack,
+            "name": name,
+            "color": color,
+            "recolorLogo": recolor
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except Exception:
+        pass
+
     return {
         "pack": pack,
         "name": str(name),
-        "color": data.get("color") or "#0b84ff",
-        "recolorLogo": bool(data.get("recolorLogo", True)),
+        "color": color,
+        "recolorLogo": recolor,
     }
 
 
@@ -360,7 +384,7 @@ def build_overlay(root, cfg, workdir):
         raise SystemExit("brand: pack not found: %s" % pack_dir)
 
     recolor = bool(cfg.get("recolorLogo")) and bool(cfg.get("color"))
-    color_hex = cfg.get("color") or "#0b84ff"
+    color_hex = cfg.get("color") or "#ec4899"
 
     def maybe_tint(src_path, rel_key):
         if not recolor:

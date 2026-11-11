@@ -1090,6 +1090,9 @@
   function checkAgentActivity() {
     try {
       if (!window.AgyShade || typeof window.AgyShade.notify !== "function") return;
+      if (!document.hidden && window.AgyShade.cancel) {
+        try { window.AgyShade.cancel("agent_progress"); window.AgyShade.cancel("agent_approval"); } catch (e) {}
+      }
 
       // 1. Approval requests: buttons exist only when the Shield requires confirmation.
       //    Notify (with action) ONLY when the app is minimized; in foreground the user sees it.
@@ -1117,34 +1120,12 @@
           window.AgyShade.notify("agent_approval", "Leostryx — Требуется подтверждение", textSnippet, true);
         }
       } else if (document.hidden) {
-        // Approval resolved (or none pending): drop the stale notification.
+        // Approval resolved (or none pending): drop stale approval / progress notifications.
         if (lastApprovalSnippet) {
           lastApprovalSnippet = "";
           try { if (window.AgyShade.cancel) window.AgyShade.cancel("agent_approval"); } catch (e) {}
         }
-        // Auto mode / no confirmation needed: passive "agent is working"
-        // message, at most ONCE per agent run.
-        var running = !!document.querySelector("[data-testid='agent-input-box'] [aria-label='Stop'],[data-testid='agent-input-box'] [aria-label*='Stop'],[data-testid='agent-input-box'] [aria-label*='Останов'],[data-testid='running-items-panel'] .animate-spin");
-        var nowP = Date.now();
-        if (running) {
-          progressRunningLast = true;
-          if (!progressNotifiedThisRun && nowP - lastProgressNotify > 10000) {
-            progressNotifiedThisRun = true;
-            lastProgressNotify = nowP;
-            // Show what the agent is actually doing (latest visible step text).
-            var stepEls = document.querySelectorAll("[data-testid='cascade-step'],[data-testid='agent-turn'],[class*='agent-message']");
-            var stepText = "";
-            if (stepEls.length > 0) {
-              stepText = (stepEls[stepEls.length - 1].textContent || "").replace(/\s+/g, " ").trim();
-            }
-            if (!stepText || stepText.length < 8) stepText = "Задача выполняется в фоне…";
-            if (stepText.length > 180) stepText = stepText.slice(0, 180) + "…";
-            window.AgyShade.notify("agent_progress", "Leostryx — Агент работает", stepText, false);
-          }
-        } else {
-          if (progressRunningLast) setTimeout(function () { progressNotifiedThisRun = false; }, 8000);
-          progressRunningLast = false;
-        }
+        try { if (window.AgyShade.cancel) window.AgyShade.cancel("agent_progress"); } catch (e) {}
       }
 
       // 2. Detect Agent Response completion (when user is in background)

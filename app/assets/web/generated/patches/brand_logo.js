@@ -11,12 +11,12 @@
         var cfg = JSON.parse(raw);
         return {
           pack: (cfg.pack && LOGOS[cfg.pack]) ? cfg.pack : "02_lynx",
-          color: cfg.color || "#0b84ff",
+          color: cfg.color || "#ec4899",
           recolorLogo: cfg.recolorLogo !== false
         };
       }
     } catch (e) {}
-    return { pack: "02_lynx", color: "#0b84ff", recolorLogo: true };
+    return { pack: "02_lynx", color: "#ec4899", recolorLogo: true };
   }
 
   function recolorFill(fill, activeColor, force) {
@@ -35,7 +35,7 @@
   window.__agyBrandSvgMarkup = function (packId, customColor, size) {
     var brand = getActiveBrand();
     var logo = LOGOS[packId] || LOGOS[brand.pack] || LOGOS["02_lynx"];
-    var col = (typeof customColor === "string" ? customColor : null) || brand.color || "#0b84ff";
+    var col = (typeof customColor === "string" ? customColor : null) || brand.color || "#ec4899";
     var force = customColor ? true : (brand.recolorLogo !== false);
     var sz = size || 48;
     var defsHtml = "";
@@ -86,7 +86,7 @@
       var packId = (props && props.pack) || brand.pack || "02_lynx";
       var hasCustomColor = !!(props && (props.color || props.forceRecolor));
       var force = (brand.recolorLogo !== false) || hasCustomColor;
-      var activeColor = (props && typeof props.color === "string" ? props.color : null) || brand.color || "#0b84ff";
+      var activeColor = (props && typeof props.color === "string" ? props.color : null) || brand.color || "#ec4899";
       var logo = LOGOS[packId] || LOGOS["02_lynx"];
       var className = (props && props.className) || "shrink-0 object-contain";
       var sz = (props && (props.size || props.width || props.height)) || void 0;
@@ -182,7 +182,7 @@
         }, []);
       }
 
-      var activeColor = brand.color || "#0b84ff";
+      var activeColor = brand.color || "#ec4899";
       return h("div", {
         className: "absolute pointer-events-none z-0 flex items-center justify-center",
         style: {

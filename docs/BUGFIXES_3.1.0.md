@@ -188,11 +188,19 @@
 - **В `tools/brand.py`**: `recolorLogo` по умолчанию `True` → `splash_logo.png` тинтируется
   в акцентный цвет при сборке APK.
 - **В `theme-bootstrap.js`**: добавлен мгновенный бутстрап акцентного цвета из
-  `localStorage["agyBrandConfig"]` на `:root` до первой отрисовки страницы.
-- **В `brand_logo.js`**: `getActiveBrand()` по умолчанию использует `recolorLogo: true`,
+  `localStorage["agyBrandConfig"]` на `:root` до первой отрисовки страницы (дефолт `#ec4899`).
+- **В `brand_logo.js`**: `getActiveBrand()` по умолчанию использует `recolorLogo: true` и цвет `#ec4899`,
   а `getLogoComp()` распознаёт `props.color === true` и принудительно тинтирует логотип
   акцентным цветом бренда.
 - **В `agy_brand.js`**: дефолт `recolorLogo: true`.
+- **В `tools/brand.py`**: `load_brand()` динамически считывает активную конфигурацию бренда из
+  `$HOME/web/brand/config.json` пользователя, дефолт `#ec4899`, генерирует розовый
+  `res/drawable-nodpi-v4/splash_logo.png` и синхронизирует `app/assets/web/brand/config.json`.
+- **В `agy_tools.sh` (`op_brand`)**: выбор цвета в настройках сохраняется как в `$HOME/web/brand/config.json`,
+  так и в репозиторий проекта для последующих сборок.
+- **В `agy_ru.js`**: полностью удалено лишнее пассивное уведомление `agent_progress` («Leostryx — Агент работает /
+  Задача выполняется в фоне…»), так как в шторке уже активен статус ядра «Leostryx core running». Добавлена
+  мгновенная отмена зависших уведомлений прогресса при активности в приложении.
 
 ---
 
@@ -201,11 +209,12 @@
 |---|---|
 | `app/classes.dex` (smali `AgyShade.smali`) | `needsAction` теперь реально управляет кнопками; `setOnlyAlertOnce(true)` |
 | `app/assets/web/generated/patches/web_optimizations.js` | `nativeNotifications.send`: запрет на переднем плане, корректный `needsAction` |
-| `app/assets/web/agy_ru.js` | `checkAgentActivity()`: shield-auto режим, дедупликация по сниппету, cancel при разрешении, прогресс 1 раз за запуск |
-| `app/assets/web/brand/config.json` | `recolorLogo: true` |
-| `tools/brand.py` | тинтинг `splash_logo.png` по умолчанию `recolorLogo: True` |
-| `app/assets/web/generated/boot/theme-bootstrap.js` | быстрый бутстрап акцентного цвета из `localStorage` до рендера |
-| `app/assets/web/generated/patches/brand_logo.js` | дефолт `recolorLogo: true`, поддержка `props.color: true` |
+| `app/assets/web/agy_ru.js` | `checkAgentActivity()`: shield-auto режим, дедупликация по сниппету, cancel при разрешении, удалено лишнее уведомление `agent_progress` |
+| `app/assets/web/brand/config.json` | `recolorLogo: true`, цвет по умолчанию `#ec4899` (Pink) |
+| `tools/brand.py` | динамическая загрузка активного цвета из `$HOME/web/brand/config.json`, тинтинг `splash_logo.png` в `#ec4899` |
+| `app/assets/web/agy_tools.sh` | `op_brand`: синхронизация выбранного пользователем цвета с репозиторием |
+| `app/assets/web/generated/boot/theme-bootstrap.js` | быстрый бутстрап акцентного цвета из `localStorage` до рендера (дефолт `#ec4899`) |
+| `app/assets/web/generated/patches/brand_logo.js` | дефолт `recolorLogo: true`, дефолтный цвет `#ec4899`, поддержка `props.color: true` |
 | `app/assets/web/agy_brand.js` | дефолт `recolorLogo: true` |
 | `app/assets/web/agy_providers.js` | specs содержат `provider`, `providerName`, `providerType`; экспорт `__agyGetProviderName` |
 | `app/assets/web/generated/main.js` | `RXb` с атрибутами селектора, сортировка по провайдерам в `SXb`, защита `fKa` от пустого conversationId |
@@ -216,10 +225,9 @@
 ---
 
 ## Проверка после установки 3.1.0
-1. Запустите приложение — **логотип сплэш-скрина и экрана входа отображается в акцентном цвете**.
+1. Запустите приложение — **нативный сплэш-скрин ОС Android и экран входа окрашены в акцентный розовый цвет (`#ec4899`)**.
 2. Откройте селектор моделей — **кастомные модели сгруппированы по провайдерам с четкими разделителями и названиями провайдеров** (OpenAI, Claude, Gemini и т.д.).
-3. Запустите агента в открытом приложении — **никаких уведомлений из шторки не появляется**.
-4. Сверните приложение при активной задаче агента — приходит **одно** информационное уведомление с актуальным статусом шага (без кнопок подтверждения).
-5. При включённом режиме «Не спрашивать» — при свёрнутом приложении уведомления с кнопками подтверждения не приходят вовсе.
-6. Переключите провайдер — в окне проекта не появляется фейковых чатов или дублирующихся индикаторов.
+3. Запустите агента — **в шторке нет лишнего уведомления «Leostryx — Агент работает»** (остаётся только штатный сервис «Core running»).
+4. При включённом режиме «Не спрашивать» — при свёрнутом приложении уведомления с кнопками подтверждения не приходят вовсе.
+5. Переключите провайдер — в окне проекта не появляется фейковых чатов или дублирующихся индикаторов.
 

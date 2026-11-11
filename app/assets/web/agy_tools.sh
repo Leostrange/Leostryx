@@ -2690,8 +2690,16 @@ cfg["name"] = "Leostryx"
 cfg["recolorLogo"] = recolor
 if colour and colour != "none":
     cfg["color"] = colour
-(web / "brand" / "config.json").write_text(
-    json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+out_json = json.dumps(cfg, ensure_ascii=False, indent=2) + "\n"
+(web / "brand" / "config.json").write_text(out_json, encoding="utf-8")
+for r_cfg in [
+    pathlib.Path("/storage/emulated/0/Leostryx Projects/Leostryx-repo/app/assets/web/brand/config.json"),
+]:
+    if r_cfg.parent.is_dir():
+        try:
+            r_cfg.write_text(out_json, encoding="utf-8")
+        except Exception:
+            pass
 print("brand: recorded pack=%s color=%s recolor=%s" % (pack, cfg.get("color", "-"), recolor))
 PYBR
     say "@@done brand $pack"

@@ -36,7 +36,7 @@
   // Fast brand accent color bootstrap: applies accent color variables to avoid un-tinted flash on startup
   try {
     var rawBrand = localStorage.getItem("agyBrandConfig");
-    var brandColor = "#0b84ff";
+    var brandColor = "#ec4899";
     if (rawBrand) {
       var brandParsed = JSON.parse(rawBrand);
       if (brandParsed && brandParsed.color) brandColor = brandParsed.color;
