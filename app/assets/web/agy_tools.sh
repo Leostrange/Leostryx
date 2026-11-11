@@ -514,11 +514,16 @@ op_sdk() {
     write_env
     . "$ENVF"
     local comps="${ARG:-platforms;android-35 build-tools;35.0.0}"
+    # API 37.x lives in the canary channel (channel 3); add --channel=3 automatically
+    local channel_flag=""
+    case "$comps" in
+        *android-37*|*build-tools\;37*) channel_flag="--channel=3" ;;
+    esac
     step "Accept licenses"
-    yes | bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses || fail "sdkmanager license acceptance failed"
+    yes | bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" $channel_flag --licenses || fail "sdkmanager license acceptance failed"
     step "sdkmanager $comps"
     # shellcheck disable=SC2086
-    bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" $comps || fail "sdkmanager"
+    bash "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" $channel_flag $comps || fail "sdkmanager"
     refresh_bridges
     local component dir
     for component in $comps; do
@@ -2669,6 +2674,28 @@ if colour:
     json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 print("brand: recorded pack=%s color=%s" % (pack, cfg.get("color", "-")))
 PYBR
+    local alias_name=""
+    case "$pack" in
+        01_owl)       alias_name="LauncherOwl" ;;
+        02_lynx)      alias_name="LauncherLynx" ;;
+        03_lsx)       alias_name="LauncherLsx" ;;
+        04_angular_x) alias_name="LauncherAngularX" ;;
+    esac
+
+    if [ -n "$alias_name" ]; then
+        step "Switching launcher icon to $alias_name"
+        local all_aliases="LauncherOwl LauncherLynx LauncherLsx LauncherAngularX"
+        for al in $all_aliases; do
+            if [ "$al" = "$alias_name" ]; then
+                pm enable "com.agyru.t2/com.agy.ui.launcher.$al" 2>/dev/null || true
+                rish -c "cmd package set-component-enabled --user 0 com.agyru.t2/com.agy.ui.launcher.$al 1" 2>/dev/null || true
+            else
+                pm disable "com.agyru.t2/com.agy.ui.launcher.$al" 2>/dev/null || true
+                rish -c "cmd package set-component-enabled --user 0 com.agyru.t2/com.agy.ui.launcher.$al 2" 2>/dev/null || true
+            fi
+        done
+    fi
+
     say "@@done brand $pack"
 }
 
@@ -2908,9 +2935,14 @@ try:
     name = (data.get("name", "") or tag or "-").strip().replace(" ", "_")
     apk_url = ""
     for a in data.get("assets", []):
-        if a["name"].endswith("-standard.apk"):
+        if a["name"].endswith("-bypass.apk") or a["name"].endswith("bypass.apk"):
             apk_url = a["browser_download_url"]
             break
+    if not apk_url:
+        for a in data.get("assets", []):
+            if a["name"].endswith("-standard.apk"):
+                apk_url = a["browser_download_url"]
+                break
     if not apk_url:
         for a in data.get("assets", []):
             if a["name"].endswith(".apk"):

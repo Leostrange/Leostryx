@@ -28,20 +28,20 @@
     { id: "build", ru: "Сборка нативного кода", en: "Native build tools", items: [
       { id: "clang", kind: "pkg", ru: "Clang / LLVM", en: "Clang / LLVM", dru: "C/C++ компилятор; нужен node-gyp и NDK-сборкам.", den: "C/C++ compiler; needed by node-gyp and NDK builds.", verify: "clang" },
       { id: "lld", kind: "pkg", ru: "LLD", en: "LLD", dru: "Линкер LLVM.", den: "LLVM linker." },
-      { id: "make", kind: "pkg", ru: "Make", en: "Make", dru: "", den: "" },
-      { id: "cmake", kind: "pkg", ru: "CMake", en: "CMake", dru: "", den: "", verify: "cmake" },
-      { id: "ninja", kind: "pkg", ru: "Ninja", en: "Ninja", dru: "", den: "" },
-      { id: "pkg-config", kind: "pkg", ru: "pkg-config", en: "pkg-config", dru: "", den: "" },
+      { id: "make", kind: "pkg", ru: "Make", en: "Make", dru: "Классическая система сборки по Makefile.", den: "Classic Makefile-based build system." },
+      { id: "cmake", kind: "pkg", ru: "CMake", en: "CMake", dru: "Кроссплатформенная система сборки для C/C++.", den: "Cross-platform build system generator for C/C++.", verify: "cmake" },
+      { id: "ninja", kind: "pkg", ru: "Ninja", en: "Ninja", dru: "Быстрая система сборки, используется CMake и NDK.", den: "Fast build system used by CMake and NDK." },
+      { id: "pkg-config", kind: "pkg", ru: "pkg-config", en: "pkg-config", dru: "Получение флагов компилятора для системных библиотек.", den: "Retrieves compiler flags for installed system libraries." },
       { id: "binutils", kind: "pkg", ru: "Binutils", en: "Binutils", dru: "objdump, readelf, strip…", den: "objdump, readelf, strip…" },
       { id: "python", kind: "pkg", ru: "Python 3", en: "Python 3", dru: "Нужен node-gyp и многим скриптам.", den: "Needed by node-gyp and many scripts.", verify: "python" },
-      { id: "python-pip", kind: "pkg", ru: "pip", en: "pip", dru: "", den: "" }
+      { id: "python-pip", kind: "pkg", ru: "pip", en: "pip", dru: "Менеджер пакетов Python.", den: "Python package manager." }
     ] },
     { id: "java", ru: "Java и Kotlin", en: "Java and Kotlin", items: [
       { id: "openjdk-17", kind: "pkg", ru: "OpenJDK 17", en: "OpenJDK 17", dru: "Для Gradle и Android Gradle Plugin 8.x.", den: "For Gradle and Android Gradle Plugin 8.x.", verify: "java17,javac17" },
       { id: "openjdk-21", kind: "pkg", ru: "OpenJDK 21", en: "OpenJDK 21", dru: "Новее; AGP 8.x работает и с 17.", den: "Newer; AGP 8.x works with 17 as well.", verify: "java21,javac21" },
-      { id: "kotlin", kind: "pkg", ru: "Kotlin (kotlinc)", en: "Kotlin (kotlinc)", dru: "", den: "", verify: "kotlin" },
+      { id: "kotlin", kind: "pkg", ru: "Kotlin (kotlinc)", en: "Kotlin (kotlinc)", dru: "Компилятор языка Kotlin.", den: "Kotlin language compiler.", verify: "kotlin" },
       { id: "gradle", kind: "pkg", ru: "Gradle", en: "Gradle", dru: "Сборка Android-проектов.", den: "Builds Android projects.", verify: "gradle" },
-      { id: "maven", kind: "pkg", ru: "Maven", en: "Maven", dru: "", den: "" }
+      { id: "maven", kind: "pkg", ru: "Maven", en: "Maven", dru: "Система сборки и управления зависимостями для Java.", den: "Build and dependency management system for Java." }
     ] },
     { id: "android", ru: "Android: сборка APK", en: "Android: APK build", items: [
       { id: "aapt", kind: "pkg", ru: "aapt + zipalign", en: "aapt + zipalign", dru: "Упаковка ресурсов и выравнивание APK.", den: "Resource packaging and APK alignment; zipalign is included in aapt.", verify: "aapt,zipalign" },
@@ -54,15 +54,15 @@
       { id: "jadx", kind: "pkg", ru: "jadx", en: "jadx", dru: "Декомпилятор DEX → Java.", den: "DEX → Java decompiler.", verify: "jadx" }
     ] },
     { id: "sdk", ru: "Android SDK", en: "Android SDK", note: { ru: "Загружается с dl.google.com через sdkmanager. Нужен OpenJDK — поставится сам. x86-бинарники build-tools заменяются нативными aapt/aapt2/zipalign.", en: "Downloaded from dl.google.com with sdkmanager. Needs OpenJDK (installed automatically). x86 build-tools binaries are replaced with native aapt/aapt2/zipalign." }, items: [
-      { id: "platforms;android-37.1", kind: "sdk", ru: "Платформа Android API 37.1", en: "Android platform API 37.1", dru: "", den: "" },
-      { id: "platforms;android-37.0", kind: "sdk", ru: "Платформа Android API 37.0", en: "Android platform API 37.0", dru: "", den: "" },
-      { id: "platforms;android-36", kind: "sdk", ru: "Платформа Android 16 (API 36)", en: "Android 16 platform (API 36)", dru: "", den: "" },
-      { id: "platforms;android-35", kind: "sdk", ru: "Платформа Android 15 (API 35)", en: "Android 15 platform (API 35)", dru: "android.jar для компиляции.", den: "android.jar for compilation." },
-      { id: "platforms;android-34", kind: "sdk", ru: "Платформа Android 14 (API 34)", en: "Android 14 platform (API 34)", dru: "", den: "" },
-      { id: "build-tools;37.0.0", kind: "sdk", ru: "Build-tools 37.0.0", en: "Build-tools 37.0.0", dru: "", den: "" },
-      { id: "build-tools;36.0.0", kind: "sdk", ru: "Build-tools 36.0.0", en: "Build-tools 36.0.0", dru: "", den: "" },
-      { id: "build-tools;35.0.0", kind: "sdk", ru: "Build-tools 35.0.0", en: "Build-tools 35.0.0", dru: "Нужны Gradle (d8, lib).", den: "Required by Gradle (d8, lib)." },
-      { id: "build-tools;34.0.0", kind: "sdk", ru: "Build-tools 34.0.0", en: "Build-tools 34.0.0", dru: "", den: "" }
+      { id: "platforms;android-37.1", kind: "sdk", ru: "Платформа Android 17 preview (API 37.1)", en: "Android 17 preview platform (API 37.1)", dru: "Canary-версия Android 17. Требуется --channel=3 в sdkmanager.", den: "Android 17 canary preview. Requires --channel=3 in sdkmanager." },
+      { id: "platforms;android-37.0", kind: "sdk", ru: "Платформа Android 17 preview (API 37.0)", en: "Android 17 preview platform (API 37.0)", dru: "Ранний preview Android 17. Требуется --channel=3 в sdkmanager.", den: "Early Android 17 preview. Requires --channel=3 in sdkmanager." },
+      { id: "platforms;android-36", kind: "sdk", ru: "Платформа Android 16 (API 36)", en: "Android 16 platform (API 36)", dru: "android.jar для компиляции под Android 16.", den: "android.jar for compiling against Android 16." },
+      { id: "platforms;android-35", kind: "sdk", ru: "Платформа Android 15 (API 35)", en: "Android 15 platform (API 35)", dru: "android.jar для компиляции. Рекомендуется.", den: "android.jar for compilation. Recommended." },
+      { id: "platforms;android-34", kind: "sdk", ru: "Платформа Android 14 (API 34)", en: "Android 14 platform (API 34)", dru: "android.jar для компиляции под Android 14.", den: "android.jar for compiling against Android 14." },
+      { id: "build-tools;37.0.0", kind: "sdk", ru: "Build-tools 37.0.0", en: "Build-tools 37.0.0", dru: "Инструменты сборки для Android 17 preview (canary).", den: "Build tools for Android 17 preview (canary channel)." },
+      { id: "build-tools;36.0.0", kind: "sdk", ru: "Build-tools 36.0.0", en: "Build-tools 36.0.0", dru: "Инструменты сборки для Android 16.", den: "Build tools for Android 16." },
+      { id: "build-tools;35.0.0", kind: "sdk", ru: "Build-tools 35.0.0", en: "Build-tools 35.0.0", dru: "Нужны Gradle (d8, lib). Рекомендуется.", den: "Required by Gradle (d8, lib). Recommended." },
+      { id: "build-tools;34.0.0", kind: "sdk", ru: "Build-tools 34.0.0", en: "Build-tools 34.0.0", dru: "Инструменты сборки для Android 14.", den: "Build tools for Android 14." }
     ] },
     { id: "ndk", ru: "Android NDK", en: "Android NDK", items: [
       { id: "ndk-sysroot", kind: "pkg", ru: "NDK sysroot", en: "NDK sysroot", dru: "Заголовки и библиотеки Android для clang.", den: "Android headers and libraries for clang." },
@@ -73,24 +73,24 @@
       { id: "flutter-sdk", kind: "flutter", ru: "Flutter SDK (stable)", en: "Flutter SDK (stable)", dru: "SDK для Flutter-приложений.", den: "Flutter SDK + Dart + bionic libc autopatch.", verify: "flutter,dart" }
     ] },
     { id: "lang", ru: "Другие языки", en: "Other languages", items: [
-      { id: "rust", kind: "pkg", ru: "Rust (cargo)", en: "Rust (cargo)", dru: "", den: "", verify: "rust" },
-      { id: "golang", kind: "pkg", ru: "Go", en: "Go", dru: "", den: "", verify: "go" }
+      { id: "rust", kind: "pkg", ru: "Rust (cargo)", en: "Rust (cargo)", dru: "Компилятор Rust и менеджер пакетов cargo.", den: "Rust compiler and cargo package manager.", verify: "rust" },
+      { id: "golang", kind: "pkg", ru: "Go", en: "Go", dru: "Компилятор языка Go.", den: "Go language compiler.", verify: "go" }
     ] },
     { id: "util", ru: "Git и утилиты", en: "Git and utilities", items: [
-      { id: "git", kind: "pkg", ru: "Git", en: "Git", dru: "", den: "", verify: "git" },
-      { id: "gh", kind: "pkg", ru: "GitHub CLI", en: "GitHub CLI", dru: "", den: "" },
-      { id: "openssh", kind: "pkg", ru: "OpenSSH", en: "OpenSSH", dru: "", den: "" },
+      { id: "git", kind: "pkg", ru: "Git", en: "Git", dru: "Система контроля версий.", den: "Version control system.", verify: "git" },
+      { id: "gh", kind: "pkg", ru: "GitHub CLI", en: "GitHub CLI", dru: "Управление репозиториями и релизами GitHub из терминала.", den: "Manage GitHub repositories and releases from the terminal." },
+      { id: "openssh", kind: "pkg", ru: "OpenSSH", en: "OpenSSH", dru: "SSH-клиент и агент ключей для git и удалённых серверов.", den: "SSH client and key agent for git and remote servers." },
       { id: "openssl-tool", kind: "pkg", ru: "OpenSSL (openssl)", en: "OpenSSL (openssl)", dru: "Сертификаты, ключи подписи PKCS#12/PEM и криптография.", den: "Certificates, PKCS#12/PEM signing keys and cryptography.", verify: "openssl" },
-      { id: "curl", kind: "pkg", ru: "curl", en: "curl", dru: "", den: "" },
-      { id: "wget", kind: "pkg", ru: "wget", en: "wget", dru: "", den: "" },
-      { id: "zip", kind: "pkg", ru: "zip", en: "zip", dru: "", den: "" },
-      { id: "unzip", kind: "pkg", ru: "unzip", en: "unzip", dru: "", den: "" },
-      { id: "jq", kind: "pkg", ru: "jq", en: "jq", dru: "", den: "" },
-      { id: "ripgrep", kind: "pkg", ru: "ripgrep (rg)", en: "ripgrep (rg)", dru: "", den: "" },
-      { id: "fd", kind: "pkg", ru: "fd", en: "fd", dru: "", den: "" },
-      { id: "tree", kind: "pkg", ru: "tree", en: "tree", dru: "", den: "" }
+      { id: "curl", kind: "pkg", ru: "curl", en: "curl", dru: "Загрузка файлов и HTTP-запросы из терминала.", den: "File downloads and HTTP requests from the terminal." },
+      { id: "wget", kind: "pkg", ru: "wget", en: "wget", dru: "Рекурсивная загрузка файлов по HTTP/FTP.", den: "Recursive file downloads over HTTP/FTP." },
+      { id: "jq", kind: "pkg", ru: "jq", en: "jq", dru: "Обработка и фильтрация JSON в терминале.", den: "JSON processing and filtering in the terminal." },
+      { id: "ripgrep", kind: "pkg", ru: "ripgrep (rg)", en: "ripgrep (rg)", dru: "Быстрый рекурсивный поиск текста в файлах.", den: "Fast recursive text search across files." },
+      { id: "fd", kind: "pkg", ru: "fd", en: "fd", dru: "Быстрый поиск файлов, замена find.", den: "Fast file search, modern replacement for find." },
+      { id: "tree", kind: "pkg", ru: "tree", en: "tree", dru: "Отображение дерева файловой системы.", den: "Display directory tree in the terminal." }
     ] },
     { id: "archives", ru: "Архивы", en: "Archives", items: [
+      { id: "zip", kind: "pkg", ru: "zip", en: "zip", dru: "Создание ZIP-архивов.", den: "Create ZIP archives." },
+      { id: "unzip", kind: "pkg", ru: "unzip", en: "unzip", dru: "Распаковка ZIP-архивов.", den: "Extract ZIP archives." },
       { id: "7zip", kind: "pkg", ru: "7zip (7z, tar, gz, bz2, xz, iso)", en: "7zip (7z, tar, gz, bz2, xz, iso)", dru: "Основной пакет для открытия остальных форматов архивов.", den: "Main package for opening the remaining archive formats.", verify: "7z" },
       { id: "unrar", kind: "pkg", ru: "unrar (RAR)", en: "unrar (RAR)", dru: "Распаковка архивов RAR.", den: "Extracts RAR archives.", verify: "unrar" },
       { id: "zstd", kind: "pkg", ru: "zstd (.zst)", en: "zstd (.zst)", dru: "Сжатие и распаковка .zst.", den: "Compresses and extracts .zst.", verify: "zstd" },
@@ -1172,7 +1172,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.0.8";
+    appVer.textContent = "3.0.9";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1284,7 +1284,7 @@
     btnUpd.textContent = T("Проверить обновления", "Check for updates");
     c3.appendChild(btnUpd);
 
-    var CURRENT_VERSION = "3.0.8";
+    var CURRENT_VERSION = "3.0.9";
     var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
     var pendingApkUrl = null;
     var updState = "check"; // "check" | "available" | "downloading" | "ready"

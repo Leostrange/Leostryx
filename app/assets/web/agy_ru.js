@@ -852,44 +852,86 @@
 
 })();
 
-/* Dismiss only the expired November 2026 third-party-model notice. */
+/* Dismiss expired November 2026 third-party model notice (Claude 4.6 -> 5.5) */
 (function () {
   var scheduled = false, seen = new WeakSet();
-  function scan() {
+  function dismissNotice() {
     scheduled = false;
-    if (!document.body || !document.createTreeWalker) return;
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), node;
-    while ((node = walker.nextNode())) {
-      var t = (node.nodeValue || '').toLowerCase();
-      if (t.indexOf('changes to third-party model access') < 0 && t.indexOf('изменения доступа к сторонним моделям') < 0) continue;
-      for (var el = node.parentElement, depth = 0; el && depth < 8 && el !== document.body; el = el.parentElement, depth++) {
-        var content = (el.textContent || '').toLowerCase();
-        if (content.indexOf('2026') < 0 || !/(november|ноябр)/i.test(content) || !/opus\s*5\.5/i.test(content) || !/sonnet\s*5\.5/i.test(content)) continue;
-        var buttons = el.querySelectorAll('button');
-        for (var i = 0; i < buttons.length; i++) {
-          var label = (buttons[i].textContent || buttons[i].getAttribute('aria-label') || '').trim().toLowerCase();
-          if ((label === 'close' || label === 'dismiss' || label === 'закрыть') && !seen.has(buttons[i])) {
-            seen.add(buttons[i]); buttons[i].click(); break;
-          }
+    if (!document.body) return;
+
+    // Check all dialogs, modals, banners, alerts
+    var candidates = document.querySelectorAll(
+      '[role="dialog"], [role="alertdialog"], [data-radix-portal], [data-state="open"], .fixed, .absolute'
+    );
+    for (var k = 0; k < candidates.length; k++) {
+      var node = candidates[k];
+      var text = (node.textContent || '').toLowerCase();
+      var hasModelNotice = (
+        (text.indexOf('opus 5.5') >= 0 || text.indexOf('sonnet 5.5') >= 0 || text.indexOf('claude') >= 0) &&
+        (text.indexOf('2 ноября') >= 0 || text.indexOf('november 2') >= 0 || text.indexOf('2026') >= 0 || text.indexOf('сторонн') >= 0 || text.indexOf('third-party') >= 0)
+      ) || (
+        text.indexOf('доступ к сторонним моделям') >= 0 ||
+        text.indexOf('third-party model access') >= 0
+      );
+      if (!hasModelNotice) continue;
+
+      // Find the closest dialog container or portal
+      var container = node.closest('[role="dialog"], [role="alertdialog"], [data-radix-portal]') || node;
+
+      // Click close / ok / dismiss button
+      var btns = container.querySelectorAll('button');
+      var clicked = false;
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        if (seen.has(b)) continue;
+        var lbl = (b.textContent || b.getAttribute('aria-label') || b.getAttribute('title') || '').trim().toLowerCase();
+        if (/^(понятно|ok|ок|закрыть|close|dismiss|got it|хорошо|продолжить|continue)$/i.test(lbl) || b.querySelector('svg')) {
+          seen.add(b);
+          try { b.click(); } catch (e) {}
+          clicked = true;
+          break;
         }
-        break;
+      }
+      if (!clicked && btns.length > 0 && !seen.has(btns[0])) {
+        seen.add(btns[0]);
+        try { btns[0].click(); } catch (e) {}
+      }
+
+      // Hide container immediately to prevent flashing
+      container.style.display = 'none';
+      container.setAttribute('aria-hidden', 'true');
+
+      // Also hide accompanying backdrop
+      var overlays = document.querySelectorAll('[data-radix-focus-guard], [data-aria-hidden="true"], .fixed.inset-0');
+      for (var oi = 0; oi < overlays.length; oi++) {
+        if (overlays[oi] !== container && overlays[oi].classList.contains('bg-black/50')) {
+          overlays[oi].style.display = 'none';
+        }
       }
     }
   }
-  function schedule() { if (!scheduled) { scheduled = true; requestAnimationFrame(scan); } }
-  function start() {
-    new MutationObserver(function (records) {
-      for (var i = 0; i < records.length; i++) {
-        var r = records[i], nodes = r.type === 'characterData' ? [r.target] : r.addedNodes;
-        for (var j = 0; j < nodes.length; j++) {
-          var t = (nodes[j].textContent || '').toLowerCase();
-          if (t.indexOf('changes to third-party model access') >= 0 || t.indexOf('изменения доступа к сторонним моделям') >= 0) { schedule(); return; }
-        }
-      }
-    }).observe(document.body, {childList:true, subtree:true, characterData:true});
-    schedule();
+
+  function schedule() {
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(dismissNotice);
+    }
   }
-  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start, {once:true});
+
+  function start() {
+    new MutationObserver(function () { schedule(); }).observe(
+      document.body,
+      { childList: true, subtree: true }
+    );
+    schedule();
+    // Re-check a few times after initial login
+    setTimeout(schedule, 500);
+    setTimeout(schedule, 1500);
+    setTimeout(schedule, 3000);
+  }
+
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
 })();
 
 /* -------------------------------------------------------------------------- */
@@ -972,7 +1014,7 @@
     }
 
   /* -------------------------------------------------------------------------- */
-  /* Subagents Chat Quick Launcher (Release 3.0.8)                              */
+  /* Subagents Chat Quick Launcher (Release 3.0.9)                              */
   /* -------------------------------------------------------------------------- */
   var CHAT_SUBAGENTS = [
     { id: "self", name: "self", title: "Текущий агент", desc: "Копия контекста и инструментов", icon: "🤖" },
@@ -1088,14 +1130,26 @@
   }, true);
 
   function attachSubagentButton() {
+    if (document.getElementById("agy-subagent-btn")) return;
     var box = document.querySelector(BOX);
     if (!box) return;
-    if (box.querySelector("#agy-subagent-btn")) return;
 
-    // Place near '+' button or first toolbar button
-    var addBtn = box.querySelector("[aria-label='Add context'],[aria-label='Добавить контекст']") ||
-                 box.querySelector("button");
-    if (!addBtn || !addBtn.parentElement) return;
+    // Try multiple selectors for the '+' / attach button
+    var anchor = box.querySelector(
+      "[aria-label='Add context'],[aria-label='Добавить контекст']," +
+      "[aria-label='Add attachment'],[aria-label='Прикрепить файл']," +
+      "[aria-label='Attach'],[aria-label='Upload']," +
+      "[data-testid='attach-button'],[data-testid='add-context-button']"
+    );
+    // Fall back to first visible button in the box
+    if (!anchor) {
+      var allBtns = box.querySelectorAll("button");
+      for (var bi = 0; bi < allBtns.length; bi++) {
+        var b = allBtns[bi];
+        if (b.offsetHeight > 0 && b.offsetWidth > 0) { anchor = b; break; }
+      }
+    }
+    if (!anchor || !anchor.parentElement) return;
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1108,15 +1162,21 @@
     btn.innerHTML = "🤖";
     btn.onmouseenter = function () { btn.style.transform = "scale(1.08)"; };
     btn.onmouseleave = function () { btn.style.transform = ""; };
-
     btn.onclick = function (e) {
       e.preventDefault();
       e.stopPropagation();
       toggleSubagentsMenu(btn);
     };
-
-    addBtn.parentElement.insertBefore(btn, addBtn.nextSibling);
+    anchor.parentElement.insertBefore(btn, anchor.nextSibling);
   }
 
-  setInterval(attachSubagentButton, 1000);
+  setInterval(attachSubagentButton, 800);
+  // Also watch DOM for SPA route changes / re-renders
+  (function () {
+    var attached = false;
+    new MutationObserver(function () { attachSubagentButton(); }).observe(
+      document.body || document.documentElement,
+      { childList: true, subtree: true }
+    );
+  })();
 })();

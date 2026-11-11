@@ -60,25 +60,41 @@ html[data-agy-language="ru"] .capitalize {
   transition: none !important;
 }
 
-/* ---- Unified Glass & Theme Variables (Release 3.0.7) -------------------- */
+/* ---- Unified Glass & Theme Variables (Release 3.0.9) -------------------- */
+/* Light theme: polупрозрачный стеклянный эффект */
 :root,
 html.light,
 html:not(.dark) {
-  --agy-glass-surface: rgba(255, 255, 255, 0.85) !important;
+  --agy-glass-surface: rgba(255, 255, 255, 0.82) !important;
   --agy-glass-border: rgba(0, 0, 0, 0.12) !important;
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
   --agy-glass-item-hover: rgba(0, 0, 0, 0.06) !important;
   --agy-glass-item-active: rgba(0, 0, 0, 0.10) !important;
-  --popover: rgba(255, 255, 255, 0.88) !important;
+  --popover: rgba(248, 248, 250, 0.82) !important;
+  --card: rgba(255, 255, 255, 0.78) !important;
 }
 
+/* Dark theme: стеклянный эффект */
 html.dark {
-  --agy-glass-surface: rgba(26, 26, 30, 0.86) !important;
+  --agy-glass-surface: rgba(26, 26, 30, 0.84) !important;
   --agy-glass-border: rgba(255, 255, 255, 0.12) !important;
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   --agy-glass-item-hover: rgba(255, 255, 255, 0.09) !important;
   --agy-glass-item-active: rgba(255, 255, 255, 0.15) !important;
-  --popover: rgba(28, 28, 30, 0.88) !important;
+  --popover: rgba(28, 28, 32, 0.84) !important;
+  --card: rgba(32, 32, 36, 0.80) !important;
+}
+
+/* Force backdrop-filter on ALL sheet/dialog containers in BOTH themes.
+   Without this, an opaque --card or --background kills the blur. */
+html [data-testid="bottom-sheet"],
+html [data-radix-popper-content-wrapper] > *,
+html [data-radix-menu-content],
+html [data-radix-select-content],
+html [role="dialog"][data-state="open"],
+html .agy-compact-sheet {
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
 }
 
 /* Fix keyboard hide filling & delay (Задача 4) */

@@ -5,7 +5,7 @@
     "bin/gnome-open": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/google-chrome": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/ld-linux-aarch64.so.1": "ca4af7c4022222bb405b0b601d818506ea608a2242f3cce43bd0b56b71f94530",
-    "bin/liblanguage_server.so": "abf5881f9983fbad00c1cdf903c81f84cf36b8a21364b3476f6d19568b528527",
+    "bin/liblanguage_server.so": "f25135e4b4a2c4a8e4cb319dc36b13eb98fa4718fa80aaae5a7819935370ff27",
     "bin/libloader.so": "ca4af7c4022222bb405b0b601d818506ea608a2242f3cce43bd0b56b71f94530",
     "bin/open": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/open_helper": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
