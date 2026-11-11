@@ -417,16 +417,53 @@ def build_overlay(root, cfg, workdir):
                     dst_m = "res/mipmap-%s-v4/ic_launcher_%s%s.png" % (_d, pid, suffix)
                     overlay[dst_m] = m_src
 
-    # resources.arsc — app label
+    # resources.arsc — app label & dynamic splash screen
     arsc_in = root / "app/resources.arsc"
-    new_arsc, hit = patch_arsc(arsc_in.read_bytes(), ARSC_OLD_LABEL, cfg["name"])
+    arsc_bytes = arsc_in.read_bytes()
+    # Dynamic splash screen (Android 12+):
+    # 1) 0x0101062d (windowSplashScreenAnimatedIcon) entries are invalidated
+    #    so the OS falls back to the ACTIVE activity-alias launcher icon.
+    # 2) 0x0101062e (windowSplashScreenIconBackgroundColor) entries point at
+    #    @drawable/splash_icon in the stock ARSC (invalid: attr expects a color).
+    #    We retarget those REFERENCE values to @color/ic_launcher_background (0x7f070001),
+    #    which stays in sync with the active pack color.
+    icon_attr = struct.pack("<I", 0x0101062d)
+    icon_bg_attr = struct.pack("<I", 0x0101062e)
+    buf = bytearray(arsc_bytes)
+    removed = retargeted = 0
+    i = 0
+    while True:
+        i = buf.find(icon_bg_attr, i)
+        if i < 0:
+            break
+        # Res_value: size(2) res0(1) dataType(1) data(4) follows the attr key
+        if buf[i + 7] == 0x01 and struct.unpack("<I", bytes(buf[i + 8:i + 12]))[0] == 0x7f020004:
+            buf[i + 8:i + 12] = struct.pack("<I", 0x7f070001)
+            retargeted += 1
+        i += 4
+    i = 0
+    while True:
+        i = buf.find(icon_attr, i)
+        if i < 0:
+            break
+        if buf[i + 7] == 0x01 and struct.unpack("<I", bytes(buf[i + 8:i + 12]))[0] == 0x7f020004:
+            # invalidate the Res_value (size=0) so the parser skips this entry
+            buf[i + 4:i + 6] = b"\x00\x00"
+            removed += 1
+        i += 4
+    arsc_bytes = bytes(buf)
+    print("brand: dynamic splash: removed %d animatedIcon entries, retargeted %d iconBackground entries" % (removed, retargeted))
+    new_arsc, hit = patch_arsc(arsc_bytes, ARSC_OLD_LABEL, cfg["name"])
     if hit:
         out = workdir / "resources.arsc"
         out.write_bytes(new_arsc)
         overlay["resources.arsc"] = out
-        print("brand: app label %r -> %r" % (ARSC_OLD_LABEL, cfg["name"]))
+        print("brand: app label %r -> %r (dynamic splash screen enabled)" % (ARSC_OLD_LABEL, cfg["name"]))
     else:
-        print("brand: app label %r not found in resources.arsc (skipped)" % ARSC_OLD_LABEL)
+        out = workdir / "resources.arsc"
+        out.write_bytes(arsc_bytes)
+        overlay["resources.arsc"] = out
+        print("brand: app label %r not found (dynamic splash screen enabled)" % ARSC_OLD_LABEL)
 
     # dex strings — notification title + channel names
     reps = dex_replacements(cfg["name"])
