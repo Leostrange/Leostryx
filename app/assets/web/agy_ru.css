@@ -60,44 +60,50 @@ html[data-agy-language="ru"] .capitalize {
   transition: none !important;
 }
 
-/* ---- Unified Glass & Theme Variables (Release 3.0.9) -------------------- */
-/* Light theme: polупрозрачный стеклянный эффект */
+/* ---- Unified Glass & Theme Variables (Release 3.1.0) -------------------- */
+/* Light theme: полупрозрачный стеклянный эффект */
 :root,
 html.light,
-html:not(.dark) {
-  --agy-glass-surface: rgba(255, 255, 255, 0.82) !important;
-  --agy-glass-border: rgba(0, 0, 0, 0.12) !important;
-  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+html:not(.dark),
+body.theme-light,
+body:not(.dark) {
+  --agy-glass-surface: rgba(255, 255, 255, 0.78) !important;
+  --agy-glass-border: rgba(0, 0, 0, 0.10) !important;
+  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
   --agy-glass-item-hover: rgba(0, 0, 0, 0.06) !important;
   --agy-glass-item-active: rgba(0, 0, 0, 0.10) !important;
-  --popover: rgba(248, 248, 250, 0.82) !important;
-  --card: rgba(255, 255, 255, 0.78) !important;
+  --popover: rgba(248, 248, 250, 0.80) !important;
+  --card: rgba(255, 255, 255, 0.76) !important;
 }
 
 /* Dark theme: стеклянный эффект */
-html.dark {
-  --agy-glass-surface: rgba(26, 26, 30, 0.84) !important;
+.dark,
+html.dark,
+body.dark,
+body.theme-dark {
+  --agy-glass-surface: rgba(26, 26, 30, 0.76) !important;
   --agy-glass-border: rgba(255, 255, 255, 0.12) !important;
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   --agy-glass-item-hover: rgba(255, 255, 255, 0.09) !important;
   --agy-glass-item-active: rgba(255, 255, 255, 0.15) !important;
-  --popover: rgba(28, 28, 32, 0.84) !important;
-  --card: rgba(32, 32, 36, 0.80) !important;
+  --popover: rgba(28, 28, 32, 0.78) !important;
+  --card: rgba(32, 32, 36, 0.74) !important;
 }
 
-/* Force backdrop-filter on ALL sheet/dialog containers in BOTH themes.
-   Without this, an opaque --card or --background kills the blur. */
-html [data-testid="bottom-sheet"],
-html [data-radix-popper-content-wrapper] > *,
-html [data-radix-menu-content],
-html [data-radix-select-content],
-html [role="dialog"][data-state="open"],
-html .agy-compact-sheet {
-  backdrop-filter: blur(22px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+/* Force backdrop-filter on ALL sheet/dialog containers in BOTH themes */
+[data-testid="bottom-sheet"],
+[data-radix-popper-content-wrapper] > *,
+[data-radix-menu-content],
+[data-radix-select-content],
+[data-testid="context-menu-popup"],
+.z-\[6000\] > *,
+[role="dialog"][data-state="open"],
+.agy-compact-sheet {
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
 }
 
-/* Fix keyboard hide filling & delay (Задача 4) */
+/* Fix keyboard hide filling & smooth chat transitions */
 html,
 body,
 #root,
@@ -106,11 +112,6 @@ body,
   height: 100% !important;
   min-height: 100% !important;
   max-height: 100% !important;
-}
-
-[data-testid="chat-container"],
-[data-testid="agent-input-box"] {
-  transition: transform 0ms linear, height 0ms linear !important;
 }
 
 /* Compact menus & Glass Popovers (Задачи 1 и 2) */
@@ -125,17 +126,14 @@ body,
   border: 1px solid var(--agy-glass-border) !important;
   border-radius: 14px !important;
   background: var(--agy-glass-surface) !important;
+  background-color: var(--agy-glass-surface) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(22px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   transform: none !important;
   transition: opacity 120ms ease-out !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
-}
-[data-testid="bottom-sheet"].agy-compact-sheet.agy-model-menu {
-  max-width: min(340px, calc(100vw - 20px)) !important;
-  max-height: min(480px, calc(100vh - 100px)) !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet[data-starting-style],
 [data-testid="bottom-sheet"].agy-compact-sheet[data-ending-style] { opacity: 0; }
@@ -160,30 +158,67 @@ body,
   background-color: var(--agy-glass-item-hover) !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet :is(svg, img) { width: 15px; height: 15px; }
-[data-testid="bottom-sheet-backdrop"].agy-compact-backdrop {
+[data-testid="bottom-sheet-backdrop"].agy-compact-backdrop,
+div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-testid="bottom-sheet-backdrop"],
+[data-testid="bottom-sheet-backdrop"]:has(~ div [data-testid^="model-selector"]),
+[data-testid="bottom-sheet-backdrop"]:has(+ div [data-testid^="model-selector"]) {
   background: transparent !important;
+  background-color: transparent !important;
 }
 
 /* Universal Glass Popovers: menus, selects, radix poppers */
 :is(
+  .z-\[6000\] > *,
+  [data-testid="context-menu-popup"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
   [data-select-popup],
-  .z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup])
+  .typeahead-popover,
+  #typeahead-menu
 ) {
   background: var(--agy-glass-surface) !important;
-  backdrop-filter: blur(22px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  background-color: var(--agy-glass-surface) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-radius: 14px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
   padding: 6px !important;
-  max-width: calc(100vw - 16px) !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: min(240px, calc(100vw - 16px)) !important;
+}
+
+/* Shield and Subagents popovers — styled with glass but aligned to context window width */
+#agy-shield,
+#agy-subagents-popover {
+  background: var(--agy-glass-surface) !important;
+  background-color: var(--agy-glass-surface) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--agy-glass-border) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
+  padding: 8px !important;
+  box-sizing: border-box !important;
+  z-index: 9000 !important;
+}
+
+/* Provider selector and host remain solid opaque (Release 3.0.1-3.0.3 style) */
+.agy-providers,
+.agy-providers-host,
+.agy-providers .agy-pv-ddlist {
+  background: var(--card, #1c1c1e) !important;
+  background-color: var(--card, #1c1c1e) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Clear opaque backgrounds inside compact popovers */
 :is(
+  .z-\[6000\] > *,
+  [data-testid="context-menu-popup"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
@@ -192,18 +227,48 @@ body,
   [role="listbox"],
   .agy-compact-sheet,
   #typeahead-menu
-) :is(div, ul, section, header, nav):not([role="menuitem"]):not([role="option"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]) {
+) :is(div, ul, section, header, nav):not([role="menuitem"]):not([role="option"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]):not([data-active="true"]) {
   background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Menu items inside popovers */
+:is(
+  .z-\[6000\] > *,
+  [data-testid="context-menu-popup"],
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content]
+) :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], button:not([class*="tab"])) {
+  min-height: 0 !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+:is(
+  .z-\[6000\] > *,
+  [data-testid="context-menu-popup"],
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content]
+) :is([data-highlighted], [aria-selected="true"], [data-active="true"]) {
+  background-color: var(--agy-glass-item-hover) !important;
 }
 
 /* Native Model Selector Bottom Sheet Glass Style */
-[data-testid="bottom-sheet"]:has([data-testid^="model-selector"]),
-[data-testid="bottom-sheet"]:has([data-testid="model-selector-panel"]) {
+[data-testid="bottom-sheet"]:has([data-testid*="model-selector"]) {
   background: var(--agy-glass-surface) !important;
-  backdrop-filter: blur(22px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  background-color: var(--agy-glass-surface) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-top: 1px solid var(--agy-glass-border) !important;
   border-radius: 18px 18px 0 0 !important;
+}
+[data-testid="bottom-sheet"]:has([data-testid*="model-selector"]) div:not([data-testid="model-selector-item"]):not([data-testid="model-selector-effort-group"]) {
+  background-color: transparent !important;
 }
 
 /* Model selector panel specific glass layout */
@@ -223,23 +288,12 @@ body,
 [data-testid="model-selector-panel"] [data-testid="model-selector-item"][aria-selected="true"] {
   background-color: var(--agy-glass-item-hover) !important;
 }
-/* Sort menu popover: main.js uses .agy-narrow-menu instead of Tailwind !w-56
-   to control width. Content-hugging, capped at 210px. */
+/* Sort menu popover: main.js uses .agy-narrow-menu instead of Tailwind !w-56 */
 .agy-narrow-menu,
 .z-\[6000\] .agy-narrow-menu {
   min-width: 148px !important;
   width: max-content !important;
   max-width: 210px !important;
-}
-.z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]) :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]) {
-  min-height: 0 !important;
-  padding: 6px 10px !important;
-  border-radius: 8px !important;
-  font-size: 13px !important;
-  line-height: 1.25 !important;
-}
-.z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]) :is([data-highlighted], [aria-selected="true"]) {
-  background-color: rgba(127, 127, 127, .22) !important;
 }
 
 /* Attachments like Out27: a tile with the preview on top and a "×" strip

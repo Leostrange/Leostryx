@@ -12,11 +12,11 @@
         return {
           pack: (cfg.pack && LOGOS[cfg.pack]) ? cfg.pack : "02_lynx",
           color: cfg.color || "#0b84ff",
-          recolorLogo: cfg.recolorLogo === true
+          recolorLogo: cfg.recolorLogo !== false
         };
       }
     } catch (e) {}
-    return { pack: "02_lynx", color: "#0b84ff", recolorLogo: false };
+    return { pack: "02_lynx", color: "#0b84ff", recolorLogo: true };
   }
 
   function recolorFill(fill, activeColor, force) {
@@ -35,8 +35,8 @@
   window.__agyBrandSvgMarkup = function (packId, customColor, size) {
     var brand = getActiveBrand();
     var logo = LOGOS[packId] || LOGOS[brand.pack] || LOGOS["02_lynx"];
-    var col = customColor || brand.color || "#0b84ff";
-    var force = customColor ? true : brand.recolorLogo;
+    var col = (typeof customColor === "string" ? customColor : null) || brand.color || "#0b84ff";
+    var force = customColor ? true : (brand.recolorLogo !== false);
     var sz = size || 48;
     var defsHtml = "";
     if (logo.defs && logo.defs.length) {
@@ -84,12 +84,13 @@
       }
 
       var packId = (props && props.pack) || brand.pack || "02_lynx";
-      var force = brand.recolorLogo || (props && props.forceRecolor);
+      var hasCustomColor = !!(props && (props.color || props.forceRecolor));
+      var force = (brand.recolorLogo !== false) || hasCustomColor;
       var activeColor = (props && typeof props.color === "string" ? props.color : null) || brand.color || "#0b84ff";
       var logo = LOGOS[packId] || LOGOS["02_lynx"];
       var className = (props && props.className) || "shrink-0 object-contain";
       var sz = (props && (props.size || props.width || props.height)) || void 0;
-      var monochrome = force && !!(props && (props.mono || props.monochrome) && !props.color);
+      var monochrome = force && !!(props && (props.mono || props.monochrome) && props.color !== true);
 
       var svgProps = {
         className: className,

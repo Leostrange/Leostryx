@@ -85,14 +85,13 @@
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start, { once: true });
 
   /* ---- Composer focus guard (ТЗ 6.3, B-08) ---------------------------------
-   * 2.4.1 refocuses the chat editor after "+" / the model selector / menu
-   * closes, which pops the keyboard. Block that programmatic focus when the
-   * last touch was on those controls or inside an open menu/sheet. A touch on
-   * the editor itself, and menu items that need typing (Mentions / Actions),
-   * keep the original behaviour. */
+   * Keyboard must open ONLY when user focuses directly on the chat editor,
+   * after selecting Mentions/Actions/Browser, or when an attachment is added.
+   * Tapping buttons (+, model selector, shield, mic, subagent) must NOT open keyboard. */
   var BOX = "[data-testid='agent-input-box']";
   var MENUISH = "[role='menu'],[role='menuitem'],[role='listbox'],[role='option'],[role='dialog']," +
-                "[data-testid^='model-selector'],[aria-label='Add context'],[aria-label='Добавить контекст']";
+                "[data-testid^='model-selector'],[aria-label='Add context'],[aria-label='Добавить контекст']," +
+                "#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']";
   var guard = { t: 0, block: false };
 
   function isEditor(el) {
@@ -100,21 +99,24 @@
       (el.isContentEditable || el.tagName === "TEXTAREA"));
   }
   function menuOpen() {
-    return !!document.querySelector("[role='menu'],[role='listbox'],[role='dialog'],[data-testid='model-selector-panel']");
+    return !!document.querySelector("[role='menu'],[role='listbox'],[role='dialog'],[data-testid='model-selector-panel'],#agy-subagents-popover,#agy-shield");
   }
   document.addEventListener("pointerdown", function (e) {
     var t = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
     if (!t || !t.closest) return;
     var item = t.closest("[role='menuitem'],[role='option'],button");
     var label = item ? (item.textContent || "").trim() : "";
-    var needsInput = /^(Mentions|Actions|Упоминания|Действия)$/.test(label);
+    var needsInput = /^(Mentions|Actions|Browser|Упоминания|Действия|Браузер)$/.test(label);
     var onEditor = isEditor(t) || !!t.closest(BOX + " [contenteditable='true']");
-    var onControls = !!t.closest(MENUISH);
-    // The "+" (Add context) button must open its menu even while text is typed.
-    // Blocking editor focus here blurred the editor, dismissed the keyboard and
-    // the layout shift ate the tap, so "+" did nothing. Never guard on that tap.
-    var onAdd = !!t.closest("[aria-label='Add context'],[aria-label='Добавить контекст']");
-    guard = { t: Date.now(), block: !onEditor && !needsInput && !onAdd && (onControls || menuOpen()) };
+    var onControls = !!t.closest(MENUISH) || !!t.closest("#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']");
+
+    if (!onEditor && !needsInput && (onControls || menuOpen())) {
+      guard = { t: Date.now(), block: true };
+      var ae = document.activeElement;
+      if (ae && isEditor(ae)) { try { ae.blur(); } catch (_) {} }
+    } else if (onEditor || needsInput) {
+      guard = { t: 0, block: false };
+    }
   }, true);
 
   function shouldBlock(el) {
@@ -131,46 +133,29 @@
     }
   }, true);
 
-  /* ---- Focus allowed again once an attachment is really added (ТЗ 6.3) --- */
+  /* ---- Focus allowed again once an attachment is really added --- */
   new MutationObserver(function (list) {
     for (var i = 0; i < list.length; i++) {
       var added = list[i].addedNodes;
       for (var j = 0; j < added.length; j++) {
         var n = added[j];
         if (n.nodeType === 1 && (n.matches("[data-testid='input-attachment']") || n.querySelector("[data-testid='input-attachment']"))) {
-          // After a file is attached the editor must NOT grab focus (it kept the
-          // keyboard up and swallowed the next tap on "+").
-          guard = { t: Date.now(), block: true };
-          var ae = document.activeElement;
-          if (ae && isEditor(ae)) { try { ae.blur(); } catch (err) {} }
+          guard = { t: 0, block: false };
           return;
         }
       }
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  /* ---- Chat input repaint nudge -------------------------------------------
-   * Intermittently, after the keyboard opens on an empty focused input, the
-   * WebView leaves the input card unpainted (black) until the next repaint
-   * (typing or tapping the chat fixes it). Force that repaint ourselves while
-   * the keyboard settles: read layout, then toggle a no-op opacity for 2 frames. */
+  /* ---- Chat input repaint nudge (No scroll jiggle) ------------------------ */
   function nudge() {
     var box = document.querySelector(BOX);
     if (!box || !box.contains(document.activeElement)) return;
-    // 1px scroll jiggle re-rasterizes without promoting a layer.
-    try { window.scrollBy(0, 1); window.scrollBy(0, -1); } catch (e) {}
-    // AND clear the black texture on the composer's own compositing layers (the
-    // "input card goes black on focus" case) — repaint only elements that are
-    // ALREADY their own layer, never <body>, so no flashing spots.
     compositingAncestors(document.activeElement || box).forEach(repaint);
   }
-  function nudgeSeries() { [120, 350, 700, 1200].forEach(function (ms) { setTimeout(nudge, ms); }); }
+  function nudgeSeries() { [120, 350, 700].forEach(function (ms) { setTimeout(nudge, ms); }); }
 
-  /* Whole-page repaint after returning from a system window (file picker,
-   * permission dialog) and when an attachment/image appears: the WebView can
-   * leave large areas unpainted (black) until something repaints them. */
-  // Overlay containers that sit on their own compositing layer and can blacken:
-  // the app's menus, selects, popovers, bottom sheets and modal/dialog roots.
+  /* Whole-page repaint after returning from a system window */
   var OVERLAY_SEL = '[role="menu"],[role="listbox"],[role="dialog"],[data-select-popup],' +
     '[data-radix-popper-content-wrapper],.typeahead-popover,#typeahead-menu,' +
     '[data-testid="bottom-sheet"],[class*="animate-slideIn"],[class*="animate-in"],.z-\\[6000\\]';
@@ -180,15 +165,6 @@
     for (var i = 0; i < nodes.length; i++) repaint(nodes[i]);
   }
   function nudgePage() {
-    // Compositing-safe: a 1px scroll jiggle re-rasterizes without promoting a
-    // layer. Then clear the black texture on the overlay layers that are open and
-    // on the focused field's compositing ancestors — never on <body> (that is what
-    // caused the flashing black spots).
-    try { window.scrollBy(0, 1); window.scrollBy(0, -1); } catch (e) {}
-    try {
-      var sc = document.scrollingElement || document.documentElement;
-      if (sc) { var top = sc.scrollTop; sc.scrollTop = top + 1; sc.scrollTop = top; }
-    } catch (e) {}
     repaintOverlays();
     var ae = document.activeElement;
     if (ae && ae !== document.body) compositingAncestors(ae).forEach(repaint);
@@ -196,7 +172,7 @@
   var pageTimers = [];
   function nudgePageSeries() {
     pageTimers.forEach(clearTimeout);
-    pageTimers = [0, 150, 400, 800, 1500, 2500].map(function (ms) { return setTimeout(nudgePage, ms); });
+    pageTimers = [0, 150, 400, 800].map(function (ms) { return setTimeout(nudgePage, ms); });
   }
 
   /* Settings / Providers inputs live inside the settings panel, which is a
@@ -382,17 +358,35 @@
     var found = null;
     for (var i = 0; i < bs.length; i++) {
       var t = (bs[i].innerText || bs[i].textContent || "").trim();
-      if (!/(^|\s)(Назад|Back)$/.test(t) && !/^(Назад|Back)$/.test((bs[i].getAttribute("aria-label") || "").trim())) continue;
+      var aria = (bs[i].getAttribute("aria-label") || "").trim();
+      if (!/(^|\s)(Назад|Back)$/i.test(t) && !/^(Назад|Back)$/i.test(aria)) continue;
       var r = bs[i].getBoundingClientRect();
       if (r.width > 0 && r.left >= -1 && r.left < window.innerWidth / 2) found = bs[i];
     }
     return found;
   }
+
+  function isSettingsOpen() {
+    var sheets = document.querySelectorAll("[data-testid='bottom-sheet']");
+    for (var i = 0; i < sheets.length; i++) {
+      var s = sheets[i];
+      if (s.querySelector("[data-testid='bottom-sheet-grabber']")) return true;
+      if (s.querySelector("[data-testid^='settings-nav-item'],[data-testid^='settings-']")) return true;
+      if (s.querySelector(".agy-tools, .agy-tools-host, .agy-providers, .agy-providers-host, .agy-cust, .agy-customizations-host, .agy-mcp, .agy-mcp-host, .agy-backup, .agy-backup-host, .agy-about, .agy-about-host, .agy-feedback-host, .agy-dictation-host")) return true;
+      var tx = s.innerText || "";
+      if (/(Настройки|Settings|Общие|General|Оформление|Appearance|Инструменты|Tools|Резервное|Backup|Провайдер|Provider|Пользователь|Customiz|MCP|Диктовка|Dictation|О приложении|About)/i.test(tx)) return true;
+    }
+    return false;
+  }
+
   /* Called by the native Back handler (button and edge swipe). Returns true
    * when the page handled Back: an open menu/list closes first, otherwise the
-   * open settings page goes one level back. */
+   * open settings page goes one level back, or history goes back one page. */
   window.__agyBack = function () {
     if (window.__agyShieldClose && window.__agyShieldClose()) return true;
+    var subPop = document.getElementById("agy-subagents-popover");
+    if (subPop) { subPop.remove(); return true; }
+
     var open = document.querySelector("[data-select-popup],[class*='animate-slideIn'],#typeahead-menu");
     if (open) {
       (document.activeElement || document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
@@ -400,15 +394,51 @@
     }
     var btn = sheetBack();
     if (btn) { btn.click(); return true; }
-    // Root settings screen: a side swipe must not close settings (ТЗ 9.4);
+
+    // Root settings screen: an edge swipe must NOT close settings (ТЗ 9.4);
     // they close only with their own control or a swipe down.
-    var sheets = document.querySelectorAll("[data-testid='bottom-sheet']");
-    for (var i = 0; i < sheets.length; i++) {
-      var tx = sheets[i].innerText || "";
-      if (/(Общие|General)/.test(tx) && /(Оформление|Appearance)/.test(tx)) return true;
+    if (isSettingsOpen()) {
+      return true;
+    }
+
+    // Normal navigation: navigate back one page in history
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return true;
     }
     return false;
   };
+
+  /* ---- Edge Swipe Back Gesture (left and right edges) --------------------
+   * Swiping from left edge (x < 35px) to right, or right edge (x > window.innerWidth - 35px)
+   * to left triggers navigation back one page. Settings sheet ignores edge swipe. */
+  (function () {
+    var touchStartX = 0, touchStartY = 0, isEdge = false;
+    window.addEventListener("touchstart", function (e) {
+      if (e.touches && e.touches.length === 1) {
+        var x = e.touches[0].clientX;
+        var y = e.touches[0].clientY;
+        touchStartX = x;
+        touchStartY = y;
+        isEdge = (x <= 35 || x >= window.innerWidth - 35);
+      } else {
+        isEdge = false;
+      }
+    }, { passive: true });
+
+    window.addEventListener("touchend", function (e) {
+      if (!isEdge) return;
+      isEdge = false;
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+      if (Math.abs(dx) > 55 && dy < 70) {
+        if ((touchStartX <= 35 && dx > 0) || (touchStartX >= window.innerWidth - 35 && dx < 0)) {
+          window.__agyBack();
+        }
+      }
+    }, { passive: true });
+  })();
 
   var popRaf = 0;
   new MutationObserver(function () {
@@ -535,20 +565,24 @@
   var ITEM = "[role='menuitem'],[role='menuitemradio'],[role='menuitemcheckbox'],[role='option']";
   function sheetKind(sheet, trigger) {
     if (!sheet) return null;
+    // Bottom sheet grabber indicates a modal full-sheet (Settings, Drawers), never a compact popover
+    if (sheet.querySelector("[data-testid='bottom-sheet-grabber']")) return null;
+    if (sheet.querySelector("[data-testid^='settings-nav-item'],[data-testid^='settings-']")) return null;
+    if (sheet.querySelector(".agy-tools, .agy-tools-host, .agy-providers, .agy-providers-host, .agy-cust, .agy-customizations-host, .agy-mcp, .agy-mcp-host, .agy-backup, .agy-backup-host, .agy-about, .agy-about-host, .agy-feedback-host, .agy-dictation-host")) return null;
+    if (trigger && trigger.closest && (trigger.closest("[data-testid^='settings-nav-item']") || trigger.closest("[data-testid='model-selector-trigger']"))) return null;
+
     // Model selector: keep native bottom sheet as in builds prior to 3.0.6
-    if (sheet.querySelector("[data-testid^='model-selector']")) return null;
-    if (trigger && trigger.closest && trigger.closest("[data-testid='model-selector-trigger']")) return null;
-    if (sheet.querySelector("[data-testid='model-quota-refreshing']")) return null;
+    if (sheet.querySelector("[data-testid^='model-selector'],[data-testid='model-selector-panel'],[data-testid='model-quota-refreshing']")) return null;
 
     // Tabs / complex sheets (Settings, Workspace Drawer, Terminal, Files, History, Artifacts)
     if (sheet.querySelector("[role='tablist'], [role='tab']")) return null;
 
-    // Any sheet that contains form inputs or large content
+    // Any sheet that contains form inputs
     if (sheet.querySelector("input:not([type='checkbox']):not([type='radio']),textarea,[contenteditable='true']")) return null;
 
     var txt = (sheet.textContent || "").trim();
     if (txt.length > 220) return null;
-    if (/^(Настройки|Settings|Оформление|Appearance|Субагенты|Subagents|Файлы|Files|Терминал|Terminal|История|History|Артефакты|Artifacts|Изменённые|Modified)/i.test(txt)) return null;
+    if (/^(Настройки|Settings|Оформление|Appearance|Провайдер|Поставщик|Provider|Пользователь|Customiz|MCP|Инструмент|Tools|Резерв|Backup|О приложении|About|Субагенты|Subagents|Файлы|Files|Терминал|Terminal|История|History|Артефакты|Artifacts|Изменённые|Modified)/i.test(txt)) return null;
 
     var btns = sheet.querySelectorAll("button, [role='menuitem'], [role='option']");
     if (btns.length === 0 || btns.length > 8) return null;
@@ -575,6 +609,13 @@
         if (sh.classList.contains("agy-compact-sheet")) {
           sh.classList.remove("agy-compact-sheet", "agy-tight-menu", "agy-model-menu");
           ["left", "top", "bottom", "width", "max-height", "transform"].forEach(function (k) { sh.style.removeProperty(k); });
+        }
+        if (sh.querySelector("[data-testid^='model-selector'],[data-testid='model-selector-panel'],[data-testid='model-quota-refreshing']")) {
+          var mLayer = sh.parentElement;
+          var mz = mLayer ? parseInt(getComputedStyle(mLayer).zIndex, 10) : NaN;
+          for (var mk = 0; mk < backs.length; mk++) {
+            if (backs.length === 1 || parseInt(getComputedStyle(backs[mk]).zIndex, 10) === mz - 1) compactBacks.add(backs[mk]);
+          }
         }
         continue;
       }
@@ -859,24 +900,27 @@
     scheduled = false;
     if (!document.body) return;
 
-    // Check all dialogs, modals, banners, alerts
+    // Check only small standalone notice dialogs/alerts, never bottom-sheets or settings pages
     var candidates = document.querySelectorAll(
-      '[role="dialog"], [role="alertdialog"], [data-radix-portal], [data-state="open"], .fixed, .absolute'
+      '[role="dialog"], [role="alertdialog"], [data-radix-portal]'
     );
     for (var k = 0; k < candidates.length; k++) {
       var node = candidates[k];
+      if (
+        node.getAttribute('data-testid') === 'bottom-sheet' ||
+        node.closest('[data-testid="bottom-sheet"], [data-testid="agent-input-box"], .agy-providers, .agy-cust, .agy-mcp, .agy-tools, .agy-backup, .agy-about') ||
+        node.querySelector('[data-testid="bottom-sheet"], [data-testid^="settings-"], .agy-providers, .agy-cust, .agy-mcp, .agy-tools, .agy-backup, .agy-about')
+      ) {
+        continue;
+      }
       var text = (node.textContent || '').toLowerCase();
-      var hasModelNotice = (
-        (text.indexOf('opus 5.5') >= 0 || text.indexOf('sonnet 5.5') >= 0 || text.indexOf('claude') >= 0) &&
-        (text.indexOf('2 ноября') >= 0 || text.indexOf('november 2') >= 0 || text.indexOf('2026') >= 0 || text.indexOf('сторонн') >= 0 || text.indexOf('third-party') >= 0)
-      ) || (
-        text.indexOf('доступ к сторонним моделям') >= 0 ||
-        text.indexOf('third-party model access') >= 0
-      );
+      if (text.length > 450) continue;
+      var hasModelNotice =
+        (text.indexOf('opus 5.5') >= 0 || text.indexOf('sonnet 5.5') >= 0) &&
+        (text.indexOf('2 ноября') >= 0 || text.indexOf('november 2') >= 0);
       if (!hasModelNotice) continue;
 
-      // Find the closest dialog container or portal
-      var container = node.closest('[role="dialog"], [role="alertdialog"], [data-radix-portal]') || node;
+      var container = node;
 
       // Click close / ok / dismiss button
       var btns = container.querySelectorAll('button');
@@ -885,14 +929,14 @@
         var b = btns[i];
         if (seen.has(b)) continue;
         var lbl = (b.textContent || b.getAttribute('aria-label') || b.getAttribute('title') || '').trim().toLowerCase();
-        if (/^(понятно|ok|ок|закрыть|close|dismiss|got it|хорошо|продолжить|continue)$/i.test(lbl) || b.querySelector('svg')) {
+        if (/^(понятно|ok|ок|закрыть|close|dismiss|got it|хорошо|продолжить|continue)$/i.test(lbl)) {
           seen.add(b);
           try { b.click(); } catch (e) {}
           clicked = true;
           break;
         }
       }
-      if (!clicked && btns.length > 0 && !seen.has(btns[0])) {
+      if (!clicked && btns.length === 1 && !seen.has(btns[0])) {
         seen.add(btns[0]);
         try { btns[0].click(); } catch (e) {}
       }
@@ -900,14 +944,6 @@
       // Hide container immediately to prevent flashing
       container.style.display = 'none';
       container.setAttribute('aria-hidden', 'true');
-
-      // Also hide accompanying backdrop
-      var overlays = document.querySelectorAll('[data-radix-focus-guard], [data-aria-hidden="true"], .fixed.inset-0');
-      for (var oi = 0; oi < overlays.length; oi++) {
-        if (overlays[oi] !== container && overlays[oi].classList.contains('bg-black/50')) {
-          overlays[oi].style.display = 'none';
-        }
-      }
     }
   }
 
@@ -992,8 +1028,11 @@
     return ok;
   };
 
+  var lastShadeTime = 0;
   window.__agyOnShadeReply = function(payload) {
     if (!payload) return;
+    if (payload.time && payload.time === lastShadeTime) return;
+    if (payload.time) lastShadeTime = payload.time;
     var text = payload.text || "";
     var isApprove = (payload.type === "approve" || text === "__AGY_APPROVE__");
 
@@ -1004,27 +1043,150 @@
         var tid = b.getAttribute("data-testid") || "";
         if (tid === "run-button" || tid === "accept-action-button" || tid === "approve-button") return true;
         var t = (b.textContent || "").trim().toLowerCase();
-        return /^(разрешить|выполнить|продолжить|run|allow|always allow|accept)$/i.test(t);
+        return /^(разрешить|разрешить один раз|разрешить всегда|выполнить|продолжить|run|allow|allow once|always allow|accept)$/i.test(t);
       });
       if (approveBtn) {
         approveBtn.click();
-        return;
       }
-      text = "Разрешить / Продолжить";
+      return;
     }
 
-  /* -------------------------------------------------------------------------- */
-  /* Subagents Chat Quick Launcher (Release 3.0.9)                              */
-  /* -------------------------------------------------------------------------- */
+    if (text && text !== "__AGY_APPROVE__") {
+      window.__agyInsertIntoChat(text, true);
+    }
+  };
+
+  /* Poll notifications replies from Android shade */
+  setInterval(function () {
+    try {
+      if (window.AgyShade && typeof window.AgyShade.pollReplies === "function") {
+        var res = window.AgyShade.pollReplies();
+        if (res && res !== "[]") {
+          var arr = JSON.parse(res);
+          for (var i = 0; i < arr.length; i++) {
+            window.__agyOnShadeReply(arr[i]);
+          }
+        }
+      }
+    } catch (e) {}
+  }, 1200);
+
+  /* Watch for approval prompts and agent responses to post Android notifications */
+  var lastNotifiedApproval = 0;
+  var lastApprovalSnippet = "";
+  var lastNotifiedMessage = "";
+  var lastProgressNotify = 0;
+  var progressNotifiedThisRun = false;
+  var progressRunningLast = false;
+  // Shield "Не спрашивать" (auto) mode = terminal auto-execution EAGER (3)
+  // in the agyShieldOv mirror. In that mode no approval notification should
+  // ever be sent — at most a passive progress message.
+  function shieldAutoMode() {
+    try {
+      var o = JSON.parse(window.localStorage.getItem("agyShieldOv") || "{}");
+      return !!o && o.term === 3;
+    } catch (e) { return false; }
+  }
+  function checkAgentActivity() {
+    try {
+      if (!window.AgyShade || typeof window.AgyShade.notify !== "function") return;
+
+      // 1. Approval requests: buttons exist only when the Shield requires confirmation.
+      //    Notify (with action) ONLY when the app is minimized; in foreground the user sees it.
+      var btns = document.hidden ? Array.from(document.querySelectorAll("button")) : [];
+      var approveBtn = null;
+      if (!shieldAutoMode()) {
+        approveBtn = btns.find(function (b) {
+          if (b.disabled) return false;
+          if (b.closest("[data-testid='bottom-sheet'],.agy-providers,.agy-cust,.agy-mcp,.agy-tools")) return false;
+          var t = (b.textContent || "").trim().toLowerCase();
+          return /^(разрешить|разрешить один раз|разрешить всегда|allow|allow once|always allow)$/i.test(t) ||
+            b.getAttribute("data-testid") === "run-button" || b.getAttribute("data-testid") === "accept-action-button";
+        });
+      }
+
+      if (approveBtn) {
+        var now = Date.now();
+        var container = approveBtn.closest("[class*='step'],[class*='card'],[role='dialog']") || approveBtn.parentElement;
+        var textSnippet = container ? (container.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160) : "Требуется подтверждение действия агента";
+        // Deduplicate by snippet: the same pending approval notifies ONCE.
+        // Re-allow the same snippet only after 5 minutes (user dismissed it).
+        if (textSnippet !== lastApprovalSnippet || (now - lastNotifiedApproval > 300000)) {
+          lastApprovalSnippet = textSnippet;
+          lastNotifiedApproval = now;
+          window.AgyShade.notify("agent_approval", "Leostryx — Требуется подтверждение", textSnippet, true);
+        }
+      } else if (document.hidden) {
+        // Approval resolved (or none pending): drop the stale notification.
+        if (lastApprovalSnippet) {
+          lastApprovalSnippet = "";
+          try { if (window.AgyShade.cancel) window.AgyShade.cancel("agent_approval"); } catch (e) {}
+        }
+        // Auto mode / no confirmation needed: passive "agent is working"
+        // message, at most ONCE per agent run.
+        var running = !!document.querySelector("[data-testid='agent-input-box'] [aria-label='Stop'],[data-testid='agent-input-box'] [aria-label*='Stop'],[data-testid='agent-input-box'] [aria-label*='Останов'],[data-testid='running-items-panel'] .animate-spin");
+        var nowP = Date.now();
+        if (running) {
+          progressRunningLast = true;
+          if (!progressNotifiedThisRun && nowP - lastProgressNotify > 10000) {
+            progressNotifiedThisRun = true;
+            lastProgressNotify = nowP;
+            // Show what the agent is actually doing (latest visible step text).
+            var stepEls = document.querySelectorAll("[data-testid='cascade-step'],[data-testid='agent-turn'],[class*='agent-message']");
+            var stepText = "";
+            if (stepEls.length > 0) {
+              stepText = (stepEls[stepEls.length - 1].textContent || "").replace(/\s+/g, " ").trim();
+            }
+            if (!stepText || stepText.length < 8) stepText = "Задача выполняется в фоне…";
+            if (stepText.length > 180) stepText = stepText.slice(0, 180) + "…";
+            window.AgyShade.notify("agent_progress", "Leostryx — Агент работает", stepText, false);
+          }
+        } else {
+          if (progressRunningLast) setTimeout(function () { progressNotifiedThisRun = false; }, 8000);
+          progressRunningLast = false;
+        }
+      }
+
+      // 2. Detect Agent Response completion (when user is in background)
+      if (document.hidden) {
+        var responses = document.querySelectorAll("[data-testid='agent-turn'],[class*='agent-message'],[data-testid='cascade-step']");
+        if (responses.length > 0) {
+          var lastResp = responses[responses.length - 1];
+          var respText = (lastResp.textContent || "").replace(/\s+/g, " ").trim();
+          if (respText && respText !== lastNotifiedMessage && respText.length > 10) {
+            var isStreaming = !!lastResp.querySelector("[class*='animate-spin'],.spinner,[data-testid='spinner']");
+            if (!isStreaming) {
+              lastNotifiedMessage = respText;
+              var snippet = respText.slice(0, 150) + (respText.length > 150 ? "..." : "");
+              window.AgyShade.notify("agent_reply", "Leostryx — Ответ агента", snippet, false);
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  setInterval(checkAgentActivity, 2000);
+  var SVG_ICONS = {
+    bot: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>',
+    search: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+    bug: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>',
+    code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+    doc: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>',
+    shield: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>',
+    test: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>',
+    image: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
+    cpu: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>'
+  };
+
   var CHAT_SUBAGENTS = [
-    { id: "self", name: "self", title: "Текущий агент", desc: "Копия контекста и инструментов", icon: "🤖" },
-    { id: "research", name: "research", title: "Исследователь", desc: "Поиск в кодовой базе и сети", icon: "🔍" },
-    { id: "android-debugger", name: "android-debugger", title: "Android отладчик", desc: "Краши, logcat, JNI, jadx-agy", icon: "🐞" },
-    { id: "code-reviewer", name: "code-reviewer", title: "Код-ревью", desc: "Поиск багов и утечек памяти", icon: "🔎" },
-    { id: "docs-architect", name: "docs-architect", title: "Архитектор доков", desc: "README, CHANGELOG, Mermaid", icon: "📝" },
-    { id: "security-auditor", name: "security-auditor", title: "Аудитор безопасности", desc: "OWASP Top 10, уязвимости", icon: "🛡️" },
-    { id: "test-engineer", name: "test-engineer", title: "Инженер тестов", desc: "Модульные и интеграционные тесты", icon: "🧪" },
-    { id: "image-generator", name: "image-generator", title: "Генератор картинок", desc: "Создание и редактирование изображений", icon: "🎨" }
+    { id: "self", name: "self", title: "Текущий агент", desc: "Копия контекста и инструментов", svg: SVG_ICONS.bot },
+    { id: "research", name: "research", title: "Исследователь", desc: "Поиск в кодовой базе и сети", svg: SVG_ICONS.search },
+    { id: "android-debugger", name: "android-debugger", title: "Android отладчик", desc: "Краши, logcat, JNI, jadx-agy", svg: SVG_ICONS.bug },
+    { id: "code-reviewer", name: "code-reviewer", title: "Код-ревью", desc: "Поиск багов и утечек памяти", svg: SVG_ICONS.code },
+    { id: "docs-architect", name: "docs-architect", title: "Архитектор доков", desc: "README, CHANGELOG, Mermaid", svg: SVG_ICONS.doc },
+    { id: "security-auditor", name: "security-auditor", title: "Аудитор безопасности", desc: "OWASP Top 10, уязвимости", svg: SVG_ICONS.shield },
+    { id: "test-engineer", name: "test-engineer", title: "Инженер тестов", desc: "Модульные и интеграционные тесты", svg: SVG_ICONS.test },
+    { id: "image-generator", name: "image-generator", title: "Генератор картинок", desc: "Создание и редактирование изображений", svg: SVG_ICONS.image }
   ];
 
   function getSubagentsCatalog() {
@@ -1036,7 +1198,7 @@
         if (Array.isArray(extra)) {
           extra.forEach(function (x) {
             if (x && x.name && !list.some(function (i) { return i.name === x.name; })) {
-              list.push({ id: x.name, name: x.name, title: x.title || x.name, desc: x.desc || "Кастомный субагент", icon: "⚡" });
+              list.push({ id: x.name, name: x.name, title: x.title || x.name, desc: x.desc || "Кастомный субагент", svg: SVG_ICONS.cpu });
             }
           });
         }
@@ -1050,29 +1212,42 @@
     if (old) old.remove();
   }
 
+  function placeSubagentsMenu(pop) {
+    if (!pop) return;
+    var box = document.querySelector(BOX);
+    if (!box) { closeSubagentsMenu(); return; }
+    var r = box.getBoundingClientRect();
+    var vw = window.innerWidth || document.documentElement.clientWidth;
+    var w = Math.min(r.width, vw - 8);
+    var left = Math.max(4, Math.min(r.left, vw - w - 4));
+    pop.style.setProperty("width", Math.round(w) + "px", "important");
+    pop.style.setProperty("max-width", Math.round(w) + "px", "important");
+    pop.style.setProperty("min-width", Math.round(w) + "px", "important");
+    pop.style.setProperty("left", Math.round(left) + "px", "important");
+    pop.style.setProperty("right", "auto", "important");
+    pop.style.setProperty("top", "auto", "important");
+    pop.style.setProperty("bottom", Math.round(window.innerHeight - r.top + 6) + "px", "important");
+    pop.style.setProperty("max-height", Math.max(160, Math.round(r.top - 64)) + "px", "important");
+  }
+
   function toggleSubagentsMenu(anchorBtn) {
     var existing = document.getElementById("agy-subagents-popover");
     if (existing) { existing.remove(); return; }
 
     var pop = document.createElement("div");
     pop.id = "agy-subagents-popover";
-    pop.style.cssText = "position:fixed;z-index:9000;width:min(320px,calc(100vw - 20px));max-height:min(360px,calc(100vh - 120px));" +
+    pop.setAttribute("data-agy-no-translate", "");
+    pop.style.cssText = "position:fixed;z-index:9000;" +
       "background:var(--agy-glass-surface, rgba(26,26,30,.88));border:1px solid var(--agy-glass-border, rgba(255,255,255,.14));" +
       "border-radius:16px;box-shadow:var(--agy-glass-shadow, 0 16px 40px rgba(0,0,0,.4));" +
-      "backdrop-filter:blur(22px) saturate(190%);-webkit-backdrop-filter:blur(22px) saturate(190%);" +
+      "backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);" +
       "padding:10px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;box-sizing:border-box";
-
-    var r = anchorBtn.getBoundingClientRect();
-    var vw = window.innerWidth, vh = window.innerHeight;
-    var top = Math.max(10, r.top - 370);
-    var left = Math.max(10, Math.min(r.left - 10, vw - 330));
-    pop.style.top = top + "px";
-    pop.style.left = left + "px";
 
     var hdr = document.createElement("div");
     hdr.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px;" +
       "border-bottom:1px solid rgba(127,127,127,.18);margin-bottom:4px;font-size:13px;font-weight:600;color:var(--foreground,#eee)";
-    hdr.innerHTML = "<span>🤖 Субагенты</span><span style='font-size:11px;font-weight:400;color:#888'>нажмите для вызова</span>";
+    hdr.innerHTML = "<span style='display:inline-flex;align-items:center;gap:6px'>" + SVG_ICONS.bot + "<span>Субагенты</span></span>" +
+      "<span style='font-size:11px;font-weight:400;color:#888'>нажмите для вызова</span>";
     pop.appendChild(hdr);
 
     var list = getSubagentsCatalog();
@@ -1086,8 +1261,8 @@
       item.onmouseleave = function () { item.style.background = "transparent"; };
 
       var ic = document.createElement("span");
-      ic.style.cssText = "font-size:16px;line-height:1;flex-shrink:0";
-      ic.textContent = ag.icon;
+      ic.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:var(--primary,#0b84ff);flex-shrink:0";
+      ic.innerHTML = ag.svg || SVG_ICONS.bot;
       item.appendChild(ic);
 
       var txtWrap = document.createElement("div");
@@ -1119,7 +1294,13 @@
     });
 
     document.body.appendChild(pop);
+    placeSubagentsMenu(pop);
   }
+
+  window.addEventListener("resize", function () {
+    var p = document.getElementById("agy-subagents-popover");
+    if (p) placeSubagentsMenu(p);
+  });
 
   document.addEventListener("pointerdown", function (e) {
     var p = document.getElementById("agy-subagents-popover");
@@ -1134,49 +1315,40 @@
     var box = document.querySelector(BOX);
     if (!box) return;
 
-    // Try multiple selectors for the '+' / attach button
-    var anchor = box.querySelector(
-      "[aria-label='Add context'],[aria-label='Добавить контекст']," +
-      "[aria-label='Add attachment'],[aria-label='Прикрепить файл']," +
-      "[aria-label='Attach'],[aria-label='Upload']," +
-      "[data-testid='attach-button'],[data-testid='add-context-button']"
-    );
-    // Fall back to first visible button in the box
-    if (!anchor) {
-      var allBtns = box.querySelectorAll("button");
-      for (var bi = 0; bi < allBtns.length; bi++) {
-        var b = allBtns[bi];
-        if (b.offsetHeight > 0 && b.offsetWidth > 0) { anchor = b; break; }
-      }
-    }
-    if (!anchor || !anchor.parentElement) return;
+    var plus = box.querySelector("[aria-label='Add context'],[aria-label='Добавить контекст'],[data-testid='attach-button']");
+    var footer = plus ? plus.closest("[class*='input-footer']") : box.querySelector("[class*='input-footer']");
+    if (!footer) return;
+    var group = footer.lastElementChild;
+    if (!group) return;
 
     var btn = document.createElement("button");
     btn.type = "button";
     btn.id = "agy-subagent-btn";
     btn.title = "Субагенты (вызов в чате)";
     btn.setAttribute("aria-label", "Субагенты");
-    btn.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;" +
-      "padding:0;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:16px;line-height:1;" +
-      "color:var(--foreground,#aaa);transition:color .15s, transform .12s;flex-shrink:0";
-    btn.innerHTML = "🤖";
-    btn.onmouseenter = function () { btn.style.transform = "scale(1.08)"; };
-    btn.onmouseleave = function () { btn.style.transform = ""; };
-    btn.onclick = function (e) {
+    btn.className = "agy-subagent-btn p-1.5 rounded-full text-secondary-foreground hover:bg-secondary cursor-pointer";
+    btn.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;" +
+      "padding:0;border:0;border-radius:9999px;background:transparent;cursor:pointer;line-height:1;" +
+      "color:var(--secondary-foreground, currentColor);flex-shrink:0;transition:background-color .15s, color .15s";
+    btn.innerHTML = SVG_ICONS.bot;
+    btn.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      guard = { t: Date.now(), block: true };
+      var ae = document.activeElement;
+      if (ae && isEditor(ae)) { try { ae.blur(); } catch (_) {} }
+    });
+    btn.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
       toggleSubagentsMenu(btn);
-    };
-    anchor.parentElement.insertBefore(btn, anchor.nextSibling);
+    });
+
+    var shield = group.querySelector(".agy-shield-btn");
+    if (shield) group.insertBefore(btn, shield);
+    else group.insertBefore(btn, group.firstChild);
   }
 
-  setInterval(attachSubagentButton, 800);
-  // Also watch DOM for SPA route changes / re-renders
-  (function () {
-    var attached = false;
-    new MutationObserver(function () { attachSubagentButton(); }).observe(
-      document.body || document.documentElement,
-      { childList: true, subtree: true }
-    );
-  })();
+  setInterval(attachSubagentButton, 600);
+
+  try { sessionStorage.removeItem("agy_composer_draft"); } catch (e) {}
 })();

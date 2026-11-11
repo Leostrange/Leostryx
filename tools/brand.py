@@ -76,7 +76,124 @@ def load_brand(root):
     if pack not in PACK_IDS:
         return None
     name = data.get("name") or "Leostryx"
-    return {"pack": pack, "name": str(name), "color": data.get("color") or "#0b84ff"}
+    return {
+        "pack": pack,
+        "name": str(name),
+        "color": data.get("color") or "#0b84ff",
+        "recolorLogo": bool(data.get("recolorLogo", True)),
+    }
+
+
+def tint_png_bytes(png_bytes, hex_color):
+    """Tint RGBA 8-bit PNG foreground with hex_color using pure stdlib."""
+    import zlib
+    if png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
+        return png_bytes
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return png_bytes
+    tr, tg, tb = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+    pos = 8
+    chunks = []
+    idat_parts = []
+    width = height = bit_depth = color_type = 0
+    while pos < len(png_bytes):
+        length = struct.unpack(">I", png_bytes[pos:pos + 4])[0]
+        ctype = png_bytes[pos + 4:pos + 8]
+        cdata = png_bytes[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if ctype == b"IHDR":
+            width, height, bit_depth, color_type = struct.unpack(">IIBB", cdata[:10])
+            chunks.append((ctype, cdata))
+        elif ctype == b"IDAT":
+            idat_parts.append(cdata)
+        elif ctype == b"IEND":
+            break
+        else:
+            chunks.append((ctype, cdata))
+
+    if bit_depth != 8 or color_type != 6 or not idat_parts:
+        return png_bytes
+    try:
+        raw = bytearray(zlib.decompress(b"".join(idat_parts)))
+    except Exception:
+        return png_bytes
+
+    stride = width * 4
+    if len(raw) != height * (1 + stride):
+        return png_bytes
+
+    # Unfilter scanlines
+    pixels = bytearray(height * stride)
+    for y in range(height):
+        f = raw[y * (1 + stride)]
+        row_in = raw[y * (1 + stride) + 1:(y + 1) * (1 + stride)]
+        row_out = memoryview(pixels)[y * stride:(y + 1) * stride]
+        prev_out = memoryview(pixels)[(y - 1) * stride:y * stride] if y > 0 else None
+        for i in range(stride):
+            x = row_in[i]
+            a = row_out[i - 4] if i >= 4 else 0
+            b = prev_out[i] if prev_out is not None else 0
+            c = prev_out[i - 4] if (prev_out is not None and i >= 4) else 0
+            if f == 0:
+                val = x
+            elif f == 1:
+                val = (x + a) & 0xFF
+            elif f == 2:
+                val = (x + b) & 0xFF
+            elif f == 3:
+                val = (x + ((a + b) >> 1)) & 0xFF
+            elif f == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
+                val = (x + pr) & 0xFF
+            else:
+                return png_bytes
+            row_out[i] = val
+
+    # Tint non-dark/colored or foreground pixels while preserving dark background and cream highlights
+    cr, cg, cb = int(tr * 0.25 + 255 * 0.75), int(tg * 0.25 + 255 * 0.75), int(tb * 0.25 + 255 * 0.75)
+    out_raw = bytearray(height * (1 + stride))
+    for y in range(height):
+        out_raw[y * (1 + stride)] = 0  # Filter None
+        base_p = y * stride
+        base_o = y * (1 + stride) + 1
+        for x in range(width):
+            r = pixels[base_p]
+            g = pixels[base_p + 1]
+            b = pixels[base_p + 2]
+            a = pixels[base_p + 3]
+            if a > 0:
+                if g > 175 and b > 155:
+                    r, g, b = cr, cg, cb
+                else:
+                    lum = max(r, g, b)
+                    if lum > 36:
+                        factor = min(1.0, lum / 203.0)
+                        r = min(255, int(tr * factor))
+                        g = min(255, int(tg * factor))
+                        b = min(255, int(tb * factor))
+            out_raw[base_o] = r
+            out_raw[base_o + 1] = g
+            out_raw[base_o + 2] = b
+            out_raw[base_o + 3] = a
+            base_p += 4
+            base_o += 4
+
+    new_idat = zlib.compress(bytes(out_raw), 6)
+
+    def make_chunk(ctype, cdata):
+        crc = zlib.crc32(ctype + cdata) & 0xFFFFFFFF
+        return struct.pack(">I", len(cdata)) + ctype + cdata + struct.pack(">I", crc)
+
+    out = bytearray(b"\x89PNG\r\n\x1a\n")
+    for ctype, cdata in chunks:
+        out += make_chunk(ctype, cdata)
+    out += make_chunk(b"IDAT", new_idat)
+    out += make_chunk(b"IEND", b"")
+    return bytes(out)
 
 
 # ------------------------------------------------------------------ uleb128
@@ -229,7 +346,8 @@ def build_overlay(root, cfg, workdir):
     """Return {apk_path: source_path} for the brand pack.
 
     Writes patched resources.arsc / classes*.dex into `workdir` and maps them
-    over the tree copies; PNGs are mapped straight from the pack directory.
+    over the tree copies; PNGs are mapped straight from the pack directory
+    (or tinted when recolorLogo is enabled).
     """
     if not cfg:
         return {}
@@ -241,12 +359,39 @@ def build_overlay(root, cfg, workdir):
     if not pack_dir.is_dir():
         raise SystemExit("brand: pack not found: %s" % pack_dir)
 
+    recolor = bool(cfg.get("recolorLogo")) and bool(cfg.get("color"))
+    color_hex = cfg.get("color") or "#0b84ff"
+
+    def maybe_tint(src_path, rel_key):
+        if not recolor:
+            return src_path
+        out_path = workdir / "tinted" / rel_key
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(tint_png_bytes(src_path.read_bytes(), color_hex))
+        return out_path
+
     overlay = {}
     for dst, src in RES_MAP:
         src_path = pack_dir / src
         if not src_path.exists():
             raise SystemExit("brand: missing %s (needed for %s)" % (src_path, dst))
-        overlay[dst] = src_path
+        overlay[dst] = maybe_tint(src_path, dst)
+
+    # Keep the 4 base per-pack launcher icons in original designer colors (for when accent toggle is OFF)
+    for pid in PACK_IDS:
+        pdir = root / "app/assets/web/brand" / pid
+        if not pdir.is_dir():
+            continue
+        fg_src = pdir / "source_res/drawable-nodpi/ic_launcher_logo.png"
+        if fg_src.exists():
+            dst_fg = "res/drawable-nodpi-v4/ic_launcher_logo_%s.png" % pid
+            overlay[dst_fg] = fg_src
+        for _d in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+            for suffix in ("", "_round"):
+                m_src = pdir / ("source_res/mipmap-%s/ic_launcher%s.png" % (_d, suffix))
+                if m_src.exists():
+                    dst_m = "res/mipmap-%s-v4/ic_launcher_%s%s.png" % (_d, pid, suffix)
+                    overlay[dst_m] = m_src
 
     # resources.arsc — app label
     arsc_in = root / "app/resources.arsc"

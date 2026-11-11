@@ -250,10 +250,13 @@
     var vw = window.innerWidth || document.documentElement.clientWidth;
     var w = Math.min(r.width, vw - 8);
     var left = Math.max(4, Math.min(r.left, vw - w - 4));
-    pop.style.width = Math.round(w) + "px";
-    pop.style.left = Math.round(left) + "px";
-    pop.style.bottom = Math.round(window.innerHeight - r.top + 6) + "px";
-    pop.style.maxHeight = Math.max(160, Math.round(r.top - 64)) + "px";
+    pop.style.setProperty("width", Math.round(w) + "px", "important");
+    pop.style.setProperty("max-width", Math.round(w) + "px", "important");
+    pop.style.setProperty("min-width", Math.round(w) + "px", "important");
+    pop.style.setProperty("left", Math.round(left) + "px", "important");
+    pop.style.setProperty("right", "auto", "important");
+    pop.style.setProperty("bottom", Math.round(window.innerHeight - r.top + 6) + "px", "important");
+    pop.style.setProperty("max-height", Math.max(160, Math.round(r.top - 64)) + "px", "important");
   }
 
   function open(btn) {

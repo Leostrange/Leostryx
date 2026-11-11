@@ -1172,7 +1172,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.0.9";
+    appVer.textContent = "3.1.0";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1284,7 +1284,7 @@
     btnUpd.textContent = T("Проверить обновления", "Check for updates");
     c3.appendChild(btnUpd);
 
-    var CURRENT_VERSION = "3.0.9";
+    var CURRENT_VERSION = "3.1.0";
     var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
     var pendingApkUrl = null;
     var updState = "check"; // "check" | "available" | "downloading" | "ready"

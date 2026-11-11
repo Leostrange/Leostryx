@@ -56,14 +56,14 @@
   /* -------------------------------------------------------------- state */
   function loadCfg() {
     var raw = store(STORE_KEY);
-    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: false };
+    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: true };
     if (raw) {
       try {
         var p = JSON.parse(raw);
         if (p && typeof p === "object") {
           if (p.pack) cfg.pack = p.pack;
           if (p.color) cfg.color = p.color;
-          if (p.recolorLogo !== undefined) cfg.recolorLogo = !!p.recolorLogo;
+          if (p.recolorLogo !== undefined) cfg.recolorLogo = p.recolorLogo !== false;
         }
       } catch (e) {}
     }
@@ -154,7 +154,8 @@
   function applyLogo(packId, after) {
     var b = bridge();
     if (!b) { if (after) after(false); return; }
-    var id = b.start("brand", packId + "@" + String(cfg.color || "").replace("#", ""));
+    var arg = packId + "@" + String(cfg.color || "").replace("#", "") + "@" + (cfg.recolorLogo ? "1" : "0");
+    var id = b.start("brand", arg);
     if (!id || /^ERR/.test(String(id))) { if (after) after(false); return; }
     var tries = 0;
     (function tick() {
@@ -174,7 +175,7 @@
     try {
       var b = bridge();
       if (!b) return;
-      b.start("brand", cfg.pack + "@" + String(cfg.color || "").replace("#", ""));
+      b.start("brand", cfg.pack + "@" + String(cfg.color || "").replace("#", "") + "@" + (cfg.recolorLogo ? "1" : "0"));
     } catch (e) {}
   }
 
@@ -259,12 +260,15 @@
         cfg.pack = p.id;
         saveCfg();
         try {
-          window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: p.id, color: cfg.color } }));
+          window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: p.id, color: cfg.color, recolorLogo: cfg.recolorLogo } }));
         } catch (e) {}
         render(el);
         try {
           if (window.AgyTools && typeof window.AgyTools.switchIconPack === "function") {
-            window.AgyTools.switchIconPack(p.id);
+            var spec = (cfg.recolorLogo && cfg.color)
+              ? (p.id + "_" + String(cfg.color).replace("#", "").toLowerCase())
+              : p.id;
+            window.AgyTools.switchIconPack(spec);
           }
         } catch (e) {}
         applyLogo(cfg.pack, function (ok) {
@@ -304,8 +308,8 @@
     var toggleDesc = document.createElement("div");
     toggleDesc.style.cssText = "font-size:11.5px;color:#999;line-height:1.35";
     toggleDesc.textContent = T(
-      "Если выключено — все 4 логотипа и значки сохраняют оригинальные авторские цвета (как на рабочем столе)",
-      "When off — all 4 logos and icons retain original designer colors (matching the launcher icon)"
+      "Если включено — логотипы, значки и иконка на рабочем столе окрашиваются в выбранный цвет акцента. Если выключено — сохраняют оригинальные авторские цвета.",
+      "When on — logos, icons and the home-screen icon are tinted with the selected accent colour. When off — they retain original designer colours."
     );
     toggleInfo.appendChild(toggleTitle);
     toggleInfo.appendChild(toggleDesc);
@@ -322,6 +326,15 @@
       try {
         window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: cfg.pack, color: cfg.color, recolorLogo: cfg.recolorLogo } }));
       } catch (e) {}
+      try {
+        if (window.AgyTools && typeof window.AgyTools.switchIconPack === "function") {
+          var spec = (cfg.recolorLogo && cfg.color)
+            ? (cfg.pack + "_" + String(cfg.color).replace("#", "").toLowerCase())
+            : cfg.pack;
+          window.AgyTools.switchIconPack(spec);
+        }
+      } catch (e) {}
+      applyLogo(cfg.pack);
       render(el);
     };
     toggleRow.appendChild(toggleSwitch);
@@ -342,14 +355,21 @@
       b.onmousedown = function () { b.style.transform = "scale(.92)"; };
       b.onmouseup = b.onmouseleave = function () { b.style.transform = ""; };
       b.onclick = function () {
-        if (cfg.color.toLowerCase() === c.hex.toLowerCase()) return;
         cfg.color = c.hex;
         saveCfg();
-        persistForBuild();
         applyColor(c.hex);
         try {
-          window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: cfg.pack, color: c.hex } }));
+          window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: cfg.pack, color: c.hex, recolorLogo: cfg.recolorLogo } }));
         } catch (e) {}
+        try {
+          if (window.AgyTools && typeof window.AgyTools.switchIconPack === "function") {
+            var spec = cfg.recolorLogo
+              ? (cfg.pack + "_" + String(c.hex).replace("#", "").toLowerCase())
+              : cfg.pack;
+            window.AgyTools.switchIconPack(spec);
+          }
+        } catch (e) {}
+        applyLogo(cfg.pack);
         render(el);
         var s = document.getElementById("agy-brand-status");
         if (s) {

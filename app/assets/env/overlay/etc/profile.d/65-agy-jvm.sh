@@ -18,10 +18,17 @@ fi
 [ -d "$_agy_jvm_tmp" ] || _agy_jvm_tmp="$HOME/.cache/tmp"
 mkdir -p "$_agy_jvm_tmp" 2>/dev/null || true
 
+_agy_cacerts="$PREFIX/etc/tls/certs/java/cacerts"
+[ -f "$_agy_cacerts" ] || _agy_cacerts="$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts"
+[ -f "$_agy_cacerts" ] || _agy_cacerts="$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts"
+
 case "${JAVA_TOOL_OPTIONS:-}" in
     *-Duser.home=*) : ;;  # already configured (e.g. by jadx-agy)
     *)
-        export JAVA_TOOL_OPTIONS="-Duser.home=$HOME -Djava.io.tmpdir=$_agy_jvm_tmp${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"
+        _agy_ts_opt=""
+        [ -f "$_agy_cacerts" ] && _agy_ts_opt=" -Djavax.net.ssl.trustStore=$_agy_cacerts"
+        export JAVA_TOOL_OPTIONS="-Duser.home=$HOME -Djava.io.tmpdir=$_agy_jvm_tmp$_agy_ts_opt${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"
+        unset _agy_ts_opt
         ;;
 esac
-unset _agy_jvm_tmp
+unset _agy_jvm_tmp _agy_cacerts

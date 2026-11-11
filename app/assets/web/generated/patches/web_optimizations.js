@@ -83,10 +83,20 @@ try {
     send: function(opts) {
       try {
         if (!opts) return Promise.resolve();
+        // Never disturb the user while the app is open in the foreground:
+        // the prompt is already visible in-app. Shade notifications are only
+        // for backgrounded sessions.
+        if (typeof document !== "undefined" && !document.hidden) return Promise.resolve();
         var cascadeId = (opts.payload && opts.payload.cascadeId) || opts.id || "";
         var title = opts.title || "Leostryx";
         var body = opts.body || "";
-        var needsAction = (opts.payload && (opts.payload.type === "request_action" || opts.payload.needsAction)) || true;
+        var id = String(opts.id || "");
+        var isFinished = id.indexOf("agent-finished-") === 0;
+        // Only genuine permission/attention requests need action buttons.
+        // "agent-finished-*" events are passive status messages — never put
+        // confirmation buttons on them.
+        var needsAction = !isFinished && !!opts.payload &&
+          (opts.payload.needsAction === true || opts.payload.type === "request_action");
         if (window.AgyShade && typeof window.AgyShade.notify === "function") {
           window.AgyShade.notify(cascadeId, title, body, !!needsAction);
         }

@@ -1,23 +1,23 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.0.9-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.0-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.0.9).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.0).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.9"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.0.9">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 ---
 
-## Leostryx для Android 3.0.9
+## Leostryx для Android 3.1.0
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -47,8 +47,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.0.7-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.0.7-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.0-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.0-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -57,10 +57,25 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.0.7](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.0.7/SHA256SUMS.txt).
-2. Установите скачанный APK 3.0.7 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.0](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.0/SHA256SUMS.txt).
+2. Установите скачанный APK 3.1.0 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.0.7
+## Что нового в 3.1.0
+
+- **полное устранение спама уведомлений из шторки**:
+  - уведомления шторки подавляются, пока приложение открыто на переднем плане;
+  - в режиме «Не спрашивать» (EAGER) approve-уведомления с кнопками не создаются вовсе;
+  - дедупликация подтверждений по тексту сниппета исключает повторные уведомления одной и той же кнопки;
+  - уведомление шторки автоматически отменяется при подтверждении действия;
+  - события завершения `agent-finished-*` стали строго пассивными;
+  - в пассивном уведомлении «Агент работает» отображается актуальный текст текущего шага агента;
+- **логотип акцентного цвета при запуске приложения**:
+  - сплэш-скрин APK и логотип экрана запуска/входа автоматически окрашиваются в выбранный акцентный цвет бренда (`recolorLogo: true` по умолчанию);
+  - мгновенный бутстрап акцентных CSS-переменных из `localStorage` до первой отрисовки;
+- **селектор моделей — разделители и названия провайдеров**:
+  - кастомные модели снабжены атрибутами селектора, отсортированы по провайдерам и разделены аккуратными заголовками (OpenAI, Claude, Gemini и др.);
+- **устранение фейкового чата с точкой** при переключении на кастомный провайдер.
+- подробный справочник первопричин и исправлений: [`docs/BUGFIXES_3.1.0.md`](docs/BUGFIXES_3.1.0.md).
 
 - **адаптация селектора выбора моделей к темам и прозрачности** — панель выбора модели теперь оформлена в стиле матового стекла (frosted glass) с `backdrop-filter: blur(22px) saturate(190%)` и плавно вписывается как в тёмную, так и в светлую тему;
 - **истинная прозрачность выпадающих списков и попапов в светлой теме** — убраны непрозрачные белые подложки внутри всплывающих списков, контекстных меню и Radix Popper контейнеров;

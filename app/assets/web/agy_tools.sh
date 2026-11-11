@@ -513,6 +513,15 @@ op_sdk() {
     fi
     write_env
     . "$ENVF"
+    local cacerts="$PREFIX/etc/tls/certs/java/cacerts"
+    [ -f "$cacerts" ] || cacerts="$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts"
+    [ -f "$cacerts" ] || cacerts="$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts"
+    if [ -f "$cacerts" ]; then
+        case "${JAVA_TOOL_OPTIONS:-}" in
+            *trustStore=*) : ;;
+            *) export JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=$cacerts${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}" ;;
+        esac
+    fi
     local comps="${ARG:-platforms;android-35 build-tools;35.0.0}"
     # API 37.x lives in the canary channel (channel 3); add --channel=3 automatically
     local channel_flag=""
@@ -2625,20 +2634,29 @@ PYCLR
 # (splash drawable, mipmap launcher icon, app label) are recorded in
 # $HOME/web/brand/config.json for rebuild.py to pick up on the next build.
 op_brand() {
-    # ARG is "pack" or "pack@colour" (colour is optional and only recorded).
-    local raw="$ARG" pack="" colour=""
+    # ARG is "pack", "pack@colour", or "pack@colour@recolor".
+    local raw="$ARG" pack="" rest="" colour="" recolor="0"
     [ -n "$raw" ] || fail "brand: pack name required"
     pack="${raw%%@*}"
-    case "$raw" in *@*) colour="${raw#*@}" ;; esac
+    case "$raw" in
+        *@*@*)
+            rest="${raw#*@}"
+            colour="${rest%%@*}"
+            recolor="${rest#*@}"
+            ;;
+        *@*)
+            colour="${raw#*@}"
+            ;;
+    esac
     case "$pack" in
         01_owl|02_lynx|03_lsx|04_angular_x) ;;
         *) fail "brand: unknown pack '$pack'" ;;
     esac
-    if [ -n "$colour" ]; then
+    if [ -n "$colour" ] && [ "$colour" != "none" ]; then
         case "$colour" in
             [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) colour="#$colour" ;;
             \#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
-            *) fail "brand: invalid colour '$colour'" ;;
+            *) colour="" ;;
         esac
     fi
     local web="$HOME/web"
@@ -2653,13 +2671,14 @@ op_brand() {
     # Keep a copy the web UI can re-read for previews/verification.
     cp -f "$src/ic_launcher_logo.png" "$web/brand/current_logo.png" 2>/dev/null || true
 
-    # Persist for the next APK build (splash + launcher icon + label + colour).
-    AGY_BRAND_PACK="$pack" AGY_BRAND_COLOUR="$colour" AGY_BRAND_WEB="$web" python3 - <<'PYBR'
+    # Persist for the next APK build (splash + launcher icon + label + colour + recolorLogo).
+    AGY_BRAND_PACK="$pack" AGY_BRAND_COLOUR="$colour" AGY_BRAND_RECOLOR="$recolor" AGY_BRAND_WEB="$web" python3 - <<'PYBR'
 import json, os, pathlib
 web = pathlib.Path(os.environ["AGY_BRAND_WEB"])
 pack = os.environ["AGY_BRAND_PACK"]
 colour = os.environ.get("AGY_BRAND_COLOUR", "").strip()
-cfg = {"pack": pack, "name": "Leostryx"}
+recolor = os.environ.get("AGY_BRAND_RECOLOR", "0").strip() == "1"
+cfg = {"pack": pack, "name": "Leostryx", "recolorLogo": recolor}
 try:
     old = json.loads((web / "brand" / "config.json").read_text(encoding="utf-8"))
     if isinstance(old, dict):
@@ -2668,34 +2687,13 @@ except Exception:
     pass
 cfg["pack"] = pack
 cfg["name"] = "Leostryx"
-if colour:
+cfg["recolorLogo"] = recolor
+if colour and colour != "none":
     cfg["color"] = colour
 (web / "brand" / "config.json").write_text(
     json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-print("brand: recorded pack=%s color=%s" % (pack, cfg.get("color", "-")))
+print("brand: recorded pack=%s color=%s recolor=%s" % (pack, cfg.get("color", "-"), recolor))
 PYBR
-    local alias_name=""
-    case "$pack" in
-        01_owl)       alias_name="LauncherOwl" ;;
-        02_lynx)      alias_name="LauncherLynx" ;;
-        03_lsx)       alias_name="LauncherLsx" ;;
-        04_angular_x) alias_name="LauncherAngularX" ;;
-    esac
-
-    if [ -n "$alias_name" ]; then
-        step "Switching launcher icon to $alias_name"
-        local all_aliases="LauncherOwl LauncherLynx LauncherLsx LauncherAngularX"
-        for al in $all_aliases; do
-            if [ "$al" = "$alias_name" ]; then
-                pm enable "com.agyru.t2/com.agy.ui.launcher.$al" 2>/dev/null || true
-                rish -c "cmd package set-component-enabled --user 0 com.agyru.t2/com.agy.ui.launcher.$al 1" 2>/dev/null || true
-            else
-                pm disable "com.agyru.t2/com.agy.ui.launcher.$al" 2>/dev/null || true
-                rish -c "cmd package set-component-enabled --user 0 com.agyru.t2/com.agy.ui.launcher.$al 2" 2>/dev/null || true
-            fi
-        done
-    fi
-
     say "@@done brand $pack"
 }
 

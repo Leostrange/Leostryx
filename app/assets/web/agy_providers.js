@@ -74,6 +74,8 @@
     if (!(cfg && cfg.useProviders && cfg.connections)) return out;
     cfg.connections.forEach(function (c) {
       var meta = c.modelMeta || {};
+      var pType = c.type || "openai";
+      var pName = c.name || (pType === "openai" ? "OpenAI-compatible" : pType === "anthropic" ? "Claude (Anthropic)" : "Gemini-compatible");
       (c.selected || []).forEach(function (m) {
         if (!m || seen[m]) return; seen[m] = 1;
         var md = effectiveInfo(c, m, meta[m]);
@@ -82,6 +84,9 @@
           // the exclusive AGY_LLM_GATEWAY to the provider, which expects the raw
           // model id (e.g. "mimo-v2.6-pro").
           label: m, modelName: m,
+          provider: pName,
+          providerName: pName,
+          providerType: pType,
           maxTokens: md.ctx && md.ctx > 0 ? md.ctx : 200000,
           images: md.images !== false, tools: md.tools !== false, thinking: md.thinking !== false,
           efforts: Array.isArray(md.efforts) && md.efforts.length ? md.efforts.slice() : null,
@@ -99,6 +104,24 @@
     // render once a provider is configured.
     if (s.length) __agySpecCache = s;
     return s;
+  };
+  window.__agyGetProviderName = function (label) {
+    if (!label) return "";
+    var specs = window.__agyProviderSpecs ? window.__agyProviderSpecs() : [];
+    for (var i = 0; i < specs.length; i++) {
+      if (specs[i].label === label) return specs[i].provider || specs[i].providerName || "";
+    }
+    var cfg = readPersisted();
+    if (cfg && cfg.connections) {
+      for (var ci = 0; ci < cfg.connections.length; ci++) {
+        var conn = cfg.connections[ci];
+        if (conn.selected && conn.selected.indexOf(label) >= 0) {
+          var t = conn.type || "openai";
+          return conn.name || (t === "openai" ? "OpenAI-compatible" : t === "anthropic" ? "Claude (Anthropic)" : "Gemini-compatible");
+        }
+      }
+    }
+    return "Custom";
   };
   // The core's gateway discovery returns the same provider models as native
   // options. Suppress exact duplicates only in this selector; keep all other
@@ -595,7 +618,7 @@
     el.appendChild(root);
     load();
     editing = null; fetchMsg = "";
-    syncModels();
+    setTimeout(function () { syncModels(); }, 0);
     render();
   };
 })();

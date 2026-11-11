@@ -2,147 +2,131 @@
   'use strict';
 
   // Patch: Group provider models by provider name in the model selector
-  // This modifies the Custom section to show provider separators
+  // This modifies the Custom section to show provider separators.
+  //
+  // v3.1.0: Robust provider detection & insertion. Targets both
+  // [data-testid="model-selector-item"] and .group.relative wrappers,
+  // resolves provider directly from __agyGetProviderName / specs / storage,
+  // and inserts styled separator headers before each provider's model group.
 
   if (window.__agyProviderModelGroupsPatch) return;
   window.__agyProviderModelGroupsPatch = true;
 
-  // Store original __agyProviderSpecs to enhance it with provider info
-  var originalProviderSpecs = window.__agyProviderSpecs;
-  window.__agyProviderSpecs = function () {
-    var specs = originalProviderSpecs ? originalProviderSpecs() : [];
-    // Add provider info to each spec for grouping
-    var cfg = null;
+  function getProviderName(label) {
+    if (!label) return null;
+    try {
+      if (typeof window.__agyGetProviderName === 'function') {
+        var p = window.__agyGetProviderName(label);
+        if (p && p !== 'Custom') return p;
+      }
+    } catch (_) {}
+
+    try {
+      var specs = typeof window.__agyProviderSpecs === 'function' ? window.__agyProviderSpecs() : [];
+      for (var i = 0; i < specs.length; i++) {
+        if (specs[i].label === label && (specs[i].provider || specs[i].providerName)) {
+          return specs[i].provider || specs[i].providerName;
+        }
+      }
+    } catch (_) {}
+
     try {
       var raw = window.AgyProviders && typeof window.AgyProviders.load === 'function'
         ? window.AgyProviders.load()
         : localStorage.getItem('agyProviders') || '';
-      if (raw) cfg = JSON.parse(raw);
-    } catch (e) {}
-
-    if (cfg && cfg.useProviders && cfg.connections) {
-      var providerMap = {};
-      cfg.connections.forEach(function (c) {
-        var type = c.type || 'openai';
-        var providerName = c.name || (type === 'openai' ? 'OpenAI-compatible' : type === 'anthropic' ? 'Claude (Anthropic)' : 'Gemini-compatible');
-        (c.selected || []).forEach(function (m) {
-          providerMap[m] = providerName;
-        });
-      });
-
-      specs = specs.map(function (s) {
-        return Object.assign({}, s, { provider: providerMap[s.label] || 'Custom' });
-      });
-    }
-    return specs;
-  };
-
-  // Patch the model selector to group by provider
-  // We'll intercept the customModels passed to the selector
-  var originalCcb = null;
-  function patchCcb() {
-    // Find the cCb component (it's minified, so we look for the pattern)
-    // This is a runtime patch that modifies how customModels are processed
-    if (typeof window.__agyPatchCustomModels === 'function') return;
-
-    window.__agyPatchCustomModels = function (customModels) {
-      // customModels is an object: { label: modelInfo }
-      // We need to add provider grouping info
-      var specs = window.__agyProviderSpecs ? window.__agyProviderSpecs() : [];
-      var providerGroups = {};
-      var ungrouped = {};
-
-      specs.forEach(function (s) {
-        var provider = s.provider || 'Custom';
-        if (!providerGroups[provider]) providerGroups[provider] = {};
-        providerGroups[provider][s.label] = customModels[s.label];
-      });
-
-      // Add any custom models not from providers
-      Object.keys(customModels).forEach(function (key) {
-        if (!providerGroups['Custom']) providerGroups['Custom'] = {};
-        var found = false;
-        Object.keys(providerGroups).forEach(function (p) {
-          if (providerGroups[p][key]) found = true;
-        });
-        if (!found) providerGroups['Custom'][key] = customModels[key];
-      });
-
-      // Flatten with group markers
-      var result = {};
-      Object.keys(providerGroups).forEach(function (provider) {
-        if (Object.keys(providerGroups[provider]).length > 0) {
-          // Add separator
-          result['__SEPARATOR__' + provider] = {
-            label: provider,
-            isSeparator: true,
-            provider: provider
-          };
-          Object.assign(result, providerGroups[provider]);
-        }
-      });
-
-      return result;
-    };
-  }
-
-  // Run patch after a short delay to ensure specs are ready
-  setTimeout(patchCcb, 100);
-
-  // Also patch the selector render to handle separators
-  // This patches the SXb component (Custom section) to render separators
-  var originalSXb = null;
-  function patchSXb() {
-    // The minified SXb is at a specific location, we can't easily patch it
-    // Instead, we'll use a MutationObserver to add separators to the DOM
-    var observer = new MutationObserver(function (mutations) {
-      mutations.forEach(function (mutation) {
-        mutation.addedNodes.forEach(function (node) {
-          if (node.nodeType === 1 && node.querySelector) {
-            var customSection = node.querySelector('[data-testid="model-selector-panel"]');
-            if (customSection) {
-              addSeparatorsToCustomSection(customSection);
+      if (raw) {
+        var cfg = JSON.parse(raw);
+        if (cfg && cfg.connections) {
+          for (var ci = 0; ci < cfg.connections.length; ci++) {
+            var conn = cfg.connections[ci];
+            if (conn.selected && conn.selected.indexOf(label) >= 0) {
+              var t = conn.type || 'openai';
+              return conn.name || (t === 'openai' ? 'OpenAI-compatible' : t === 'anthropic' ? 'Claude (Anthropic)' : 'Gemini-compatible');
             }
           }
-        });
-      });
-    });
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
+  function applySeparators(panel) {
+    if (!panel) return;
+    var items = Array.prototype.slice.call(panel.querySelectorAll('[data-testid="model-selector-item"], .group.relative'));
+    var seen = {};
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var label = item.getAttribute('data-model-label');
+      if (!label) {
+        var tr = item.querySelector('.truncate');
+        if (tr) label = (tr.textContent || '').trim();
+      }
+      if (!label) continue;
+      var provider = getProviderName(label);
+      if (!provider || seen[provider]) continue;
+      seen[provider] = true;
+
+      var targetRow = item.classList && item.classList.contains('relative') ? item : (item.closest('.group.relative') || item);
+      if (!targetRow || !targetRow.parentNode) continue;
+
+      var sep = document.createElement('div');
+      sep.setAttribute('data-agy-provider-sep', '1');
+      sep.className = 'agy-provider-separator';
+      sep.style.cssText = 'padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; color: var(--muted-foreground, #8e8e93); text-transform: uppercase; letter-spacing: 0.06em; border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 6px; margin-bottom: 2px; user-select: none; pointer-events: none;';
+      sep.textContent = provider;
+      targetRow.parentNode.insertBefore(sep, targetRow);
+    }
+  }
+
+  function panelSignature(panel) {
+    var items = panel.querySelectorAll('[data-testid="model-selector-item"], .group.relative');
+    var parts = [];
+    for (var i = 0; i < items.length; i++) {
+      var l = items[i].getAttribute('data-model-label');
+      if (!l) {
+        var tr = items[i].querySelector('.truncate');
+        if (tr) l = (tr.textContent || '').trim();
+      }
+      if (l) parts.push(l);
+    }
+    return parts.join('|');
+  }
+
+  var lastSig = null;
+  function tick() {
+    var panel = document.querySelector('[data-testid="model-selector-panel"]');
+    if (!panel) { lastSig = null; return; }
+    var sig = panelSignature(panel);
+    if (sig === lastSig && panel.querySelector('[data-agy-provider-sep="1"]')) return;
+    lastSig = sig;
+
+    var olds = panel.querySelectorAll('[data-agy-provider-sep="1"]');
+    for (var i = 0; i < olds.length; i++) olds[i].remove();
+    try { applySeparators(panel); } catch (e) {}
+  }
+
+  var scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(function () { scheduled = false; tick(); });
+  }
+
+  try {
+    var observer = new MutationObserver(function () { schedule(); });
     observer.observe(document.body || document.documentElement, {
       childList: true,
       subtree: true
     });
-  }
+  } catch (e) {}
 
-  function addSeparatorsToCustomSection(panel) {
-    var customItems = panel.querySelectorAll('[data-testid="model-selector-item"]');
-    var seenProviders = new Set();
+  setInterval(tick, 600);
 
-    customItems.forEach(function (item) {
-      var label = item.getAttribute('data-model-label');
-      if (!label) return;
-
-      var specs = window.__agyProviderSpecs ? window.__agyProviderSpecs() : [];
-      var spec = specs.find(function (s) { return s.label === label; });
-      if (spec && spec.provider && !seenProviders.has(spec.provider)) {
-        seenProviders.add(spec.provider);
-        // Insert separator before this item
-        var separator = document.createElement('div');
-        separator.className = 'agy-provider-separator';
-        separator.style.cssText = 'padding: 8px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted-foreground, #888); text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid var(--border, #333); margin-top: 8px;';
-        separator.textContent = spec.provider;
-        item.parentNode.insertBefore(separator, item);
-      }
-    });
-  }
-
-  // Install DOM patch when ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', patchSXb);
+    document.addEventListener('DOMContentLoaded', tick);
   } else {
-    patchSXb();
+    tick();
   }
 
-  // Expose for debugging
-  window.__agyAddSeparators = addSeparatorsToCustomSection;
+  window.__agyAddSeparators = applySeparators;
 })();
