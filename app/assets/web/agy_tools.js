@@ -1172,7 +1172,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.0.5";
+    appVer.textContent = "3.0.8";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1278,75 +1278,150 @@
     c3.appendChild(updStatus);
 
     var btnUpd = document.createElement("button");
-    btnUpd.style.cssText = "width:100%;padding:12px;border:0;border-radius:12px;background:" + ACCENT + ";color:#fff;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s";
+    btnUpd.style.cssText = "width:100%;padding:12px;border:0;border-radius:12px;background:" + ACCENT + ";color:#fff;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s, background .15s";
     btnUpd.onmouseenter = function() { btnUpd.style.opacity = "0.85"; };
     btnUpd.onmouseleave = function() { btnUpd.style.opacity = "1"; };
     btnUpd.textContent = T("Проверить обновления", "Check for updates");
     c3.appendChild(btnUpd);
 
+    var CURRENT_VERSION = "3.0.8";
+    var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
+    var pendingApkUrl = null;
+    var updState = "check"; // "check" | "available" | "downloading" | "ready"
+
+    function triggerInstall(apkPath) {
+      var p = apkPath || downloadedApkPath;
+      try {
+        if (window.AgyTools && typeof window.AgyTools.installApk === "function") {
+          window.AgyTools.installApk(p);
+          return true;
+        }
+      } catch (e) {
+        console.warn("AgyTools.installApk error:", e);
+      }
+      return false;
+    }
+
     btnUpd.onclick = function () {
-      btnUpd.disabled = true;
-      btnUpd.textContent = "";
-      var spin = document.createElement("div");
-      spin.style.cssText = "width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:agy-usage-spin .7s linear infinite";
-      btnUpd.appendChild(spin);
-      var stx = document.createElement("span");
-      stx.textContent = T(" Проверяем…", " Checking…");
-      btnUpd.appendChild(stx);
-      updStatus.textContent = "";
       var b = bridge();
-      if (!b) { updStatus.textContent = T("Мост недоступен.", "Bridge unavailable."); btnUpd.disabled = false; btnUpd.textContent = T("Проверить обновления", "Check for updates"); return; }
-      var id = b.start("updatecheck", "");
-      if (!id || /^ERR/.test(id)) {
-        updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
-        btnUpd.disabled = false; btnUpd.textContent = T("Проверить обновления", "Check for updates");
+      if (!b) {
+        updStatus.textContent = T("Мост недоступен.", "Bridge unavailable.");
         return;
       }
-      pollStandalone(id, function (r) {
-        btnUpd.disabled = false;
-        btnUpd.textContent = T("Проверить обновления", "Check for updates");
-        var m = /@@UPDATE (\S+) (\S+) (\S+)/.exec(r.log || "");
-        if (m && m[1] && !m[1].startsWith("ERR")) {
-          var tag = m[1], apkUrl = m[3];
-          if (tag.replace(/^v/, "") === "3.0.5") {
-            updStatus.textContent = T("Установлена актуальная версия (3.0.5).", "Latest version is installed (3.0.5).");
-          } else {
-            updStatus.textContent = T("Доступна версия ", "Update available: ") + tag;
-            var btnDl = document.createElement("button");
-            btnDl.style.cssText = "width:100%;margin-top:10px;padding:11px;border:1px solid " + ACCENT + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:14px;font-weight:500;cursor:pointer;transition:background .15s";
-            btnDl.onmouseenter = function() { btnDl.style.background = "rgba(11,132,255,.1)"; };
-            btnDl.onmouseleave = function() { btnDl.style.background = "transparent"; };
-            btnDl.textContent = T("Скачать обновление", "Download update");
-            btnDl.onclick = function () {
-              btnDl.disabled = true;
-              btnDl.textContent = T("Скачивание…", "Downloading…");
-              var dlId = b.start("updatedownload", apkUrl);
-              if (!dlId || /^ERR/.test(dlId)) {
-                updStatus.textContent = T("Не удалось начать загрузку.", "Download failed to start.");
-                btnDl.disabled = false; btnDl.textContent = T("Скачать обновление", "Download update");
-                return;
-              }
-              pollStandalone(dlId, function (r2) {
-                var log = r2.log || "";
-                if (log.indexOf("@@UPDOK") >= 0) {
-                  updStatus.textContent = T("Обновление установлено! Перезапустите приложение.", "Update installed! Restart the app.");
-                  btnDl.remove();
-                } else if (log.indexOf("@@UPD manual") >= 0) {
-                  updStatus.textContent = T("APK сохранён в «Загрузки». Установите вручную.", "APK saved to Downloads. Install manually.");
-                  btnDl.remove();
-                } else {
-                  updStatus.textContent = T("Ошибка загрузки.", "Download error.");
-                  btnDl.disabled = false;
-                  btnDl.textContent = T("Скачать обновление", "Download update");
-                }
-              }, 0);
-            };
-            c3.appendChild(btnDl);
-          }
-        } else {
+
+      if (updState === "ready") {
+        updStatus.textContent = T("Запуск установщика пакетов…", "Launching package installer…");
+        triggerInstall(downloadedApkPath);
+        return;
+      }
+
+      if (updState === "check") {
+        btnUpd.disabled = true;
+        btnUpd.textContent = "";
+        var spin = document.createElement("div");
+        spin.style.cssText = "width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:agy-usage-spin .7s linear infinite";
+        btnUpd.appendChild(spin);
+        var stx = document.createElement("span");
+        stx.textContent = T(" Проверяем…", " Checking…");
+        btnUpd.appendChild(stx);
+        updStatus.textContent = "";
+
+        var id = b.start("updatecheck", "");
+        if (!id || /^ERR/.test(id)) {
           updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
+          btnUpd.disabled = false;
+          btnUpd.textContent = T("Проверить обновления", "Check for updates");
+          return;
         }
-      }, 0);
+
+        pollStandalone(id, function (r) {
+          btnUpd.disabled = false;
+          var m = /@@UPDATE (\S+) (\S+) (\S+)/.exec(r.log || "");
+          if (m && m[1] && !m[1].startsWith("ERR")) {
+            var tag = m[1], apkUrl = m[3];
+            var cleanTag = tag.replace(/^v/, "");
+            if (cleanTag === CURRENT_VERSION) {
+              updStatus.textContent = T("Установлена актуальная версия (" + CURRENT_VERSION + ").", "Latest version is installed (" + CURRENT_VERSION + ").");
+              btnUpd.textContent = T("Проверить обновления", "Check for updates");
+              updState = "check";
+            } else {
+              pendingApkUrl = apkUrl;
+              updState = "available";
+              updStatus.textContent = T("Доступна новая версия: ", "Update available: ") + tag;
+              btnUpd.textContent = T("Скачать обновление (" + tag + ")", "Download update (" + tag + ")");
+            }
+          } else {
+            updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
+            btnUpd.textContent = T("Проверить обновления", "Check for updates");
+            updState = "check";
+          }
+        }, 0);
+        return;
+      }
+
+      if (updState === "available") {
+        if (!pendingApkUrl) return;
+        btnUpd.disabled = true;
+        btnUpd.textContent = T("Скачивание… 0%", "Downloading… 0%");
+        updStatus.textContent = T("Загрузка APK…", "Downloading APK…");
+        updState = "downloading";
+
+        var dlId = b.start("updatedownload", pendingApkUrl);
+        if (!dlId || /^ERR/.test(dlId)) {
+          updStatus.textContent = T("Не удалось начать загрузку.", "Download failed to start.");
+          btnUpd.disabled = false;
+          btnUpd.textContent = T("Скачать обновление", "Download update");
+          updState = "available";
+          return;
+        }
+
+        /* Continuous progress polling */
+        var dlPollTimer = setInterval(function () {
+          var chunk = b.read(dlId);
+          if (chunk) {
+            var lines = chunk.split("\n");
+            for (var i = lines.length - 1; i >= 0; i--) {
+              var pm = /@@UPDPROGRESS (\d+) (\d+)/.exec(lines[i]);
+              if (pm) {
+                var done = parseInt(pm[1], 10);
+                var total = parseInt(pm[2], 10);
+                if (total > 0) {
+                  var pct = Math.min(100, Math.round((done * 100) / total));
+                  btnUpd.textContent = T("Скачивание… " + pct + "%", "Downloading… " + pct + "%");
+                }
+                break;
+              }
+            }
+          }
+        }, 350);
+
+        pollStandalone(dlId, function (r2) {
+          clearInterval(dlPollTimer);
+          var log = r2.log || "";
+          if (log.indexOf("@@UPDOK installed") >= 0) {
+            btnUpd.disabled = false;
+            btnUpd.textContent = T("Обновлено! Перезапустить", "Updated! Restart");
+            btnUpd.onclick = function() { location.reload(); };
+            updStatus.textContent = T("Обновление успешно установлено!", "Update successfully installed!");
+            updState = "done";
+          } else if (log.indexOf("@@UPDREADY") >= 0 || log.indexOf("@@UPD manual") >= 0 || log.indexOf("@@UPDOK") >= 0) {
+            var rm = /@@UPDREADY (\S+)/.exec(log);
+            if (rm && rm[1]) downloadedApkPath = rm[1];
+            btnUpd.disabled = false;
+            btnUpd.style.background = "#30d158";
+            btnUpd.textContent = T("Обновить и установить", "Update & install");
+            updStatus.textContent = T("Загрузка завершена! Запуск установщика…", "Download complete! Launching installer…");
+            updState = "ready";
+            /* Automatically launch the system package installer! */
+            triggerInstall(downloadedApkPath);
+          } else {
+            updStatus.textContent = T("Ошибка загрузки.", "Download error.");
+            btnUpd.disabled = false;
+            btnUpd.textContent = T("Повторить скачивание", "Retry download");
+            updState = "available";
+          }
+        }, 0);
+      }
     };
 
     wrap.appendChild(c3);

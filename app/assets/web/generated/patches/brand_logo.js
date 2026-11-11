@@ -11,14 +11,16 @@
         var cfg = JSON.parse(raw);
         return {
           pack: (cfg.pack && LOGOS[cfg.pack]) ? cfg.pack : "02_lynx",
-          color: cfg.color || "#0b84ff"
+          color: cfg.color || "#0b84ff",
+          recolorLogo: cfg.recolorLogo === true
         };
       }
     } catch (e) {}
-    return { pack: "02_lynx", color: "#0b84ff" };
+    return { pack: "02_lynx", color: "#0b84ff", recolorLogo: false };
   }
 
-  function recolorFill(fill, activeColor) {
+  function recolorFill(fill, activeColor, force) {
+    if (!force) return fill;
     if (!fill || !activeColor) return fill;
     var u = String(fill).toUpperCase();
     if (u === "#CB7040" || u === "#CA7040" || u === "#C87B50" || u === "#D77F54" || u === "#DB7A2D") {
@@ -34,18 +36,19 @@
     var brand = getActiveBrand();
     var logo = LOGOS[packId] || LOGOS[brand.pack] || LOGOS["02_lynx"];
     var col = customColor || brand.color || "#0b84ff";
+    var force = customColor ? true : brand.recolorLogo;
     var sz = size || 48;
     var defsHtml = "";
     if (logo.defs && logo.defs.length) {
       defsHtml = "<defs>" + logo.defs.map(function (g) {
         return "<linearGradient id=\"" + g.id + "_prev\" x1=\"" + g.x1 + "\" y1=\"" + g.y1 + "\" x2=\"" + g.x2 + "\" y2=\"" + g.y2 + "\" gradientUnits=\"userSpaceOnUse\">" +
           g.stops.map(function (s) {
-            return "<stop offset=\"" + (s.offset || 0) + "\" stop-color=\"" + recolorFill(s.color, col) + "\"" + (s.opacity != null ? " stop-opacity=\"" + s.opacity + "\"" : "") + "/>";
+            return "<stop offset=\"" + (s.offset || 0) + "\" stop-color=\"" + recolorFill(s.color, col, force) + "\"" + (s.opacity != null ? " stop-opacity=\"" + s.opacity + "\"" : "") + "/>";
           }).join("") + "</linearGradient>";
       }).join("") + "</defs>";
     }
     var pathsHtml = (logo.colorPaths || []).map(function (cp) {
-      var f = recolorFill(cp.fill, col);
+      var f = recolorFill(cp.fill, col, force);
       if (f && f.indexOf("url(#") === 0) {
         f = f.replace(")", "_prev)");
       }
@@ -81,18 +84,19 @@
       }
 
       var packId = (props && props.pack) || brand.pack || "02_lynx";
+      var force = brand.recolorLogo || (props && props.forceRecolor);
       var activeColor = (props && typeof props.color === "string" ? props.color : null) || brand.color || "#0b84ff";
       var logo = LOGOS[packId] || LOGOS["02_lynx"];
       var className = (props && props.className) || "shrink-0 object-contain";
       var sz = (props && (props.size || props.width || props.height)) || void 0;
-      var monochrome = !!(props && (props.mono || props.monochrome) && !props.color);
+      var monochrome = force && !!(props && (props.mono || props.monochrome) && !props.color);
 
       var svgProps = {
         className: className,
         viewBox: logo.viewBox,
         fill: "none",
         xmlns: "http://www.w3.org/2000/svg",
-        style: Object.assign({ color: activeColor, flexShrink: 0 }, (props && props.style) || {})
+        style: Object.assign(force ? { color: activeColor, flexShrink: 0 } : { flexShrink: 0 }, (props && props.style) || {})
       };
       if (sz) {
         svgProps.width = sz;
@@ -131,7 +135,7 @@
                   gradientUnits: "userSpaceOnUse"
                 },
                 g.stops.map(function (s, si) {
-                  var stopProps = { key: si, stopColor: recolorFill(s.color, activeColor) };
+                  var stopProps = { key: si, stopColor: recolorFill(s.color, activeColor, force) };
                   if (s.offset) stopProps.offset = s.offset;
                   if (s.opacity) stopProps.stopOpacity = s.opacity;
                   return h("stop", stopProps);
@@ -147,7 +151,7 @@
             key: "p" + idx,
             d: cp.d,
             transform: cp.transform,
-            fill: recolorFill(cp.fill, activeColor)
+            fill: recolorFill(cp.fill, activeColor, force)
           })
         );
       });

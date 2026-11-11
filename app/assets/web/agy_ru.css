@@ -64,21 +64,21 @@ html[data-agy-language="ru"] .capitalize {
 :root,
 html.light,
 html:not(.dark) {
-  --agy-glass-surface: rgba(255, 255, 255, 0.82) !important;
-  --agy-glass-border: rgba(0, 0, 0, 0.10) !important;
+  --agy-glass-surface: rgba(255, 255, 255, 0.85) !important;
+  --agy-glass-border: rgba(0, 0, 0, 0.12) !important;
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
   --agy-glass-item-hover: rgba(0, 0, 0, 0.06) !important;
   --agy-glass-item-active: rgba(0, 0, 0, 0.10) !important;
-  --popover: #ffffff !important;
+  --popover: rgba(255, 255, 255, 0.88) !important;
 }
 
 html.dark {
-  --agy-glass-surface: rgba(26, 26, 30, 0.84) !important;
+  --agy-glass-surface: rgba(26, 26, 30, 0.86) !important;
   --agy-glass-border: rgba(255, 255, 255, 0.12) !important;
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   --agy-glass-item-hover: rgba(255, 255, 255, 0.09) !important;
   --agy-glass-item-active: rgba(255, 255, 255, 0.15) !important;
-  --popover: #1c1c1e !important;
+  --popover: rgba(28, 28, 30, 0.88) !important;
 }
 
 /* Fix keyboard hide filling & delay (Задача 4) */
@@ -148,15 +148,13 @@ body,
   background: transparent !important;
 }
 
-/* Universal Glass Popovers: model selector, menus, selects, radix poppers */
+/* Universal Glass Popovers: menus, selects, radix poppers */
 :is(
-  [data-testid="model-selector-panel"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
   [data-select-popup],
-  .z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup]),
-  .z-\[6000\] > *
+  .z-\[6000\] > :is([role="menu"], [role="listbox"], [data-select-popup])
 ) {
   background: var(--agy-glass-surface) !important;
   backdrop-filter: blur(22px) saturate(190%) !important;
@@ -168,10 +166,8 @@ body,
   max-width: calc(100vw - 16px) !important;
 }
 
-/* Clear opaque backgrounds inside popovers in light & dark themes */
+/* Clear opaque backgrounds inside compact popovers */
 :is(
-  [data-testid="model-selector-panel"],
-  [data-testid="bottom-sheet"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
@@ -182,6 +178,16 @@ body,
   #typeahead-menu
 ) :is(div, ul, section, header, nav):not([role="menuitem"]):not([role="option"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]) {
   background-color: transparent !important;
+}
+
+/* Native Model Selector Bottom Sheet Glass Style */
+[data-testid="bottom-sheet"]:has([data-testid^="model-selector"]),
+[data-testid="bottom-sheet"]:has([data-testid="model-selector-panel"]) {
+  background: var(--agy-glass-surface) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  border-top: 1px solid var(--agy-glass-border) !important;
+  border-radius: 18px 18px 0 0 !important;
 }
 
 /* Model selector panel specific glass layout */

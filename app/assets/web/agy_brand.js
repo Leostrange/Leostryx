@@ -56,13 +56,14 @@
   /* -------------------------------------------------------------- state */
   function loadCfg() {
     var raw = store(STORE_KEY);
-    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR };
+    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: false };
     if (raw) {
       try {
         var p = JSON.parse(raw);
         if (p && typeof p === "object") {
           if (p.pack) cfg.pack = p.pack;
           if (p.color) cfg.color = p.color;
+          if (p.recolorLogo !== undefined) cfg.recolorLogo = !!p.recolorLogo;
         }
       } catch (e) {}
     }
@@ -111,7 +112,7 @@
         st.id = "agy-brand-accent-css";
         (document.head || root).appendChild(st);
       }
-      st.textContent =
+      var css =
         ":root, html, body {\n" +
         "  --primary: " + hex + " !important;\n" +
         "  --primary-foreground: " + fg + " !important;\n" +
@@ -120,25 +121,29 @@
         "  --accent: " + hex + " !important;\n" +
         "  --brand-accent: " + hex + " !important;\n" +
         "}\n" +
-        ".google-symbols,\n" +
-        "[data-testid=\"app-icon-new-conversation-button\"] svg,\n" +
-        "[data-testid=\"sidebar-header-logo\"] svg,\n" +
-        ".floating-icon,\n" +
-        ".animated-logo-container svg,\n" +
-        "button[aria-selected=\"true\"] svg,\n" +
-        "button[data-state=\"active\"] svg,\n" +
-        "[role=\"tab\"][aria-selected=\"true\"] svg,\n" +
-        "nav button svg,\n" +
-        "header button svg {\n" +
-        "  color: " + hex + " !important;\n" +
-        "}\n" +
-        "[data-testid=\"app-icon-new-conversation-button\"] svg path,\n" +
-        ".floating-icon path {\n" +
-        "  fill: " + hex + " !important;\n" +
-        "}\n" +
         ".ripple-container .ripple {\n" +
         "  border-color: " + hex + " !important;\n" +
         "}\n";
+      if (cfg.recolorLogo) {
+        css +=
+          ".google-symbols,\n" +
+          "[data-testid=\"app-icon-new-conversation-button\"] svg,\n" +
+          "[data-testid=\"sidebar-header-logo\"] svg,\n" +
+          ".floating-icon,\n" +
+          ".animated-logo-container svg,\n" +
+          "button[aria-selected=\"true\"] svg,\n" +
+          "button[data-state=\"active\"] svg,\n" +
+          "[role=\"tab\"][aria-selected=\"true\"] svg,\n" +
+          "nav button svg,\n" +
+          "header button svg {\n" +
+          "  color: " + hex + " !important;\n" +
+          "}\n" +
+          "[data-testid=\"app-icon-new-conversation-button\"] svg path,\n" +
+          ".floating-icon path {\n" +
+          "  fill: " + hex + " !important;\n" +
+          "}\n";
+      }
+      st.textContent = css;
     } catch (e) {}
   }
 
@@ -226,7 +231,7 @@
       var iconWrap = document.createElement("div");
       iconWrap.style.cssText = "width:56px;height:56px;display:flex;align-items:center;justify-content:center;pointer-events:none";
       if (typeof window.__agyBrandSvgMarkup === "function") {
-        iconWrap.innerHTML = window.__agyBrandSvgMarkup(p.id, cfg.color, 52);
+        iconWrap.innerHTML = window.__agyBrandSvgMarkup(p.id, cfg.recolorLogo ? cfg.color : null, 52);
       } else {
         var img = document.createElement("img");
         img.src = "./brand/" + p.id + "/ic_launcher_logo.png";
@@ -280,11 +285,47 @@
 
     /* ── Card 2: accent colour ── */
     var c2 = makeCard();
-    c2.appendChild(makeTitle(T("Цвет иконки и кнопок", "Icon and button colour")));
+    c2.appendChild(makeTitle(T("Цвет интерфейса и кнопок", "UI and button colour")));
     c2.appendChild(makeNote(T(
-      "Акцентный цвет: мгновенно перекрашивает логотип, значки, свечение и все акцентные кнопки интерфейса.",
-      "Accent colour: immediately re-tints the logo, icons, glow and all primary UI buttons."
+      "Акцентный цвет: задаёт тон кнопок, активных элементов и интерфейсных акцентов.",
+      "Accent colour: sets the tint for buttons, active controls and UI accents."
     )));
+
+    /* Switch: Recolor logos & icons */
+    var toggleRow = document.createElement("label");
+    toggleRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;" +
+      "background:rgba(255,255,255,.03);border:1px solid rgba(127,127,127,.18);border-radius:12px;margin-bottom:14px;cursor:pointer";
+
+    var toggleInfo = document.createElement("div");
+    toggleInfo.style.cssText = "display:flex;flex-direction:column;gap:2px";
+    var toggleTitle = document.createElement("div");
+    toggleTitle.style.cssText = "font-size:13.5px;font-weight:600;color:var(--foreground,#eee)";
+    toggleTitle.textContent = T("Перекрашивать логотипы и значки", "Recolor logos and icons");
+    var toggleDesc = document.createElement("div");
+    toggleDesc.style.cssText = "font-size:11.5px;color:#999;line-height:1.35";
+    toggleDesc.textContent = T(
+      "Если выключено — все 4 логотипа и значки сохраняют оригинальные авторские цвета (как на рабочем столе)",
+      "When off — all 4 logos and icons retain original designer colors (matching the launcher icon)"
+    );
+    toggleInfo.appendChild(toggleTitle);
+    toggleInfo.appendChild(toggleDesc);
+    toggleRow.appendChild(toggleInfo);
+
+    var toggleSwitch = document.createElement("input");
+    toggleSwitch.type = "checkbox";
+    toggleSwitch.checked = !!cfg.recolorLogo;
+    toggleSwitch.style.cssText = "width:20px;height:20px;accent-color:" + cfg.color + ";cursor:pointer;flex-shrink:0";
+    toggleSwitch.onchange = function () {
+      cfg.recolorLogo = toggleSwitch.checked;
+      saveCfg();
+      applyColor(cfg.color);
+      try {
+        window.dispatchEvent(new CustomEvent("agy:brand-changed", { detail: { pack: cfg.pack, color: cfg.color, recolorLogo: cfg.recolorLogo } }));
+      } catch (e) {}
+      render(el);
+    };
+    toggleRow.appendChild(toggleSwitch);
+    c2.appendChild(toggleRow);
 
     var sw = document.createElement("div");
     sw.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:8px";

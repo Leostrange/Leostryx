@@ -534,14 +534,28 @@
 
   var ITEM = "[role='menuitem'],[role='menuitemradio'],[role='menuitemcheckbox'],[role='option']";
   function sheetKind(sheet, trigger) {
-    if (sheet.querySelector("[data-testid^='model-selector']")) return "model-menu";
-    if (trigger && trigger.closest && trigger.closest("[data-testid='model-selector-trigger']")) return "model-menu";
+    if (!sheet) return null;
+    // Model selector: keep native bottom sheet as in builds prior to 3.0.6
+    if (sheet.querySelector("[data-testid^='model-selector']")) return null;
+    if (trigger && trigger.closest && trigger.closest("[data-testid='model-selector-trigger']")) return null;
     if (sheet.querySelector("[data-testid='model-quota-refreshing']")) return null;
+
+    // Tabs / complex sheets (Settings, Workspace Drawer, Terminal, Files, History, Artifacts)
+    if (sheet.querySelector("[role='tablist'], [role='tab']")) return null;
+
+    // Any sheet that contains form inputs or large content
     if (sheet.querySelector("input:not([type='checkbox']):not([type='radio']),textarea,[contenteditable='true']")) return null;
+
+    var txt = (sheet.textContent || "").trim();
+    if (txt.length > 220) return null;
+    if (/^(Настройки|Settings|Оформление|Appearance|Субагенты|Subagents|Файлы|Files|Терминал|Terminal|История|History|Артефакты|Artifacts|Изменённые|Modified)/i.test(txt)) return null;
+
+    var btns = sheet.querySelectorAll("button, [role='menuitem'], [role='option']");
+    if (btns.length === 0 || btns.length > 8) return null;
+
     if (sheet.querySelector("[role='option'],[role='menuitemradio']")) return "select";
     if (sheet.querySelector(ITEM)) return "menu";
-    var btns = sheet.querySelectorAll("button");
-    if (!sheet.style.height && btns.length > 0 && btns.length <= 8 && (sheet.textContent || "").length < 300) return "menu";
+    if (!sheet.style.height && btns.length <= 8 && txt.length < 220) return "menu";
     return null;
   }
 
@@ -560,7 +574,7 @@
         sheetTriggers.delete(sh);
         if (sh.classList.contains("agy-compact-sheet")) {
           sh.classList.remove("agy-compact-sheet", "agy-tight-menu", "agy-model-menu");
-          ["left", "top", "bottom", "width"].forEach(function (k) { sh.style.removeProperty(k); });
+          ["left", "top", "bottom", "width", "max-height", "transform"].forEach(function (k) { sh.style.removeProperty(k); });
         }
         continue;
       }
@@ -957,22 +971,152 @@
       text = "Разрешить / Продолжить";
     }
 
-    if (text) {
-      window.__agyInsertIntoChat(text, true);
-    }
-  };
+  /* -------------------------------------------------------------------------- */
+  /* Subagents Chat Quick Launcher (Release 3.0.8)                              */
+  /* -------------------------------------------------------------------------- */
+  var CHAT_SUBAGENTS = [
+    { id: "self", name: "self", title: "Текущий агент", desc: "Копия контекста и инструментов", icon: "🤖" },
+    { id: "research", name: "research", title: "Исследователь", desc: "Поиск в кодовой базе и сети", icon: "🔍" },
+    { id: "android-debugger", name: "android-debugger", title: "Android отладчик", desc: "Краши, logcat, JNI, jadx-agy", icon: "🐞" },
+    { id: "code-reviewer", name: "code-reviewer", title: "Код-ревью", desc: "Поиск багов и утечек памяти", icon: "🔎" },
+    { id: "docs-architect", name: "docs-architect", title: "Архитектор доков", desc: "README, CHANGELOG, Mermaid", icon: "📝" },
+    { id: "security-auditor", name: "security-auditor", title: "Аудитор безопасности", desc: "OWASP Top 10, уязвимости", icon: "🛡️" },
+    { id: "test-engineer", name: "test-engineer", title: "Инженер тестов", desc: "Модульные и интеграционные тесты", icon: "🧪" },
+    { id: "image-generator", name: "image-generator", title: "Генератор картинок", desc: "Создание и редактирование изображений", icon: "🎨" }
+  ];
 
-  setInterval(function() {
+  function getSubagentsCatalog() {
+    var list = CHAT_SUBAGENTS.slice();
     try {
-      if (window.AgyShade && typeof window.AgyShade.pollReplies === "function") {
-        var res = window.AgyShade.pollReplies();
-        if (res && res !== "[]") {
-          var arr = JSON.parse(res);
-          for (var i = 0; i < arr.length; i++) {
-            window.__agyOnShadeReply(arr[i]);
-          }
+      var raw = localStorage.getItem("agyCustomSubagents");
+      if (raw) {
+        var extra = JSON.parse(raw);
+        if (Array.isArray(extra)) {
+          extra.forEach(function (x) {
+            if (x && x.name && !list.some(function (i) { return i.name === x.name; })) {
+              list.push({ id: x.name, name: x.name, title: x.title || x.name, desc: x.desc || "Кастомный субагент", icon: "⚡" });
+            }
+          });
         }
       }
-    } catch(e) {}
-  }, 1500);
+    } catch (e) {}
+    return list;
+  }
+
+  function closeSubagentsMenu() {
+    var old = document.getElementById("agy-subagents-popover");
+    if (old) old.remove();
+  }
+
+  function toggleSubagentsMenu(anchorBtn) {
+    var existing = document.getElementById("agy-subagents-popover");
+    if (existing) { existing.remove(); return; }
+
+    var pop = document.createElement("div");
+    pop.id = "agy-subagents-popover";
+    pop.style.cssText = "position:fixed;z-index:9000;width:min(320px,calc(100vw - 20px));max-height:min(360px,calc(100vh - 120px));" +
+      "background:var(--agy-glass-surface, rgba(26,26,30,.88));border:1px solid var(--agy-glass-border, rgba(255,255,255,.14));" +
+      "border-radius:16px;box-shadow:var(--agy-glass-shadow, 0 16px 40px rgba(0,0,0,.4));" +
+      "backdrop-filter:blur(22px) saturate(190%);-webkit-backdrop-filter:blur(22px) saturate(190%);" +
+      "padding:10px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;box-sizing:border-box";
+
+    var r = anchorBtn.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var top = Math.max(10, r.top - 370);
+    var left = Math.max(10, Math.min(r.left - 10, vw - 330));
+    pop.style.top = top + "px";
+    pop.style.left = left + "px";
+
+    var hdr = document.createElement("div");
+    hdr.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px;" +
+      "border-bottom:1px solid rgba(127,127,127,.18);margin-bottom:4px;font-size:13px;font-weight:600;color:var(--foreground,#eee)";
+    hdr.innerHTML = "<span>🤖 Субагенты</span><span style='font-size:11px;font-weight:400;color:#888'>нажмите для вызова</span>";
+    pop.appendChild(hdr);
+
+    var list = getSubagentsCatalog();
+    list.forEach(function (ag) {
+      var item = document.createElement("button");
+      item.type = "button";
+      item.style.cssText = "display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;" +
+        "border:0;border-radius:10px;background:transparent;cursor:pointer;text-align:left;font:inherit;" +
+        "color:var(--foreground,#eee);transition:background .12s";
+      item.onmouseenter = function () { item.style.background = "var(--agy-glass-item-hover, rgba(255,255,255,.08))"; };
+      item.onmouseleave = function () { item.style.background = "transparent"; };
+
+      var ic = document.createElement("span");
+      ic.style.cssText = "font-size:16px;line-height:1;flex-shrink:0";
+      ic.textContent = ag.icon;
+      item.appendChild(ic);
+
+      var txtWrap = document.createElement("div");
+      txtWrap.style.cssText = "display:flex;flex-direction:column;gap:1px;min-width:0;flex:1";
+
+      var tTitle = document.createElement("div");
+      tTitle.style.cssText = "font-size:13px;font-weight:600;line-height:1.2;color:var(--foreground,#eee);display:flex;align-items:center;gap:6px";
+      tTitle.textContent = ag.title;
+      var tBadge = document.createElement("span");
+      tBadge.style.cssText = "font-size:10.5px;font-weight:400;color:var(--primary,#0b84ff);font-family:ui-monospace,monospace";
+      tBadge.textContent = "@" + ag.name;
+      tTitle.appendChild(tBadge);
+      txtWrap.appendChild(tTitle);
+
+      var tDesc = document.createElement("div");
+      tDesc.style.cssText = "font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+      tDesc.textContent = ag.desc;
+      txtWrap.appendChild(tDesc);
+
+      item.appendChild(txtWrap);
+
+      item.onclick = function (ev) {
+        ev.stopPropagation();
+        closeSubagentsMenu();
+        var prompt = "@" + ag.name + " ";
+        window.__agyInsertIntoChat(prompt, false);
+      };
+      pop.appendChild(item);
+    });
+
+    document.body.appendChild(pop);
+  }
+
+  document.addEventListener("pointerdown", function (e) {
+    var p = document.getElementById("agy-subagents-popover");
+    if (!p) return;
+    if (!p.contains(e.target) && !e.target.closest("#agy-subagent-btn")) {
+      closeSubagentsMenu();
+    }
+  }, true);
+
+  function attachSubagentButton() {
+    var box = document.querySelector(BOX);
+    if (!box) return;
+    if (box.querySelector("#agy-subagent-btn")) return;
+
+    // Place near '+' button or first toolbar button
+    var addBtn = box.querySelector("[aria-label='Add context'],[aria-label='Добавить контекст']") ||
+                 box.querySelector("button");
+    if (!addBtn || !addBtn.parentElement) return;
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "agy-subagent-btn";
+    btn.title = "Субагенты (вызов в чате)";
+    btn.setAttribute("aria-label", "Субагенты");
+    btn.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;" +
+      "padding:0;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:16px;line-height:1;" +
+      "color:var(--foreground,#aaa);transition:color .15s, transform .12s;flex-shrink:0";
+    btn.innerHTML = "🤖";
+    btn.onmouseenter = function () { btn.style.transform = "scale(1.08)"; };
+    btn.onmouseleave = function () { btn.style.transform = ""; };
+
+    btn.onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSubagentsMenu(btn);
+    };
+
+    addBtn.parentElement.insertBefore(btn, addBtn.nextSibling);
+  }
+
+  setInterval(attachSubagentButton, 1000);
 })();

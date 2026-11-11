@@ -400,28 +400,33 @@
     runOp("read-instructions", "", done);
   }
 
+  function dismissSettingsSheet() {
+    try {
+      var closeBtn = document.querySelector("[data-testid='sheet-close'], button[aria-label='Close'], button[aria-label='Назад'], button[aria-label='Закрыть']");
+      if (closeBtn) closeBtn.click();
+    } catch (e) {}
+    try {
+      if (typeof window.__agyShieldClose === "function") window.__agyShieldClose();
+    } catch (e) {}
+    try {
+      var back = document.querySelector("[data-testid='bottom-sheet-backdrop']");
+      if (back) back.click();
+    } catch (e) {}
+  }
+
   function invokeSubagentInChat(ag) {
     if (!ag) return;
-    var promptText;
-    if (ag.type === "builtin") {
-      promptText = T(
-        "Вызови субагента `" + ag.name + "` (роль: \"" + (ag.title || ag.name) + "\") через `invoke_subagent` для следующей задачи: ",
-        "Invoke subagent `" + ag.name + "` (role: \"" + (ag.title || ag.name) + "\") via `invoke_subagent` for the following task: "
-      );
-    } else {
-      promptText = T(
-        "Используй кастомного субагента `" + ag.name + "` (" + (ag.title || ag.name) + ", инструкция в `" + ag.path + "`, модель `" + ag.model + "`): зарегистрируй его через `define_subagent` и запусти через `invoke_subagent` для задачи: ",
-        "Use custom subagent `" + ag.name + "` (" + (ag.title || ag.name) + ", prompt in `" + ag.path + "`, model `" + ag.model + "`): register via `define_subagent` and invoke via `invoke_subagent` for task: "
-      );
-    }
-    if (typeof window.__agyInsertIntoChat === "function") {
-      window.__agyInsertIntoChat(promptText, false);
-      return;
-    }
-    try {
-      navigator.clipboard.writeText(promptText);
-    } catch (e) {}
-    alert(T("Команда вызова субагента скопирована и подготовлена:\n\n" + promptText, "Subagent invocation prompt copied:\n\n" + promptText));
+    dismissSettingsSheet();
+    var promptText = "@" + ag.name + " ";
+    setTimeout(function () {
+      if (typeof window.__agyInsertIntoChat === "function") {
+        window.__agyInsertIntoChat(promptText, false);
+        return;
+      }
+      try {
+        navigator.clipboard.writeText(promptText);
+      } catch (e) {}
+    }, 150);
   }
 
   /* ------------------------------------------------------------ Filtering */

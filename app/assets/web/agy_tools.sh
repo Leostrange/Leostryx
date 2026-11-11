@@ -2928,13 +2928,13 @@ op_updatedownload() {
 import os, sys, subprocess, urllib.request, ssl
 url = os.environ.get("AGY_APKURL", "").strip()
 if not url.startswith("https://"):
-    print("@@UPD ERR:bad url"); sys.exit(1)
+    print("@@UPD ERR:bad url", flush=True); sys.exit(1)
 dst = "/storage/emulated/0/Download/update-temp.apk"
-print("@@UPD downloading...")
+print("@@UPD downloading...", flush=True)
 ctx = ssl._create_unverified_context()
 try:
     req = urllib.request.Request(url, headers={"User-Agent": "Antigravity-App"})
-    with urllib.request.urlopen(req, timeout=120, context=ctx) as r, open(dst, "wb") as f:
+    with urllib.request.urlopen(req, timeout=180, context=ctx) as r, open(dst, "wb") as f:
         total = int(r.headers.get("Content-Length", 0))
         done = 0
         while True:
@@ -2943,19 +2943,36 @@ try:
             f.write(chunk)
             done += len(chunk)
             if total > 0:
-                print("@@UPDPROGRESS %d %d" % (done, total))
+                print("@@UPDPROGRESS %d %d" % (done, total), flush=True)
     sz = os.path.getsize(dst)
-    print("@@UPD downloaded %d" % sz)
-    # install via pm (requires Shizuku or root)
-    r = subprocess.run(["pm", "install", "-r", dst], capture_output=True, text=True, timeout=60)
-    out = (r.stdout + r.stderr).strip()
-    if r.returncode == 0 or "Success" in out:
-        print("@@UPDOK installed")
+    print("@@UPD downloaded %d" % sz, flush=True)
+    installed = False
+    try:
+        r = subprocess.run(["rish", "-c", "pm install -r " + dst], capture_output=True, text=True, timeout=60)
+        out = (r.stdout + r.stderr).strip()
+        if r.returncode == 0 or "Success" in out:
+            installed = True
+    except Exception:
+        pass
+    if not installed:
+        try:
+            r = subprocess.run(["pm", "install", "-r", dst], capture_output=True, text=True, timeout=60)
+            out = (r.stdout + r.stderr).strip()
+            if r.returncode == 0 or "Success" in out:
+                installed = True
+        except Exception:
+            pass
+    if installed:
+        print("@@UPDOK installed", flush=True)
     else:
-        print("@@UPD install result:", out[:200])
-        print("@@UPD manual: %s" % dst)
+        # Fallback intent via rish
+        try:
+            subprocess.run(["rish", "-c", "am start -a android.intent.action.VIEW -d file://" + dst + " -t application/vnd.android.package-archive --grant-read-uri-permission"], capture_output=True, text=True, timeout=10)
+        except Exception:
+            pass
+        print("@@UPDREADY " + dst, flush=True)
 except Exception as e:
-    print("@@UPD ERR", e)
+    print("@@UPD ERR", e, flush=True)
 PYUD
 }
 
