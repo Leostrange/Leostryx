@@ -5,6 +5,122 @@
   if (window.__agyRuFixes) return;
   window.__agyRuFixes = true;
 
+  /* ---- Dynamic Theme-Adaptive Glass Variables ----------------------------
+   * Reads the active theme tokens (--background, --foreground) directly from
+   * document.documentElement (which main.js updates on theme switch) and sets
+   * precise RGBA glass tokens for all menus, dropdowns, and popups.
+   * Supports Default Dark, Default Light, and ALL theme presets (Dracula,
+   * Catppuccin, One Dark, Monokai, Tokyo Night, Gruvbox, etc.). */
+  function parseColorToRgb(str, fallback) {
+    if (!str || typeof str !== "string") return fallback;
+    str = str.trim();
+    if (str.startsWith("#")) {
+      var raw = str.slice(1);
+      if (raw.length === 3) raw = raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2];
+      if (raw.length === 6) {
+        var num = parseInt(raw, 16);
+        if (!isNaN(num)) return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+      }
+      return fallback;
+    }
+    var m = str.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (m) {
+      return { r: parseInt(m[1], 10), g: parseInt(m[2], 10), b: parseInt(m[3], 10) };
+    }
+    var spaceM = str.match(/^(\d+)\s+(\d+)\s+(\d+)$/);
+    if (spaceM) {
+      return { r: parseInt(spaceM[1], 10), g: parseInt(spaceM[2], 10), b: parseInt(spaceM[3], 10) };
+    }
+    return fallback;
+  }
+
+  var lastGlassBg = "";
+  var lastGlassFg = "";
+  var lastGlassDark = null;
+  var lastGlassPrimary = "";
+
+  function updateGlassTheme() {
+    var doc = document.documentElement;
+    var body = document.body;
+    if (!doc) return;
+    var isDark = doc.classList.contains("dark") || (body && body.classList.contains("dark")) || (!doc.classList.contains("light") && (!body || !body.classList.contains("theme-light")));
+    var bg = (doc.style && doc.style.getPropertyValue("--background")) || "";
+    var fg = (doc.style && doc.style.getPropertyValue("--foreground")) || "";
+    var primary = (doc.style && doc.style.getPropertyValue("--primary")) || "";
+    if (!bg) {
+      try { bg = getComputedStyle(doc).getPropertyValue("--background") || ""; } catch (e) {}
+    }
+    if (!fg) {
+      try { fg = getComputedStyle(doc).getPropertyValue("--foreground") || ""; } catch (e) {}
+    }
+    if (!primary) {
+      try { primary = getComputedStyle(doc).getPropertyValue("--primary") || ""; } catch (e) {}
+    }
+
+    /* agyBrandConfig НЕ перебивает --primary: акцент бренда красит ТОЛЬКО
+       лого/иконки/сплэшскрин (agy_brand.js applyColor()), а --primary
+       берётся напрямую из выбранного пресета темы (Dracula, Monokai и т.д.) */
+
+    bg = bg.trim();
+    fg = fg.trim();
+    primary = primary.trim() || (isDark ? "#a3e635" : "#0b84ff");
+
+    if (bg === lastGlassBg && fg === lastGlassFg && isDark === lastGlassDark && primary === lastGlassPrimary) return;
+    lastGlassBg = bg;
+    lastGlassFg = fg;
+    lastGlassDark = isDark;
+    lastGlassPrimary = primary;
+
+    var bgRgb = parseColorToRgb(bg, isDark ? { r: 24, g: 24, b: 28 } : { r: 250, g: 250, b: 252 });
+    var fgRgb = parseColorToRgb(fg, isDark ? { r: 220, g: 220, b: 220 } : { r: 20, g: 20, b: 20 });
+    var priRgb = parseColorToRgb(primary, isDark ? { r: 163, g: 230, b: 53 } : { r: 11, g: 132, b: 255 });
+
+    // Цвет выбранной темы (Dracula, Monokai, Gruvbox, Catppuccin, Light, Dark)
+    // с ЛЁГКОЙ прозрачностью (88% плотности цвета темы, 12% прозрачности).
+    // Текст никогда не накладывается и не сливается, цвет темы и акцентный цвет чётко видны!
+    var sR = bgRgb.r;
+    var sG = bgRgb.g;
+    var sB = bgRgb.b;
+    var alpha = isDark ? 0.88 : 0.92;
+    var surface = "rgba(" + sR + ", " + sG + ", " + sB + ", " + alpha + ")";
+
+    var border = "color-mix(in srgb, " + primary + " 26%, " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.12)") + ")";
+    var hover = "color-mix(in srgb, " + primary + " 15%, transparent)";
+    var active = "color-mix(in srgb, " + primary + " 26%, transparent)";
+    var shadow = isDark
+      ? "0 18px 46px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px color-mix(in srgb, " + primary + " 18%, transparent)"
+      : "0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, " + primary + " 14%, transparent)";
+
+    [doc, body].forEach(function (el) {
+      if (!el || !el.style) return;
+      el.style.setProperty("--agy-glass-surface", surface, "important");
+      el.style.setProperty("--agy-glass-border", border, "important");
+      el.style.setProperty("--agy-glass-item-hover", hover, "important");
+      el.style.setProperty("--agy-glass-item-active", active, "important");
+      el.style.setProperty("--agy-glass-shadow", shadow, "important");
+      el.style.setProperty("--popover", surface, "important");
+    });
+  }
+  window.__agyUpdateGlassTheme = updateGlassTheme;
+  updateGlassTheme();
+  if (typeof MutationObserver !== "undefined") {
+    try {
+      var themeObs = new MutationObserver(updateGlassTheme);
+      if (document.documentElement) {
+        themeObs.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["style", "class"]
+        });
+      }
+      if (document.body) {
+        themeObs.observe(document.body, {
+          attributes: true,
+          attributeFilter: ["style", "class"]
+        });
+      }
+    } catch (_) {}
+  }
+
 
   /* ---- Usage: "Refreshing…" without changing the panel height ----------
    * 2.4.1 inserts a status row (+ separator) above the quota list while it
@@ -299,9 +415,33 @@
       }
     }
   }
-  /* Selects (Base UI select popup): short lists = exactly the trigger width;
-   * lists with descriptions = width of the settings card that holds the row,
-   * aligned to it (never wider than that card). */
+  /* Позиционирование всплывающих окон и списков из архива 03_popup_positioning_engine.js:
+   * Защита от вылета за правый и левый край экрана без ломки ширины и геометрии Base UI. */
+  function compactPoppers() {
+    var popups = document.querySelectorAll(
+      "[role='menu'], [class*='animate-slideIn']:not([data-select-popup])"
+    );
+    var viewW = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+    for (var i = 0; i < popups.length; i++) {
+      var popup = popups[i];
+      if (popup.closest("[data-testid*='model-selector']") || popup.matches("[data-select-popup]") || popup.closest("[data-select-popup]")) continue;
+      var rect = popup.getBoundingClientRect();
+      if (rect.width < 2 && rect.height < 2) continue;
+      if (rect.right > viewW - 6) {
+        var overflow = rect.right - (viewW - 6);
+        var currentLeft = parseFloat(popup.style.left) || rect.left;
+        popup.style.left = Math.max(6, Math.round(currentLeft - overflow)) + "px";
+      }
+      if (rect.left < 6) {
+        popup.style.left = "6px";
+      }
+    }
+  }
+
+  /* Selects (Base UI select popup):
+   * Списки с описанием пунктов (в Настройках: «Профиль безопасности», «Браузер»)
+   * точно подгоняются по ширине карточки/колонки и выравниваются по ее левому краю,
+   * не выходя за границы. */
   var selTrigger = null, selLoop = 0;
   function selTick() {
     selLoop = 0;
@@ -317,7 +457,11 @@
     var ps = document.querySelectorAll("[data-select-popup]");
     for (var i = 0; i < ps.length; i++) {
       var p = ps[i];
-      var tr = selTrigger && selTrigger.isConnected ? selTrigger : null;
+      var tr = (selTrigger && selTrigger.isConnected ? selTrigger : null) ||
+               (p.id ? document.querySelector('[aria-controls="' + p.id + '"]') : null) ||
+               (p.querySelector("[role='listbox']") && p.querySelector("[role='listbox']").id ?
+                document.querySelector('[aria-controls="' + p.querySelector("[role='listbox']").id + '"]') : null) ||
+               document.querySelector('[role="combobox"][aria-expanded="true"], button[aria-expanded="true"]');
       if (!tr) continue;
       var opts = p.querySelectorAll("[role='option']");
       var described = false;
@@ -325,28 +469,29 @@
         var lines = (opts[o].innerText || "").split("\n").filter(function (x) { return x.trim(); });
         if (lines.length > 1) { described = true; break; }
       }
-      var tw = tr.getBoundingClientRect();
       if (!described) {
-        p.style.setProperty("width", Math.round(tw.width) + "px", "important");
-        p.style.setProperty("min-width", "0", "important");
-        p.style.setProperty("max-width", "none", "important");
-        p.style.removeProperty("translate"); delete p.dataset.agyDx;
+        p.style.removeProperty("translate");
+        delete p.dataset.agyDx;
         continue;
       }
-      var card = tr.parentElement, vw = window.innerWidth;
+      var card = (tr.closest && (tr.closest(".rounded-xl, .divide-y, [class*='rounded-xl']") || tr.closest(".space-y-2"))) || tr.parentElement, vw = window.innerWidth;
       while (card && card !== document.body) {
         var cs = getComputedStyle(card), r = card.getBoundingClientRect();
         if (r.width >= vw * 0.7 && parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderTopLeftRadius) > 0) break;
         card = card.parentElement;
       }
       var cr = card && card !== document.body ? card.getBoundingClientRect() : { left: 16, width: vw - 32 };
-      p.style.setProperty("width", Math.round(cr.width) + "px", "important");
+      var targetW = Math.round(cr.width);
+      p.style.setProperty("width", targetW + "px", "important");
       p.style.setProperty("min-width", "0", "important");
-      p.style.setProperty("max-width", "none", "important");
+      p.style.setProperty("max-width", targetW + "px", "important");
       var cur = parseFloat(p.dataset.agyDx || "0") || 0;
-      var base = p.getBoundingClientRect().left - cur;      // where floating-ui put it
+      var base = p.getBoundingClientRect().left - cur;      // исходное положение floating-ui
       var dx = Math.round(cr.left - base);
-      if (dx !== cur) { p.dataset.agyDx = String(dx); p.style.setProperty("translate", dx + "px 0", "important"); }
+      if (dx !== cur) {
+        p.dataset.agyDx = String(dx);
+        p.style.setProperty("translate", dx + "px 0", "important");
+      }
     }
   }
 
@@ -442,8 +587,10 @@
 
   var popRaf = 0;
   new MutationObserver(function () {
-    if (!popRaf) popRaf = requestAnimationFrame(function () { popRaf = 0; fitPopups(); if (!selLoop) selTick(); });
+    if (!popRaf) popRaf = requestAnimationFrame(function () { popRaf = 0; fitPopups(); compactPoppers(); if (!selLoop) selTick(); });
   }).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("scroll", function () { if (!selLoop && document.querySelector("[data-select-popup]")) selTick(); }, true);
+  window.addEventListener("resize", function () { if (!selLoop && document.querySelector("[data-select-popup]")) selTick(); }, true);
 
   var taRaf = 0;
   new MutationObserver(function () {
@@ -594,10 +741,18 @@
   }
 
   function lines(el) {
-    return (el.innerText || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean);
+    /* textContent вместо innerText: innerText принудительно пересчитывает
+       layout (рефлоу) и вызывал подтормаживание при открытии медиа-меню. */
+    return (el.textContent || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean);
   }
 
   function layoutCompact() {
+    /* Ранний выход: если bottom-sheet нет в DOM, ничего не делаем —
+       избегаем лишних querySelectorAll/getComputedStyle на каждую мутацию. */
+    if (!document.querySelector("[data-testid='bottom-sheet']")) {
+      if (sheetTriggers.size) sheetTriggers.clear();
+      return;
+    }
     var sheets = document.querySelectorAll("[data-testid='bottom-sheet']");
     var backs = document.querySelectorAll("[data-testid='bottom-sheet-backdrop']");
     var compactBacks = new Set();
@@ -1219,9 +1374,8 @@
     pop.id = "agy-subagents-popover";
     pop.setAttribute("data-agy-no-translate", "");
     pop.style.cssText = "position:fixed;z-index:9000;" +
-      "background:var(--agy-glass-surface, rgba(26,26,30,.88));border:1px solid var(--agy-glass-border, rgba(255,255,255,.14));" +
-      "border-radius:16px;box-shadow:var(--agy-glass-shadow, 0 16px 40px rgba(0,0,0,.4));" +
-      "backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);" +
+      "background:var(--agy-glass-surface);border:1px solid var(--agy-glass-border);" +
+      "border-radius:16px;box-shadow:var(--agy-glass-shadow);" +
       "padding:10px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;box-sizing:border-box";
 
     var hdr = document.createElement("div");

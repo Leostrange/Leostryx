@@ -80,6 +80,11 @@ function notify() {
     document.documentElement.style.colorScheme = theme;
   } catch (e) { /* ignore */ }
   try {
+    if (typeof window.__agyUpdateGlassTheme === 'function') {
+      window.__agyUpdateGlassTheme();
+    }
+  } catch (e) { /* ignore */ }
+  try {
     if (window.Android) {
       state.hasAndroid = true;
       if (typeof window.Android.setThemeByUser === 'function') {

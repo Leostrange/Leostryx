@@ -95,37 +95,21 @@
   function contrastText(hex) { return luminance(hex) > 0.45 ? "#111111" : "#ffffff"; }
 
   function applyColor(hex) {
+    /* Акцент бренда красит ТОЛЬКО лого/иконки/сплэшскрин (при включённой
+       опции recolorLogo). Глобальные токены темы (--primary/--accent и пр.)
+       не трогаем, чтобы не перекрашивать кнопки, поля и прочий UI. */
     var root = document.documentElement;
     if (!root || !root.style) return;
-    var fg = contrastText(hex);
-    root.style.setProperty("--primary", hex);
-    root.style.setProperty("--primary-foreground", fg);
-    root.style.setProperty("--color-primary", hex);
-    root.style.setProperty("--color-primary-foreground", fg);
-    root.style.setProperty("--accent", hex);
-    root.style.setProperty("--brand-accent", hex);
 
     try {
       var st = document.getElementById("agy-brand-accent-css");
-      if (!st) {
-        st = document.createElement("style");
-        st.id = "agy-brand-accent-css";
-        (document.head || root).appendChild(st);
-      }
-      var css =
-        ":root, html, body {\n" +
-        "  --primary: " + hex + " !important;\n" +
-        "  --primary-foreground: " + fg + " !important;\n" +
-        "  --color-primary: " + hex + " !important;\n" +
-        "  --color-primary-foreground: " + fg + " !important;\n" +
-        "  --accent: " + hex + " !important;\n" +
-        "  --brand-accent: " + hex + " !important;\n" +
-        "}\n" +
-        ".ripple-container .ripple {\n" +
-        "  border-color: " + hex + " !important;\n" +
-        "}\n";
       if (cfg.recolorLogo) {
-        css +=
+        if (!st) {
+          st = document.createElement("style");
+          st.id = "agy-brand-accent-css";
+          (document.head || root).appendChild(st);
+        }
+        var css =
           ".google-symbols,\n" +
           "[data-testid=\"app-icon-new-conversation-button\"] svg,\n" +
           "[data-testid=\"sidebar-header-logo\"] svg,\n" +
@@ -142,8 +126,10 @@
           ".floating-icon path {\n" +
           "  fill: " + hex + " !important;\n" +
           "}\n";
+        st.textContent = css;
+      } else if (st) {
+        st.textContent = "";
       }
-      st.textContent = css;
     } catch (e) {}
   }
 
@@ -289,10 +275,10 @@
 
     /* ── Card 2: accent colour ── */
     var c2 = makeCard();
-    c2.appendChild(makeTitle(T("Цвет интерфейса и кнопок", "UI and button colour")));
+    c2.appendChild(makeTitle(T("Цвет логотипа и иконки", "Logo and icon colour")));
     c2.appendChild(makeNote(T(
-      "Акцентный цвет: задаёт тон кнопок, активных элементов и интерфейсных акцентов.",
-      "Accent colour: sets the tint for buttons, active controls and UI accents."
+      "Акцентный цвет: окрашивает только логотип, значки и сплэшскрин приложения. Цвета интерфейса не меняет.",
+      "Accent colour: tints only the app logo, icons and splash screen. Does not affect interface colours."
     )));
 
     /* Switch: Recolor logos & icons */

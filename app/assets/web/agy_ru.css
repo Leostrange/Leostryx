@@ -61,46 +61,46 @@ html[data-agy-language="ru"] .capitalize {
 }
 
 /* ---- Unified Glass & Theme Variables (Release 3.1.0) -------------------- */
-/* Light theme: полупрозрачный стеклянный эффект */
+/* Fallback values for light and dark themes. The exact RGBA surface, border
+   and hover colors are dynamically updated from the active theme's background
+   and foreground tokens by updateGlassTheme() in agy_ru.js, supporting ALL
+   custom themes (Dracula, Catppuccin, One Dark, Monokai, etc.) */
 :root,
 html.light,
 html:not(.dark),
 body.theme-light,
 body:not(.dark) {
-  --agy-glass-surface: rgba(255, 255, 255, 0.78) !important;
-  --agy-glass-border: rgba(0, 0, 0, 0.10) !important;
-  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
-  --agy-glass-item-hover: rgba(0, 0, 0, 0.06) !important;
-  --agy-glass-item-active: rgba(0, 0, 0, 0.10) !important;
-  --popover: rgba(248, 248, 250, 0.80) !important;
-  --card: rgba(255, 255, 255, 0.76) !important;
+  --agy-glass-surface: rgba(250, 250, 252, 0.92);
+  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 22%, rgba(0, 0, 0, 0.12));
+  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
+  --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
+  --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 22%, transparent);
+  --popover: var(--agy-glass-surface);
 }
 
-/* Dark theme: стеклянный эффект */
+/* Dark theme: цвет выбранной темы с лёгкой прозрачностью (88% плотности) */
 .dark,
 html.dark,
 body.dark,
 body.theme-dark {
-  --agy-glass-surface: rgba(26, 26, 30, 0.76) !important;
-  --agy-glass-border: rgba(255, 255, 255, 0.12) !important;
-  --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-  --agy-glass-item-hover: rgba(255, 255, 255, 0.09) !important;
-  --agy-glass-item-active: rgba(255, 255, 255, 0.15) !important;
-  --popover: rgba(28, 28, 32, 0.78) !important;
-  --card: rgba(32, 32, 36, 0.74) !important;
+  --agy-glass-surface: rgba(24, 24, 28, 0.88);
+  --agy-glass-border: color-mix(in srgb, var(--primary, #a3e635) 26%, rgba(255, 255, 255, 0.14));
+  --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px color-mix(in srgb, var(--primary, #a3e635) 18%, transparent);
+  --agy-glass-item-hover: color-mix(in srgb, var(--primary, #a3e635) 15%, transparent);
+  --agy-glass-item-active: color-mix(in srgb, var(--primary, #a3e635) 26%, transparent);
+  --popover: var(--agy-glass-surface);
 }
 
-/* Force backdrop-filter on ALL sheet/dialog containers in BOTH themes */
-[data-testid="bottom-sheet"],
-[data-radix-popper-content-wrapper] > *,
-[data-radix-menu-content],
-[data-radix-select-content],
-[data-testid="context-menu-popup"],
-.z-\[6000\] > *,
+/* Стиль v3.0.1: цвет выбранной темы + лёгкая прозрачность, БЕЗ backdrop-filter/blur.
+   Оригинальный подход — color-mix(in srgb, var(--popover) 90%, transparent). */
+/* Native modal dialogs & bottom sheets: glass surface in both themes */
 [role="dialog"][data-state="open"],
-.agy-compact-sheet {
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+[data-radix-dialog-content],
+[data-testid="bottom-sheet"] {
+  background: var(--agy-glass-surface) !important;
+  background-color: var(--agy-glass-surface) !important;
+  border: 1px solid var(--agy-glass-border) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
 }
 
 /* Fix keyboard hide filling & smooth chat transitions */
@@ -128,8 +128,6 @@ body,
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   transform: none !important;
   transition: opacity 120ms ease-out !important;
   overflow-x: hidden !important;
@@ -158,36 +156,72 @@ body,
   background-color: var(--agy-glass-item-hover) !important;
 }
 [data-testid="bottom-sheet"].agy-compact-sheet :is(svg, img) { width: 15px; height: 15px; }
-[data-testid="bottom-sheet-backdrop"].agy-compact-backdrop,
-div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-testid="bottom-sheet-backdrop"],
-[data-testid="bottom-sheet-backdrop"]:has(~ div [data-testid^="model-selector"]),
-[data-testid="bottom-sheet-backdrop"]:has(+ div [data-testid^="model-selector"]) {
+
+/* Bottom sheet backdrop: fully transparent so the frosted glass renders directly over the page */
+[data-testid="bottom-sheet-backdrop"] {
   background: transparent !important;
   background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Universal Glass Popovers: menus, selects, radix poppers */
 :is(
-  .z-\[6000\] > *,
+  [role="menu"],
+  [role="listbox"],
+  [data-select-popup],
   [data-testid="context-menu-popup"],
+  .z-\[6000\] > *,
+  .z-\[6000\] [class*="animate-slideIn"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
-  [data-select-popup],
   .typeahead-popover,
   #typeahead-menu
 ) {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  padding: 6px !important;
-  width: max-content !important;
+  max-width: calc(100vw - 12px) !important;
+  box-sizing: border-box !important;
+}
+
+/* Избегаем двойного слоя стекла: внутренний список role="listbox" и дочерние контейнеры внутри data-select-popup прозрачны */
+[data-select-popup] [role="listbox"],
+[data-select-popup] > [role="listbox"],
+[data-select-popup] > div,
+[data-select-popup] :is(div, ul, section):not([role="option"]):not([data-highlighted]):not([aria-selected="true"]),
+[data-radix-popper-content-wrapper] [role="menu"] [role="menu"],
+[role="menu"] > div:not([role="menuitem"]):not([role="menuitemradio"]):not([role="menuitemcheckbox"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Пункт меню/списка: подпись может переноситься, значение справа не сжимается в ноль (из архива 02_popups_and_menus_layout.css) */
+[role="menuitem"] > span:first-child,
+[role="menuitemradio"] > span:first-child,
+[role="option"] > span:first-child {
   min-width: 0 !important;
-  max-width: min(240px, calc(100vw - 16px)) !important;
+  overflow-wrap: break-word !important;
+}
+[role="menuitem"] .ml-auto,
+[role="menuitemradio"] .ml-auto {
+  flex: 0 0 auto !important;
+  max-width: 46% !important;
+}
+[data-testid="group-by-submenu-trigger"],
+[data-testid="sort-by-submenu-trigger"],
+[data-testid="display-submenu-trigger"],
+[data-testid="filter-submenu-trigger"] {
+  white-space: normal !important;
+  overflow-wrap: break-word !important;
+  text-overflow: clip !important;
 }
 
 /* Shield and Subagents popovers — styled with glass but aligned to context window width */
@@ -195,8 +229,6 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 #agy-subagents-popover {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-radius: 16px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
@@ -205,31 +237,90 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
   z-index: 9000 !important;
 }
 
-/* Provider selector and host remain solid opaque (Release 3.0.1-3.0.3 style) */
+/* Provider settings page stays solid for readability (Release 3.0.1-3.0.3 style),
+   but its dropdown list (API type picker) is glass like every other popup. */
 .agy-providers,
-.agy-providers-host,
-.agy-providers .agy-pv-ddlist {
+.agy-providers-host {
   background: var(--card, #1c1c1e) !important;
   background-color: var(--card, #1c1c1e) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+.agy-providers .agy-pv-ddlist {
+  background: var(--agy-glass-surface) !important;
+  background-color: var(--agy-glass-surface) !important;
+  border: 1px solid var(--agy-glass-border) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
+}
+.agy-providers .agy-pv-ddlist .agy-pv-opt:hover,
+.agy-providers .agy-pv-ddlist .agy-pv-opt.sel {
+  background: var(--agy-glass-item-hover) !important;
+}
 
-/* Clear opaque backgrounds inside compact popovers */
+/* Universal: clear opaque backgrounds of ALL inner layers inside any glass
+   popup (menus, selects, popovers, compact sheets, dialogs). Items keep their
+   own hover styling via the item rules below. */
 :is(
-  .z-\[6000\] > *,
+  [role="menu"],
+  [role="listbox"],
+  [data-select-popup],
   [data-testid="context-menu-popup"],
+  .z-\[6000\] > *,
+  .z-\[6000\] [class*="animate-slideIn"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
-  [data-select-popup],
-  [role="menu"],
-  [role="listbox"],
-  .agy-compact-sheet,
+  [role="dialog"][data-state="open"],
+  [data-radix-dialog-content],
+  [data-testid="bottom-sheet"].agy-compact-sheet,
+  [data-testid="bottom-sheet"]:has([data-testid*="model-selector"]),
+  #agy-shield,
+  #agy-subagents-popover,
   #typeahead-menu
-) :is(div, ul, section, header, nav):not([role="menuitem"]):not([role="option"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]):not([data-active="true"]) {
+) :is(div, ul, section, header, nav, main, footer, span, td):not([role="menu"]):not([role="menuitem"]):not([role="option"]):not([role="menuitemradio"]):not([role="menuitemcheckbox"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]):not([data-active="true"]):not(.agy-pv-opt):not([class*="bg-"] > button):not(button):not([style*="background"]):not([style*="background-color"]):not([data-color]):not([data-color-value]):not(.color-swatch):not([class*="swatch"]):not([class*="picker"]) {
   background-color: transparent !important;
   background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Individual items inside popups: translucent tint, not opaque fill */
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+) {
+  background-color: transparent !important;
+}
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[data-highlighted],
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[data-active="true"] {
+  background-color: var(--agy-glass-item-hover) !important;
+}
+
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[aria-selected="true"],
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[data-state="checked"] {
+  background-color: var(--agy-glass-item-active) !important;
+}
+
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[aria-selected="true"] svg,
+:is(
+  [role="menuitem"], [role="option"], [role="menuitemradio"], [role="menuitemcheckbox"],
+  [data-testid="model-selector-item"]
+)[data-state="checked"] svg {
+  color: var(--primary, #a3e635) !important;
 }
 
 /* Menu items inside popovers */
@@ -262,12 +353,10 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 [data-testid="bottom-sheet"]:has([data-testid*="model-selector"]) {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-top: 1px solid var(--agy-glass-border) !important;
   border-radius: 18px 18px 0 0 !important;
 }
-[data-testid="bottom-sheet"]:has([data-testid*="model-selector"]) div:not([data-testid="model-selector-item"]):not([data-testid="model-selector-effort-group"]) {
+[data-testid="bottom-sheet"] div:not([data-testid="model-selector-item"]):not([data-testid="model-selector-effort-group"]) {
   background-color: transparent !important;
 }
 
@@ -296,12 +385,91 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
   max-width: 210px !important;
 }
 
+/* Attachments: горизонтальная лента с прокруткой (до 10 файлов) строго в панели вложений */
+[data-testid="agent-input-box"] [id*="agentSidePanelInputBox"],
+[data-testid="agent-input-box"] .relative.w-full {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  width: 100% !important;
+}
+
+[data-testid="agent-input-box"] div.border-b:has([data-testid="input-attachment"]) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 6px 4px !important;
+  gap: 8px !important;
+  scrollbar-width: thin !important;
+}
+[data-testid="agent-input-box"] div.border-b:has([data-testid="input-attachment"]) > * {
+  flex-shrink: 0 !important;
+}
+[data-testid="agent-input-box"] div.border-b:has([data-testid="input-attachment"])::-webkit-scrollbar {
+  height: 3px;
+}
+[data-testid="agent-input-box"] div.border-b:has([data-testid="input-attachment"])::-webkit-scrollbar-thumb {
+  background: rgba(127, 127, 127, 0.35);
+  border-radius: 3px;
+}
+
+/* Поле ввода текста под вложениями всегда доступно на полную ширину */
+[data-testid="agent-input-box"] .relative.w-full > div:not(.border-b) {
+  display: block !important;
+  width: 100% !important;
+  min-height: 40px !important;
+  visibility: visible !important;
+}
+[data-testid="agent-input-box"] [contenteditable="true"] {
+  min-height: 24px !important;
+  visibility: visible !important;
+}
+
+/* Горизонтальная лента прикрепленных файлов в отправленных сообщениях чата */
+[data-testid="user-input-step"] div.relative.flex.mb-2:has(img),
+[data-testid="user-input-step"] div.mb-2:has([data-testid="user-message-document-chip"]) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  max-width: 100% !important;
+  gap: 8px !important;
+  padding-bottom: 4px !important;
+  scrollbar-width: thin !important;
+}
+[data-testid="user-input-step"] div.relative.flex.mb-2:has(img) > *,
+[data-testid="user-input-step"] div.mb-2:has([data-testid="user-message-document-chip"]) > * {
+  flex-shrink: 0 !important;
+}
+[data-testid="user-input-step"] div.relative.flex.mb-2:has(img)::-webkit-scrollbar,
+[data-testid="user-input-step"] div.mb-2:has([data-testid="user-message-document-chip"])::-webkit-scrollbar {
+  height: 3px;
+}
+[data-testid="user-input-step"] div.relative.flex.mb-2:has(img)::-webkit-scrollbar-thumb,
+[data-testid="user-input-step"] div.mb-2:has([data-testid="user-message-document-chip"])::-webkit-scrollbar-thumb {
+  background: rgba(127, 127, 127, 0.35);
+  border-radius: 3px;
+}
+
 /* Attachments like Out27: a tile with the preview on top and a "×" strip
    under it (instead of a 32px chip with a tiny corner badge). */
 [data-testid="input-attachment"] {
+  flex: 0 0 96px !important;
+  flex-shrink: 0 !important;
   flex-direction: column !important;
   align-items: stretch !important;
   width: 96px !important;
+  max-width: 96px !important;
   border-radius: 10px !important;
   overflow: hidden !important;
   vertical-align: top;
@@ -356,11 +524,11 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 .agy-shield-btn[aria-expanded="true"] { background: rgba(127,127,127,.22); }
 #agy-shield {
   position: fixed; z-index: 6100; overflow-y: auto; overscroll-behavior: contain;
-  padding: 4px; border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--foreground, #888) 14%, transparent);
-  background: color-mix(in srgb, var(--card, var(--popover, var(--background))) 90%, transparent);
+  padding: 4px; border-radius: 14px;
+  border: 1px solid var(--agy-glass-border) !important;
+  background: var(--agy-glass-surface) !important;
   color: var(--foreground);
-  box-shadow: 0 10px 28px rgba(0,0,0,.26);
+  box-shadow: var(--agy-glass-shadow) !important;
   font-size: 13px; line-height: 1.25;
 }
 #agy-shield button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; width: 100%; gap: 8px; border-radius: 8px; }
@@ -372,7 +540,8 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 #agy-shield .agy-sh-sec + .agy-sh-sec { border-top: 1px solid color-mix(in srgb, var(--foreground, #888) 10%, transparent); }
 #agy-shield .agy-sh-opts { padding: 0 0 4px 8px; }
 #agy-shield .agy-sh-opt { padding: 6px 10px; justify-content: space-between; }
-#agy-shield .agy-sh-opt.sel { background: rgba(127,127,127,.22); }
+#agy-shield .agy-sh-opt:hover { background: var(--agy-glass-item-hover) !important; }
+#agy-shield .agy-sh-opt.sel { background: var(--agy-glass-item-active) !important; color: var(--foreground) !important; }
 #agy-shield .agy-sh-opt.passive:not(.sel) { opacity: .6; cursor: default; }
 #agy-shield .agy-sh-ol { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 #agy-shield .agy-sh-od { color: var(--muted-foreground, #888); font-size: 11.5px; white-space: normal; }
@@ -409,13 +578,7 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 .agy-tools .agy-t-status { font-size: 12.5px; margin: 4px 0; }
 .agy-tools .agy-t-log { max-height: 40vh; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: 8px; font-size: 11px; line-height: 1.35;
   white-space: pre-wrap; word-break: break-all; background: color-mix(in srgb, var(--foreground, #888) 7%, transparent); }
-
-/* Dark theme: no drop shadows under popups / menus / selects / shield —
-   on dark backgrounds they read (and sometimes render) as black overlays. */
-.dark :is(#agy-shield, [data-select-popup], [role="menu"], [role="listbox"], [class*="animate-slideIn"], .typeahead-popover, #typeahead-menu, [data-testid="bottom-sheet"].agy-compact-sheet),
-.dark .z-\[6000\] > * {
-  box-shadow: none !important;
-}
+/* Popups maintain elevated glass drop shadow in dark theme via --agy-glass-shadow */
 
 /* Tools: live job panel (top of the page). No CSS animations or extra
    compositing layers here — on this GPU they leave black rectangles. */
@@ -765,9 +928,11 @@ div:has(> [data-testid="bottom-sheet"] [data-testid^="model-selector"]) > [data-
 }
 .agy-mcp-modal {
   width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; border-radius: 14px;
-  background: var(--card, var(--background, #1e1e20)); color: var(--foreground);
-  border: 1px solid var(--border, rgba(127,127,127,.3)); padding: 18px; box-sizing: border-box;
-  box-shadow: 0 16px 36px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 12px;
+  background: var(--agy-glass-surface, var(--card, var(--background, #1e1e20)));
+  background-color: var(--agy-glass-surface, var(--card, var(--background, #1e1e20)));
+  color: var(--foreground);
+  border: 1px solid var(--agy-glass-border, var(--border, rgba(127,127,127,.3))); padding: 18px; box-sizing: border-box;
+  box-shadow: var(--agy-glass-shadow, 0 16px 36px rgba(0,0,0,.5)); display: flex; flex-direction: column; gap: 12px;
 }
 .agy-mcp-modal-title { font-size: 15px; font-weight: 600; color: var(--foreground); }
 .agy-mcp-modal-desc { font-size: 11.5px; color: var(--muted-foreground, #888); line-height: 1.4; }

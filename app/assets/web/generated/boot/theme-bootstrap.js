@@ -32,20 +32,5 @@
 
   document.documentElement.style.colorScheme = theme;
   document.documentElement.classList.add(theme);
-
-  // Fast brand accent color bootstrap: applies accent color variables to avoid un-tinted flash on startup
-  try {
-    var rawBrand = localStorage.getItem("agyBrandConfig");
-    var brandColor = "#ec4899";
-    if (rawBrand) {
-      var brandParsed = JSON.parse(rawBrand);
-      if (brandParsed && brandParsed.color) brandColor = brandParsed.color;
-    }
-    var rootEl = document.documentElement;
-    rootEl.style.setProperty("--primary", brandColor);
-    rootEl.style.setProperty("--color-primary", brandColor);
-    rootEl.style.setProperty("--accent", brandColor);
-    rootEl.style.setProperty("--brand-accent", brandColor);
-  } catch (e) {}
 })();
 
