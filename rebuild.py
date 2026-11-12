@@ -179,7 +179,89 @@ def main():
         pack(unsigned, merged)
         zipalign4(unsigned)
         sign(unsigned)
-    print("ready in", ROOT / "dist/signed")
+
+    # Finalize release 3.1.0 artifacts
+    version = "3.1.0"
+    signed_dir = ROOT / "dist/signed"
+    parent_dir = ROOT.parent
+
+    # 1. Versioned APKs with fresh mtime
+    for kind in ("standard", "bypass"):
+        src_apk = signed_dir / f"{kind}.apk"
+        src_idsig = signed_dir / f"{kind}.apk.idsig"
+        target_apk = signed_dir / f"Leostryx-{version}-{kind}.apk"
+        target_idsig = signed_dir / f"Leostryx-{version}-{kind}.apk.idsig"
+        if src_apk.exists():
+            if target_apk.exists():
+                target_apk.unlink()
+            shutil.copy2(src_apk, target_apk)
+            os.utime(target_apk, None)
+        if src_idsig.exists():
+            if target_idsig.exists():
+                target_idsig.unlink()
+            shutil.copy2(src_idsig, target_idsig)
+            os.utime(target_idsig, None)
+
+    # 2. Re-pack source code zip
+    zip_path = signed_dir / "Leostryx-repo.zip"
+    if zip_path.exists():
+        zip_path.unlink()
+    subprocess.check_call([
+        "zip", "-q", "-r", "-9", str(zip_path), ".", "-x", "dist/*"
+    ], cwd=str(ROOT))
+    os.utime(zip_path, None)
+
+    # 3. Checksums
+    sums_path = signed_dir / f"SHA256SUMS-{version}.txt"
+    sums_plain = signed_dir / "SHA256SUMS.txt"
+    with open(sums_path, "w", encoding="utf-8") as sf:
+        subprocess.check_call([
+            "sha256sum",
+            f"Leostryx-{version}-standard.apk",
+            f"Leostryx-{version}-bypass.apk",
+            "Leostryx-repo.zip",
+        ], cwd=str(signed_dir), stdout=sf)
+    shutil.copy2(sums_path, sums_plain)
+    os.utime(sums_path, None)
+    os.utime(sums_plain, None)
+
+    # 4. Sync to parent project directory and cleanup old stale files
+    for old in ("bypass.apk", "standard.apk", "standard-unsigned.apk", "bypass-unsigned.apk"):
+        p = parent_dir / old
+        if p.exists():
+            p.unlink()
+
+    for item in [
+        f"Leostryx-{version}-standard.apk",
+        f"Leostryx-{version}-standard.apk.idsig",
+        f"Leostryx-{version}-bypass.apk",
+        f"Leostryx-{version}-bypass.apk.idsig",
+        "Leostryx-repo.zip",
+        f"SHA256SUMS-{version}.txt",
+        "SHA256SUMS.txt"
+    ]:
+        src = signed_dir / item
+        if src.exists():
+            dest = parent_dir / item
+            if dest.exists():
+                dest.unlink()
+            shutil.copy2(src, dest)
+            os.utime(dest, None)
+
+    for doc in ("CHANGELOG.md", "README.md"):
+        src = ROOT / doc
+        if src.exists():
+            dest = parent_dir / doc
+            if dest.exists():
+                dest.unlink()
+            shutil.copy2(src, dest)
+            os.utime(dest, None)
+
+    # Remove intermediate unsigned files
+    for uns in ROOT.glob("dist/*-unsigned.apk"):
+        uns.unlink()
+
+    print("ready in", ROOT / "dist/signed", "and synced to", parent_dir)
     return 0
 
 
