@@ -116,7 +116,10 @@ body,
   max-height: 100% !important;
 }
 
-/* Fix Base UI scroll-lock shifting page left and showing blank stripe on the right */
+/* Fix Base UI scroll-lock shifting page left and showing blank stripe on the right.
+   Base UI JS sets scrollbar-gutter:stable inline on documentElement.style — that
+   reserves gutter space and causes the phantom right stripe. Overriding it with
+   !important (stylesheet beats inline) removes the reservation entirely. */
 html[data-base-ui-scroll-locked],
 html[data-base-ui-scroll-locked] body,
 html,
@@ -126,6 +129,11 @@ body {
   margin-right: 0 !important;
   padding-right: 0 !important;
   box-sizing: border-box !important;
+}
+html[data-base-ui-scroll-locked] {
+  scrollbar-gutter: auto !important;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
 }
 
 /* Compact menus & Glass Popovers (Задачи 1 и 2) */
@@ -1145,9 +1153,15 @@ body {
 }
 .agy-cust-modal {
   width: 100%; max-width: 500px; max-height: 88vh; overflow-y: auto; border-radius: 14px;
-  background: var(--card, var(--background, #1e1e20)); color: var(--foreground);
-  border: 1px solid var(--border, rgba(127,127,127,.3)); padding: 18px; box-sizing: border-box;
-  box-shadow: 0 16px 36px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 12px;
+  background: var(--agy-glass-surface, var(--card, var(--background, #1e1e20)));
+  background-color: var(--agy-glass-surface, var(--card, var(--background, #1e1e20)));
+  color: var(--foreground);
+  border: 1px solid var(--agy-glass-border, var(--border, rgba(127,127,127,.3)));
+  padding: 18px; box-sizing: border-box;
+  box-shadow: var(--agy-glass-shadow, 0 16px 36px rgba(0,0,0,.5));
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  display: flex; flex-direction: column; gap: 12px;
 }
 .agy-cust-modal-title { font-size: 15px; font-weight: 600; color: var(--foreground); }
 .agy-cust-modal-desc { font-size: 11.5px; color: var(--muted-foreground, #888); line-height: 1.4; }
