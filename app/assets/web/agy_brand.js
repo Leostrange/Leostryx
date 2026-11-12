@@ -528,12 +528,12 @@
     var currentFont = FONTS.filter(function (x) { return x.id === cfg.font; })[0] || FONTS[0];
 
     var fontContainer = document.createElement("div");
-    fontContainer.style.cssText = "display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;margin-top:6px";
+    fontContainer.style.cssText = "display:flex;flex-direction:column;gap:10px;width:100%;box-sizing:border-box;margin-top:6px";
 
-    /* LEFT: Live Preview Box showing real-time changes */
+    /* Live Preview Box showing real-time changes */
     var previewCol = document.createElement("div");
     previewCol.id = "agy-font-preview-box";
-    previewCol.style.cssText = "flex:1 1 240px;min-width:200px;background:rgba(255,255,255,.03);border:1px solid rgba(127,127,127,.2);" +
+    previewCol.style.cssText = "width:100%;box-sizing:border-box;background:rgba(255,255,255,.03);border:1px solid rgba(127,127,127,.2);" +
       "border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:all .15s";
 
     var previewHead = document.createElement("div");
@@ -562,31 +562,31 @@
 
     fontContainer.appendChild(previewCol);
 
-    /* RIGHT: Button with Dropdown List */
+    /* Button with Dropdown List (full width matching preview block) */
     var selectCol = document.createElement("div");
-    selectCol.style.cssText = "flex:0 1 210px;min-width:170px;position:relative;display:flex;flex-direction:column;justify-content:center";
+    selectCol.style.cssText = "width:100%;box-sizing:border-box;position:relative;display:flex;flex-direction:column";
 
     var fontBtn = document.createElement("button");
     fontBtn.type = "button";
     fontBtn.id = "agy-font-select-btn";
     fontBtn.setAttribute("aria-haspopup", "listbox");
     fontBtn.setAttribute("aria-expanded", "false");
-    fontBtn.style.cssText = "width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;" +
+    fontBtn.style.cssText = "width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;" +
       "background:var(--secondary,rgba(255,255,255,.05));border:1px solid rgba(127,127,127,.25);border-radius:12px;" +
       "color:var(--foreground,#eee);font-size:13.5px;font-weight:500;cursor:pointer;transition:border-color .15s, background .15s";
 
     var btnContent = document.createElement("div");
-    btnContent.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;text-align:left;overflow:hidden";
+    btnContent.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;text-align:left;overflow:hidden;flex:1 1 auto";
 
     var btnTitle = document.createElement("span");
     btnTitle.id = "agy-font-btn-title";
-    btnTitle.style.cssText = "font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px";
+    btnTitle.style.cssText = "font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
     btnTitle.textContent = T(currentFont.ru, currentFont.en);
     btnContent.appendChild(btnTitle);
 
     var btnSub = document.createElement("span");
     btnSub.id = "agy-font-btn-sub";
-    btnSub.style.cssText = "font-size:11px;color:var(--muted-foreground,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px";
+    btnSub.style.cssText = "font-size:11px;color:var(--muted-foreground,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
     btnSub.textContent = currentFont.license;
     btnContent.appendChild(btnSub);
 
@@ -599,11 +599,11 @@
 
     selectCol.appendChild(fontBtn);
 
-    /* Dropdown Popover */
+    /* Dropdown Popover (full width matching button and preview block) */
     var dropdown = document.createElement("div");
     dropdown.id = "agy-font-dropdown";
     dropdown.setAttribute("role", "listbox");
-    dropdown.style.cssText = "display:none;position:absolute;top:calc(100% + 6px);right:0;width:max-content;min-width:240px;max-width:320px;" +
+    dropdown.style.cssText = "display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;width:100%;" +
       "max-height:280px;overflow-y:auto;z-index:9999;border-radius:14px;background:var(--agy-glass-surface,rgba(24,24,28,.95));" +
       "backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--agy-glass-border,rgba(127,127,127,.25));" +
       "box-shadow:var(--agy-glass-shadow,0 16px 40px rgba(0,0,0,.5));padding:6px;box-sizing:border-box";
