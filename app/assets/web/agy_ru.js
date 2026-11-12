@@ -76,20 +76,20 @@
     var priRgb = parseColorToRgb(primary, isDark ? { r: 163, g: 230, b: 53 } : { r: 11, g: 132, b: 255 });
 
     // Цвет выбранной темы (Dracula, Monokai, Gruvbox, Catppuccin, Light, Dark)
-    // с выразительной прозрачностью стекла (0.58 для светлых тем, 0.78 для тёмных).
+    // с выразительной прозрачностью стекла (0.38 для светлых тем, 0.78 для тёмных).
     // Текст остаётся контрастным, а подложка красиво просвечивает с эффектом размытия!
     var sR = bgRgb.r;
     var sG = bgRgb.g;
     var sB = bgRgb.b;
-    var alpha = isDark ? 0.78 : 0.58;
+    var alpha = isDark ? 0.78 : 0.38;
     var surface = "rgba(" + sR + ", " + sG + ", " + sB + ", " + alpha + ")";
 
-    var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "24%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.12)") + ")";
-    var hover = "color-mix(in srgb, " + primary + " " + (isDark ? "15%" : "12%") + ", transparent)";
-    var active = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "22%") + ", transparent)";
+    var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "25%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.14)") + ")";
+    var hover = "color-mix(in srgb, " + primary + " " + (isDark ? "15%" : "14%") + ", transparent)";
+    var active = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "24%") + ", transparent)";
     var shadow = isDark
       ? "0 18px 46px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px color-mix(in srgb, " + primary + " 18%, transparent)"
-      : "0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, " + primary + " 12%, transparent)";
+      : "0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, " + primary + " 14%, transparent)";
 
     [doc, body].forEach(function (el) {
       if (!el || !el.style) return;

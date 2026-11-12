@@ -72,11 +72,11 @@ html.light,
 html:not(.dark),
 body.theme-light,
 body:not(.dark) {
-  --agy-glass-surface: rgba(255, 255, 255, 0.58);
-  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 24%, rgba(0, 0, 0, 0.12));
-  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
-  --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
-  --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 22%, transparent);
+  --agy-glass-surface: rgba(255, 255, 255, 0.38);
+  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 25%, rgba(0, 0, 0, 0.14));
+  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
+  --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
+  --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 24%, transparent);
   --popover: var(--agy-glass-surface);
 }
 
@@ -266,14 +266,21 @@ html[data-base-ui-scroll-locked] {
   z-index: 9000 !important;
 }
 
-/* Provider settings page stays solid for readability (Release 3.0.1-3.0.3 style),
-   but its dropdown list (API type picker) is glass like every other popup. */
+/* Provider settings page: seamless glass host so the modal/sheet frosted glass
+   shines through, and its cards & dropdown list (API type picker) are glass like every popup. */
 .agy-providers,
 .agy-providers-host {
-  background: var(--card, #1c1c1e) !important;
-  background-color: var(--card, #1c1c1e) !important;
+  background: transparent !important;
+  background-color: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+.agy-providers .agy-pv-card {
+  background: var(--agy-glass-surface) !important;
+  border: 1px solid var(--agy-glass-border, var(--border, rgba(127,127,127,.3))) !important;
+  box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
 }
 .agy-providers .agy-pv-ddlist {
   background: var(--agy-glass-surface) !important;
@@ -410,6 +417,9 @@ html[data-base-ui-scroll-locked] {
 [data-testid="model-selector-panel"] [data-testid="model-selector-item"][data-highlighted],
 [data-testid="model-selector-panel"] [data-testid="model-selector-item"][aria-selected="true"] {
   background-color: var(--agy-glass-item-hover) !important;
+}
+[data-testid="model-selector-panel"] [class*="from-card"] {
+  --tw-gradient-from: transparent !important;
 }
 /* Sort menu popover: main.js uses .agy-narrow-menu instead of Tailwind !w-56 */
 .agy-narrow-menu,
