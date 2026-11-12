@@ -1485,5 +1485,75 @@
 
   setInterval(attachSubagentButton, 600);
 
+  /* ---- Background Keep-Alive for Uninterrupted Chat & Agent Execution ------
+   * When the user minimizes the app, Chromium WebView on Android throttles
+   * timers and suspends streaming fetch/SSE connections unless an active media
+   * session is present.
+   * We maintain a silent HTML5 audio loop while generation/chat is active.
+   * This signals Android/Chromium to keep the renderer alive, preventing
+   * chat disconnects or streaming aborts when the app is in the background. */
+  var bgAudio = null;
+  var isKeepAliveActive = false;
+
+  function isChatRunning() {
+    if (document.querySelector("[data-tooltip-id='input-send-button-cancel-tooltip'],[aria-label='Stop'],[aria-label='Остановить'],[aria-label='Cancel'],[aria-label='Отмена'],[data-testid='send-button-pending']")) {
+      return true;
+    }
+    if (document.querySelector(".animate-spin,[data-state='streaming'],[data-streaming='true'],.agy-streaming-indicator")) {
+      return true;
+    }
+    return false;
+  }
+
+  function startKeepAlive() {
+    if (isKeepAliveActive) return;
+    try {
+      if (!bgAudio) {
+        bgAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        bgAudio.loop = true;
+        bgAudio.volume = 0.001;
+      }
+      var p = bgAudio.play();
+      if (p && p.catch) p.catch(function () {});
+      isKeepAliveActive = true;
+    } catch (e) {}
+  }
+
+  function stopKeepAlive() {
+    if (!isKeepAliveActive) return;
+    try {
+      if (bgAudio) bgAudio.pause();
+      isKeepAliveActive = false;
+    } catch (e) {}
+  }
+
+  function checkBackgroundState() {
+    if (document.hidden) {
+      if (isChatRunning()) {
+        startKeepAlive();
+      }
+    } else {
+      if (!isChatRunning()) {
+        stopKeepAlive();
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", checkBackgroundState);
+  document.addEventListener("pointerdown", function (e) {
+    var t = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
+    if (t && t.closest && t.closest("[data-testid='send-button'],[data-testid='agent-input-box'] form")) {
+      startKeepAlive();
+    }
+  }, true);
+
+  setInterval(function () {
+    if (isChatRunning()) {
+      if (document.hidden) startKeepAlive();
+    } else {
+      if (isKeepAliveActive) stopKeepAlive();
+    }
+  }, 1500);
+
   try { sessionStorage.removeItem("agy_composer_draft"); } catch (e) {}
 })();

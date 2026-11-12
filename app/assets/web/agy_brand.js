@@ -53,10 +53,96 @@
   ];
   var DEFAULT_COLOR = "#0b84ff";
 
+  var FONTS = [
+    {
+      id: "system",
+      ru: "Системный (По умолчанию)",
+      en: "System (Default)",
+      desc: "Roboto / MiSans / UI",
+      family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'MiSans', sans-serif",
+      license: "System",
+      isMono: false
+    },
+    {
+      id: "inter",
+      ru: "Inter",
+      en: "Inter",
+      desc: "Современный UI-гротеск",
+      family: "'Inter', system-ui, -apple-system, sans-serif",
+      license: "SIL OFL 1.1",
+      isMono: false
+    },
+    {
+      id: "jetbrains_mono",
+      ru: "JetBrains Mono",
+      en: "JetBrains Mono",
+      desc: "Шрифт разработчиков",
+      family: "'JetBrains Mono', ui-monospace, monospace",
+      license: "SIL OFL 1.1",
+      isMono: true
+    },
+    {
+      id: "fira_code",
+      ru: "Fira Code",
+      en: "Fira Code",
+      desc: "Моноширинный с лигатурами",
+      family: "'Fira Code', ui-monospace, monospace",
+      license: "SIL OFL 1.1",
+      isMono: true
+    },
+    {
+      id: "roboto",
+      ru: "Roboto",
+      en: "Roboto",
+      desc: "Классический Android",
+      family: "'Roboto', 'RobotoFlex', sans-serif",
+      license: "Apache 2.0",
+      isMono: false
+    },
+    {
+      id: "geist",
+      ru: "Geist",
+      en: "Geist",
+      desc: "Чистый технический",
+      family: "'Geist', sans-serif",
+      license: "SIL OFL 1.1",
+      isMono: false
+    },
+    {
+      id: "montserrat",
+      ru: "Montserrat",
+      en: "Montserrat",
+      desc: "Геометрический гротеск",
+      family: "'Montserrat', sans-serif",
+      license: "SIL OFL 1.1",
+      isMono: false
+    },
+    {
+      id: "ubuntu",
+      ru: "Ubuntu",
+      en: "Ubuntu",
+      desc: "Гуманистический гротеск",
+      family: "'Ubuntu', sans-serif",
+      license: "Ubuntu Font Licence",
+      isMono: false
+    },
+    {
+      id: "pt_root_ui",
+      ru: "PT Root UI",
+      en: "PT Root UI",
+      desc: "Создан для кириллицы",
+      family: "'PT Root UI', 'PT Sans', sans-serif",
+      license: "SIL OFL 1.1",
+      isMono: false
+    }
+  ];
+  var DEFAULT_FONT = "system";
+
   /* -------------------------------------------------------------- state */
   function loadCfg() {
     var raw = store(STORE_KEY);
-    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: true };
+    var savedFont = store("agyFontFamily");
+    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: true, font: savedFont || DEFAULT_FONT };
     if (raw) {
       try {
         var p = JSON.parse(raw);
@@ -64,20 +150,70 @@
           if (p.pack) cfg.pack = p.pack;
           if (p.color) cfg.color = p.color;
           if (p.recolorLogo !== undefined) cfg.recolorLogo = p.recolorLogo !== false;
+          if (p.font) cfg.font = p.font;
         }
       } catch (e) {}
     }
+    if (savedFont && FONTS.some(function (f) { return f.id === savedFont; })) cfg.font = savedFont;
     if (!PACKS.some(function (p) { return p.id === cfg.pack; })) cfg.pack = DEFAULT_PACK;
     if (!COLORS.some(function (c) { return c.hex.toLowerCase() === String(cfg.color).toLowerCase(); })) cfg.color = DEFAULT_COLOR;
+    if (!FONTS.some(function (f) { return f.id === cfg.font; })) cfg.font = DEFAULT_FONT;
     return cfg;
   }
   var cfg = loadCfg();
 
-  function saveCfg() { store(STORE_KEY, JSON.stringify(cfg)); }
+  function saveCfg() {
+    store(STORE_KEY, JSON.stringify(cfg));
+    store("agyFontFamily", cfg.font);
+  }
 
   window.__agyGetBrandAccent = function () {
     return cfg && cfg.color ? cfg.color : DEFAULT_COLOR;
   };
+
+  /* -------------------------------------------------------- font apply */
+  function applyFont(fontId) {
+    var f = FONTS.filter(function (x) { return x.id === fontId; })[0] || FONTS[0];
+    var root = document.documentElement;
+    var body = document.body;
+    if (!root) return;
+
+    var styleEl = document.getElementById("agy-font-override-css");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "agy-font-override-css";
+      (document.head || root).appendChild(styleEl);
+    }
+
+    if (f.id === "system") {
+      styleEl.textContent = "";
+      root.style.removeProperty("--default-font-family");
+      root.style.removeProperty("--font-sans");
+      root.style.removeProperty("--vscode-font-family");
+      if (body) {
+        body.style.removeProperty("font-family");
+      }
+    } else {
+      var cssRule =
+        ":root, html, body, button, input, select, textarea, .font-sans {\n" +
+        "  --default-font-family: " + f.family + " !important;\n" +
+        "  --font-sans: " + f.family + " !important;\n" +
+        "  --vscode-font-family: " + f.family + " !important;\n" +
+        "  font-family: " + f.family + " !important;\n" +
+        "}\n";
+      if (f.isMono) {
+        cssRule +=
+          "code, pre, .font-mono {\n" +
+          "  --default-mono-font-family: " + f.family + " !important;\n" +
+          "  --font-mono: " + f.family + " !important;\n" +
+          "  --editor-font-family: " + f.family + " !important;\n" +
+          "  font-family: " + f.family + " !important;\n" +
+          "}\n";
+      }
+      styleEl.textContent = cssRule;
+    }
+  }
+  window.__agyApplyFont = applyFont;
 
   /* ------------------------------------------------------- colour apply */
   function hexToRgb(hex) {
@@ -381,15 +517,199 @@
     c2.appendChild(cur);
     el.appendChild(c2);
 
+    /* ── Card 3: fonts ── */
+    var c3 = makeCard();
+    c3.appendChild(makeTitle(T("Шрифт интерфейса", "Interface font")));
+    c3.appendChild(makeNote(T(
+      "Шрифты, одинаково подходящие для английского и русского языка (полная поддержка кириллицы и латиницы), свободные от авторских прав (SIL OFL / Apache 2.0 / Ubuntu).",
+      "Fonts equally suited for English and Russian (full Latin and Cyrillic coverage), completely copyright-free (SIL OFL / Apache 2.0 / Ubuntu)."
+    )));
+
+    var currentFont = FONTS.filter(function (x) { return x.id === cfg.font; })[0] || FONTS[0];
+
+    var fontContainer = document.createElement("div");
+    fontContainer.style.cssText = "display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;margin-top:6px";
+
+    /* LEFT: Live Preview Box showing real-time changes */
+    var previewCol = document.createElement("div");
+    previewCol.id = "agy-font-preview-box";
+    previewCol.style.cssText = "flex:1 1 240px;min-width:200px;background:rgba(255,255,255,.03);border:1px solid rgba(127,127,127,.2);" +
+      "border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:all .15s";
+
+    var previewHead = document.createElement("div");
+    previewHead.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px";
+
+    var previewLabel = document.createElement("span");
+    previewLabel.style.cssText = "font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted-foreground,#888)";
+    previewLabel.textContent = T("Предпросмотр", "Live preview");
+    previewHead.appendChild(previewLabel);
+
+    var previewBadge = document.createElement("span");
+    previewBadge.id = "agy-font-preview-badge";
+    previewBadge.style.cssText = "font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(127,127,127,.15);color:var(--muted-foreground,#888);font-family:monospace";
+    previewBadge.textContent = currentFont.license;
+    previewHead.appendChild(previewBadge);
+    previewCol.appendChild(previewHead);
+
+    var previewText = document.createElement("div");
+    previewText.id = "agy-font-preview-text";
+    previewText.style.cssText = "font-size:13.5px;line-height:1.45;color:var(--foreground,#eee);font-family:" + currentFont.family;
+    previewText.innerHTML =
+      "<strong>Leostryx AI</strong> — умный агент для Android.<br>" +
+      "The quick brown fox jumps over the lazy dog.<br>" +
+      "<span style='font-size:11.5px;opacity:0.8'>0123456789 • АБВГДЕёжзийклмноп • ABCDEF • { ok: true }</span>";
+    previewCol.appendChild(previewText);
+
+    fontContainer.appendChild(previewCol);
+
+    /* RIGHT: Button with Dropdown List */
+    var selectCol = document.createElement("div");
+    selectCol.style.cssText = "flex:0 1 210px;min-width:170px;position:relative;display:flex;flex-direction:column;justify-content:center";
+
+    var fontBtn = document.createElement("button");
+    fontBtn.type = "button";
+    fontBtn.id = "agy-font-select-btn";
+    fontBtn.setAttribute("aria-haspopup", "listbox");
+    fontBtn.setAttribute("aria-expanded", "false");
+    fontBtn.style.cssText = "width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;" +
+      "background:var(--secondary,rgba(255,255,255,.05));border:1px solid rgba(127,127,127,.25);border-radius:12px;" +
+      "color:var(--foreground,#eee);font-size:13.5px;font-weight:500;cursor:pointer;transition:border-color .15s, background .15s";
+
+    var btnContent = document.createElement("div");
+    btnContent.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;text-align:left;overflow:hidden";
+
+    var btnTitle = document.createElement("span");
+    btnTitle.id = "agy-font-btn-title";
+    btnTitle.style.cssText = "font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px";
+    btnTitle.textContent = T(currentFont.ru, currentFont.en);
+    btnContent.appendChild(btnTitle);
+
+    var btnSub = document.createElement("span");
+    btnSub.id = "agy-font-btn-sub";
+    btnSub.style.cssText = "font-size:11px;color:var(--muted-foreground,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px";
+    btnSub.textContent = currentFont.license;
+    btnContent.appendChild(btnSub);
+
+    fontBtn.appendChild(btnContent);
+
+    var arrowIcon = document.createElement("span");
+    arrowIcon.style.cssText = "flex-shrink:0;opacity:0.7;display:inline-flex";
+    arrowIcon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    fontBtn.appendChild(arrowIcon);
+
+    selectCol.appendChild(fontBtn);
+
+    /* Dropdown Popover */
+    var dropdown = document.createElement("div");
+    dropdown.id = "agy-font-dropdown";
+    dropdown.setAttribute("role", "listbox");
+    dropdown.style.cssText = "display:none;position:absolute;top:calc(100% + 6px);right:0;width:max-content;min-width:240px;max-width:320px;" +
+      "max-height:280px;overflow-y:auto;z-index:9999;border-radius:14px;background:var(--agy-glass-surface,rgba(24,24,28,.95));" +
+      "backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--agy-glass-border,rgba(127,127,127,.25));" +
+      "box-shadow:var(--agy-glass-shadow,0 16px 40px rgba(0,0,0,.5));padding:6px;box-sizing:border-box";
+
+    FONTS.forEach(function (f) {
+      var isSel = f.id === cfg.font;
+      var item = document.createElement("div");
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", isSel ? "true" : "false");
+      item.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:8px;" +
+        "cursor:pointer;transition:background .12s;background:" + (isSel ? "var(--agy-glass-item-hover,rgba(255,255,255,.08))" : "transparent");
+
+      var itemInfo = document.createElement("div");
+      itemInfo.style.cssText = "display:flex;flex-direction:column;gap:1px;text-align:left";
+
+      var itemTitle = document.createElement("span");
+      itemTitle.style.cssText = "font-size:13px;font-weight:" + (isSel ? "600" : "500") + ";color:var(--foreground,#eee);font-family:" + f.family;
+      itemTitle.textContent = T(f.ru, f.en);
+      itemInfo.appendChild(itemTitle);
+
+      var itemDesc = document.createElement("span");
+      itemDesc.style.cssText = "font-size:10.5px;color:var(--muted-foreground,#888)";
+      itemDesc.textContent = f.desc + " · " + f.license;
+      itemInfo.appendChild(itemDesc);
+
+      item.appendChild(itemInfo);
+
+      if (isSel) {
+        var check = document.createElement("span");
+        check.style.cssText = "color:" + cfg.color + ";font-size:13px;font-weight:700";
+        check.textContent = "✓";
+        item.appendChild(check);
+      }
+
+      item.onmouseenter = function () {
+        if (!isSel) item.style.background = "var(--agy-glass-item-hover,rgba(255,255,255,.05))";
+      };
+      item.onmouseleave = function () {
+        if (!isSel) item.style.background = "transparent";
+      };
+
+      item.onclick = function (e) {
+        e.stopPropagation();
+        cfg.font = f.id;
+        saveCfg();
+        store("agyFontFamily", f.id);
+        applyFont(f.id);
+
+        dropdown.style.display = "none";
+        fontBtn.setAttribute("aria-expanded", "false");
+
+        previewText.style.fontFamily = f.family;
+        previewBadge.textContent = f.license;
+        btnTitle.textContent = T(f.ru, f.en);
+        btnSub.textContent = f.license;
+
+        render(el);
+
+        var s = document.getElementById("agy-brand-status");
+        if (s) {
+          s.textContent = T("Шрифт применён: ", "Font applied: ") + T(f.ru, f.en) + " (" + f.license + ")";
+          s.style.color = "#10b981";
+        }
+      };
+
+      dropdown.appendChild(item);
+    });
+
+    selectCol.appendChild(dropdown);
+
+    fontBtn.onclick = function (e) {
+      e.stopPropagation();
+      var open = dropdown.style.display === "block";
+      dropdown.style.display = open ? "none" : "block";
+      fontBtn.setAttribute("aria-expanded", open ? "false" : "true");
+    };
+
+    document.addEventListener("pointerdown", function (e) {
+      if (dropdown.style.display === "block" && !selectCol.contains(e.target)) {
+        dropdown.style.display = "none";
+        fontBtn.setAttribute("aria-expanded", "false");
+      }
+    }, true);
+
+    fontContainer.appendChild(selectCol);
+    c3.appendChild(fontContainer);
+    el.appendChild(c3);
+
     /* ── status ── */
     var st = document.createElement("div");
     st.id = "agy-brand-status";
     st.style.cssText = "font-size:12.5px;line-height:1.5;color:#999;min-height:18px;padding:0 2px";
     st.textContent = T(
-      "Логотип: " + packName(cfg.pack) + " · Цвет: " + cfg.color.toUpperCase(),
-      "Logo: " + packNameEn(cfg.pack) + " · Colour: " + cfg.color.toUpperCase()
+      "Логотип: " + packName(cfg.pack) + " · Цвет: " + cfg.color.toUpperCase() + " · Шрифт: " + fontName(cfg.font),
+      "Logo: " + packNameEn(cfg.pack) + " · Colour: " + cfg.color.toUpperCase() + " · Font: " + fontNameEn(cfg.font)
     );
     el.appendChild(st);
+  }
+
+  function fontName(id) {
+    var f = FONTS.filter(function (x) { return x.id === id; })[0];
+    return f ? T(f.ru, f.en) : id;
+  }
+  function fontNameEn(id) {
+    var f = FONTS.filter(function (x) { return x.id === id; })[0];
+    return f ? f.en : id;
   }
 
   function packName(id) {
@@ -405,6 +725,7 @@
   window.__agyBrandMount = function (el) {
     if (!el) return;
     applyColor(cfg.color);
+    applyFont(cfg.font);
     if (el.getAttribute("data-brand-mounted") === "1") { render(el); return; }
     el.setAttribute("data-brand-mounted", "1");
     el.style.cssText = "padding:4px 4px 24px;max-width:620px;box-sizing:border-box";
@@ -412,8 +733,12 @@
   };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { applyColor(cfg.color); });
+    document.addEventListener("DOMContentLoaded", function () {
+      applyColor(cfg.color);
+      applyFont(cfg.font);
+    });
   } else {
     applyColor(cfg.color);
+    applyFont(cfg.font);
   }
 })();
