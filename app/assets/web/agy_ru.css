@@ -80,12 +80,12 @@ body:not(.dark) {
   --popover: var(--agy-glass-surface);
 }
 
-/* Dark theme: цвет выбранной темы со стеклянной прозрачностью */
+/* Dark theme: цвет выбранной темы с лёгкой прозрачностью (88% плотности), как было до изменений */
 .dark,
-html.dark,
+html.dark:not(:has(body.theme-light)),
 body.dark,
 body.theme-dark {
-  --agy-glass-surface: rgba(24, 24, 28, 0.78);
+  --agy-glass-surface: rgba(24, 24, 28, 0.88);
   --agy-glass-border: color-mix(in srgb, var(--primary, #a3e635) 26%, rgba(255, 255, 255, 0.14));
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px color-mix(in srgb, var(--primary, #a3e635) 18%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #a3e635) 15%, transparent);
@@ -93,7 +93,21 @@ body.theme-dark {
   --popover: var(--agy-glass-surface);
 }
 
-/* Native modal dialogs & bottom sheets: glass surface in both themes */
+/* Light theme: 38% плотности, видимая чистая прозрачность как на эталонном фото */
+html.light,
+body.light,
+body.theme-light {
+  --agy-glass-surface: rgba(255, 255, 255, 0.38);
+  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 25%, rgba(0, 0, 0, 0.14));
+  --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
+  --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
+  --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 24%, transparent);
+  --popover: var(--agy-glass-surface);
+}
+
+/* Стиль: цвет выбранной темы + чистая прозрачность, БЕЗ backdrop-filter/blur (не мутное стекло). */
+/* Native modal dialogs & bottom sheets: чистая прозрачность в обеих темах */
+[role="dialog"],
 [role="dialog"][data-state="open"],
 [data-radix-dialog-content],
 [data-testid="bottom-sheet"] {
@@ -101,8 +115,8 @@ body.theme-dark {
   background-color: var(--agy-glass-surface) !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Fix keyboard hide filling & smooth chat transitions */
@@ -150,8 +164,8 @@ html[data-base-ui-scroll-locked] {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   transform: none !important;
   transition: opacity 120ms ease-out !important;
   overflow-x: hidden !important;
@@ -209,8 +223,8 @@ html[data-base-ui-scroll-locked] {
   border-radius: 12px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   max-width: calc(100vw - 12px) !important;
   box-sizing: border-box !important;
 }
@@ -259,8 +273,8 @@ html[data-base-ui-scroll-locked] {
   border-radius: 16px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   padding: 8px !important;
   box-sizing: border-box !important;
   z-index: 9000 !important;
@@ -279,16 +293,16 @@ html[data-base-ui-scroll-locked] {
   background: var(--agy-glass-surface) !important;
   border: 1px solid var(--agy-glass-border, var(--border, rgba(127,127,127,.3))) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .agy-providers .agy-pv-ddlist {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .agy-providers .agy-pv-ddlist .agy-pv-opt:hover,
 .agy-providers .agy-pv-ddlist .agy-pv-opt.sel {
@@ -308,10 +322,10 @@ html[data-base-ui-scroll-locked] {
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
-  [role="dialog"][data-state="open"],
+  [role="dialog"],
   [data-radix-dialog-content],
-  [data-testid="bottom-sheet"].agy-compact-sheet,
-  [data-testid="bottom-sheet"]:has([data-testid*="model-selector"]),
+  [data-testid="bottom-sheet"],
+  [data-testid="model-selector-panel"],
   #agy-shield,
   #agy-subagents-popover,
   #typeahead-menu,
@@ -394,8 +408,8 @@ html[data-base-ui-scroll-locked] {
   background-color: var(--agy-glass-surface) !important;
   border-top: 1px solid var(--agy-glass-border) !important;
   border-radius: 18px 18px 0 0 !important;
-  backdrop-filter: blur(12px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 [data-testid="bottom-sheet"] div:not([data-testid="model-selector-item"]):not([data-testid="model-selector-effort-group"]) {
   background-color: transparent !important;
@@ -968,7 +982,7 @@ html[data-base-ui-scroll-locked] {
 /* Antigravity Modal Dialogs */
 .agy-mcp-modal-overlay {
   position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,.6); backdrop-filter: blur(4px); padding: 16px;
+  background: rgba(0,0,0,.6); backdrop-filter: none; padding: 16px;
 }
 .agy-mcp-modal {
   width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; border-radius: 14px;
@@ -1159,7 +1173,7 @@ html[data-base-ui-scroll-locked] {
 
 .agy-cust-modal-overlay {
   position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,.6); backdrop-filter: blur(4px); padding: 16px;
+  background: rgba(0,0,0,.6); backdrop-filter: none; padding: 16px;
 }
 .agy-cust-modal {
   width: 100%; max-width: 500px; max-height: 88vh; overflow-y: auto; border-radius: 14px;
@@ -1169,8 +1183,8 @@ html[data-base-ui-scroll-locked] {
   border: 1px solid var(--agy-glass-border, var(--border, rgba(127,127,127,.3)));
   padding: 18px; box-sizing: border-box;
   box-shadow: var(--agy-glass-shadow, 0 16px 36px rgba(0,0,0,.5));
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex; flex-direction: column; gap: 12px;
 }
 .agy-cust-modal-title { font-size: 15px; font-weight: 600; color: var(--foreground); }

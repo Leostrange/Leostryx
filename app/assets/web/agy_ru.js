@@ -43,7 +43,6 @@
     var doc = document.documentElement;
     var body = document.body;
     if (!doc) return;
-    var isDark = doc.classList.contains("dark") || (body && body.classList.contains("dark")) || (!doc.classList.contains("light") && (!body || !body.classList.contains("theme-light")));
     var bg = (doc.style && doc.style.getPropertyValue("--background")) || "";
     var fg = (doc.style && doc.style.getPropertyValue("--foreground")) || "";
     var primary = (doc.style && doc.style.getPropertyValue("--primary")) || "";
@@ -63,6 +62,20 @@
 
     bg = bg.trim();
     fg = fg.trim();
+
+    // Надёжное определение тёмной/светлой темы:
+    // 1. Проверяем классы document.body (main.js переключает theme-light / theme-dark именно на body)
+    // 2. Вычисляем яркость фона (lum < 128)
+    var isLight = !!(body && (body.classList.contains("theme-light") || body.classList.contains("light")));
+    var isDarkExplicit = !!(body && (body.classList.contains("dark") || body.classList.contains("theme-dark") || body.classList.contains("dark-theme")));
+    var tempBgRgb = parseColorToRgb(bg, { r: 24, g: 24, b: 28 });
+    var lum = (tempBgRgb.r * 299 + tempBgRgb.g * 587 + tempBgRgb.b * 114) / 1000;
+    var isDark = isLight ? false : (isDarkExplicit ? true : lum < 128);
+
+    // Синхронизируем documentElement.classList со значением темы, чтобы CSS-селекторы html.light и html.dark работали безупречно
+    doc.classList.toggle("dark", isDark);
+    doc.classList.toggle("light", !isDark);
+
     primary = primary.trim() || (isDark ? "#a3e635" : "#0b84ff");
 
     if (bg === lastGlassBg && fg === lastGlassFg && isDark === lastGlassDark && primary === lastGlassPrimary) return;
@@ -75,13 +88,12 @@
     var fgRgb = parseColorToRgb(fg, isDark ? { r: 220, g: 220, b: 220 } : { r: 20, g: 20, b: 20 });
     var priRgb = parseColorToRgb(primary, isDark ? { r: 163, g: 230, b: 53 } : { r: 11, g: 132, b: 255 });
 
-    // Цвет выбранной темы (Dracula, Monokai, Gruvbox, Catppuccin, Light, Dark)
-    // с выразительной прозрачностью стекла (0.38 для светлых тем, 0.78 для тёмных).
-    // Текст остаётся контрастным, а подложка красиво просвечивает с эффектом размытия!
+    // Тёмная тема: плотность 88% цвета темы, чистая прозрачность БЕЗ мутного блюра ("не тупо стекло").
+    // Светлая тема: плотность 38%, выразительная прозрачность как на эталонном фото.
     var sR = bgRgb.r;
     var sG = bgRgb.g;
     var sB = bgRgb.b;
-    var alpha = isDark ? 0.78 : 0.38;
+    var alpha = isDark ? 0.88 : 0.38;
     var surface = "rgba(" + sR + ", " + sG + ", " + sB + ", " + alpha + ")";
 
     var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "25%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.14)") + ")";
