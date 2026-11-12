@@ -71,25 +71,25 @@
     lastGlassDark = isDark;
     lastGlassPrimary = primary;
 
-    var bgRgb = parseColorToRgb(bg, isDark ? { r: 24, g: 24, b: 28 } : { r: 250, g: 250, b: 252 });
+    var bgRgb = parseColorToRgb(bg, isDark ? { r: 24, g: 24, b: 28 } : { r: 255, g: 255, b: 255 });
     var fgRgb = parseColorToRgb(fg, isDark ? { r: 220, g: 220, b: 220 } : { r: 20, g: 20, b: 20 });
     var priRgb = parseColorToRgb(primary, isDark ? { r: 163, g: 230, b: 53 } : { r: 11, g: 132, b: 255 });
 
     // Цвет выбранной темы (Dracula, Monokai, Gruvbox, Catppuccin, Light, Dark)
-    // с ЛЁГКОЙ прозрачностью (88% плотности цвета темы, 12% прозрачности).
-    // Текст никогда не накладывается и не сливается, цвет темы и акцентный цвет чётко видны!
+    // с выразительной прозрачностью стекла (0.58 для светлых тем, 0.78 для тёмных).
+    // Текст остаётся контрастным, а подложка красиво просвечивает с эффектом размытия!
     var sR = bgRgb.r;
     var sG = bgRgb.g;
     var sB = bgRgb.b;
-    var alpha = isDark ? 0.88 : 0.92;
+    var alpha = isDark ? 0.78 : 0.58;
     var surface = "rgba(" + sR + ", " + sG + ", " + sB + ", " + alpha + ")";
 
-    var border = "color-mix(in srgb, " + primary + " 26%, " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.12)") + ")";
-    var hover = "color-mix(in srgb, " + primary + " 15%, transparent)";
-    var active = "color-mix(in srgb, " + primary + " 26%, transparent)";
+    var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "24%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.12)") + ")";
+    var hover = "color-mix(in srgb, " + primary + " " + (isDark ? "15%" : "12%") + ", transparent)";
+    var active = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "22%") + ", transparent)";
     var shadow = isDark
       ? "0 18px 46px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px color-mix(in srgb, " + primary + " 18%, transparent)"
-      : "0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, " + primary + " 14%, transparent)";
+      : "0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, " + primary + " 12%, transparent)";
 
     [doc, body].forEach(function (el) {
       if (!el || !el.style) return;

@@ -72,20 +72,20 @@ html.light,
 html:not(.dark),
 body.theme-light,
 body:not(.dark) {
-  --agy-glass-surface: rgba(250, 250, 252, 0.92);
-  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 22%, rgba(0, 0, 0, 0.12));
+  --agy-glass-surface: rgba(255, 255, 255, 0.58);
+  --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 24%, rgba(0, 0, 0, 0.12));
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 12%, transparent);
   --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 22%, transparent);
   --popover: var(--agy-glass-surface);
 }
 
-/* Dark theme: цвет выбранной темы с лёгкой прозрачностью (88% плотности) */
+/* Dark theme: цвет выбранной темы со стеклянной прозрачностью */
 .dark,
 html.dark,
 body.dark,
 body.theme-dark {
-  --agy-glass-surface: rgba(24, 24, 28, 0.88);
+  --agy-glass-surface: rgba(24, 24, 28, 0.78);
   --agy-glass-border: color-mix(in srgb, var(--primary, #a3e635) 26%, rgba(255, 255, 255, 0.14));
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px color-mix(in srgb, var(--primary, #a3e635) 18%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #a3e635) 15%, transparent);
@@ -93,8 +93,6 @@ body.theme-dark {
   --popover: var(--agy-glass-surface);
 }
 
-/* Стиль v3.0.1: цвет выбранной темы + лёгкая прозрачность, БЕЗ backdrop-filter/blur.
-   Оригинальный подход — color-mix(in srgb, var(--popover) 90%, transparent). */
 /* Native modal dialogs & bottom sheets: glass surface in both themes */
 [role="dialog"][data-state="open"],
 [data-radix-dialog-content],
@@ -103,6 +101,8 @@ body.theme-dark {
   background-color: var(--agy-glass-surface) !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
 }
 
 /* Fix keyboard hide filling & smooth chat transitions */
@@ -142,6 +142,8 @@ body {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
   box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
   transform: none !important;
   transition: opacity 120ms ease-out !important;
   overflow-x: hidden !important;
@@ -185,19 +187,22 @@ body {
   [role="listbox"],
   [data-select-popup],
   [data-testid="context-menu-popup"],
+  [class*="animate-slideIn"],
   .z-\[6000\] > *,
-  .z-\[6000\] [class*="animate-slideIn"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
   .typeahead-popover,
-  #typeahead-menu
+  #typeahead-menu,
+  #agy-font-dropdown
 ) {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
   border-radius: 12px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
   max-width: calc(100vw - 12px) !important;
   box-sizing: border-box !important;
 }
@@ -246,6 +251,8 @@ body {
   border-radius: 16px !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
   padding: 8px !important;
   box-sizing: border-box !important;
   z-index: 9000 !important;
@@ -265,6 +272,8 @@ body {
   background-color: var(--agy-glass-surface) !important;
   border: 1px solid var(--agy-glass-border) !important;
   box-shadow: var(--agy-glass-shadow) !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
 }
 .agy-providers .agy-pv-ddlist .agy-pv-opt:hover,
 .agy-providers .agy-pv-ddlist .agy-pv-opt.sel {
@@ -279,8 +288,8 @@ body {
   [role="listbox"],
   [data-select-popup],
   [data-testid="context-menu-popup"],
+  [class*="animate-slideIn"],
   .z-\[6000\] > *,
-  .z-\[6000\] [class*="animate-slideIn"],
   [data-radix-popper-content-wrapper] > *,
   [data-radix-menu-content],
   [data-radix-select-content],
@@ -290,7 +299,8 @@ body {
   [data-testid="bottom-sheet"]:has([data-testid*="model-selector"]),
   #agy-shield,
   #agy-subagents-popover,
-  #typeahead-menu
+  #typeahead-menu,
+  #agy-font-dropdown
 ) :is(div, ul, section, header, nav, main, footer, span, td):not([role="menu"]):not([role="menuitem"]):not([role="option"]):not([role="menuitemradio"]):not([role="menuitemcheckbox"]):not([data-testid="model-selector-item"]):not([class*="badge"]):not([class*="tag"]):not([data-active="true"]):not(.agy-pv-opt):not([class*="bg-"] > button):not(button):not([style*="background"]):not([style*="background-color"]):not([data-color]):not([data-color-value]):not(.color-swatch):not([class*="swatch"]):not([class*="picker"]) {
   background-color: transparent !important;
   background: transparent !important;
@@ -369,6 +379,8 @@ body {
   background-color: var(--agy-glass-surface) !important;
   border-top: 1px solid var(--agy-glass-border) !important;
   border-radius: 18px 18px 0 0 !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
 }
 [data-testid="bottom-sheet"] div:not([data-testid="model-selector-item"]):not([data-testid="model-selector-effort-group"]) {
   background-color: transparent !important;
