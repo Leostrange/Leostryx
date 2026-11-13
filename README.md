@@ -192,6 +192,24 @@ python3 rebuild.py bypass     # только bypass
 
 Все правки интерфейса лежат в `app/assets/web/` — после изменений достаточно пересобрать.
 
+### Чем отличаются variants и как это проверить
+
+`standard` собирается из `app/` как есть, `bypass` — из `app/` с наложением дельты `variants/bypass/`: `assets/runtime/manifest.json` и `assets/runtime/bin/liblanguage_server.so`. Оба этих файла в git **не хранятся** (лимит GitHub 100 МБ), поэтому `app/` должен содержать **standard**-ядро, а `variants/bypass/` — патченное.
+
+Если в `app/` случайно окажется bypass-ядро, обе сборки выйдут побайтово одинаковыми. Проверка после сборки:
+
+```bash
+sha256sum dist/signed/standard.apk dist/signed/bypass.apk      # хеши должны различаться
+unzip -p dist/signed/standard.apk assets/runtime/bin/liblanguage_server.so | sha256sum  # == значение в manifest.json этого APK
+unzip -p dist/signed/bypass.apk   assets/runtime/bin/liblanguage_server.so | sha256sum
+```
+
+Хеш ядра внутри каждого APK обязан совпадать со строкой `bin/liblanguage_server.so` в его же `assets/runtime/manifest.json`.
+
+### Финализация артефактов
+
+Переименование в `Leostryx-<version>-<variant>.apk`, обновление mtime и копирование в каталог проекта применяются **только к вариантам, собранным в текущем запуске**. Несобранный вариант не трогается: иначе старый бинарник получил бы свежий mtime и выглядел бы актуальным. `SHA256SUMS.txt` при этом всегда перечисляет **все** присутствующие APK версии, чтобы сборка одного варианта не вычёркивала второй из списка.
+
 ## Лицензия
 
 Код проекта распространяется по лицензии [Apache 2.0](LICENSE). Antigravity, Gemini и сторонние компоненты принадлежат соответствующим авторам и распространяются по их собственным лицензиям. Оригинальный проект: [werdio325-png/antigravity-android](https://github.com/werdio325-png/antigravity-android).

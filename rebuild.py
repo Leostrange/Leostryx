@@ -13,6 +13,11 @@
   python3 rebuild.py standard
   python3 rebuild.py bypass
 Результат: dist/signed/<name>.apk
+
+Финализация (переименование в Leostryx-<version>-<name>.apk, mtime, SHA256SUMS,
+копирование в каталог проекта) применяется ТОЛЬКО к вариантам, собранным в этом
+запуске. Несобранный вариант остаётся нетронутым: иначе старый бинарник получил бы
+свежий mtime и строку в контрольных суммах, то есть выглядел бы актуальным.
 """
 import json
 import os
@@ -184,9 +189,12 @@ def main():
     version = "3.1.0"
     signed_dir = ROOT / "dist/signed"
     parent_dir = ROOT.parent
+    built = [name for name, _ in jobs]
 
-    # 1. Versioned APKs with fresh mtime
-    for kind in ("standard", "bypass"):
+    # 1. Versioned APKs with fresh mtime. Only the variants built in this run
+    # are refreshed: touching an unbuilt one would give a stale binary a fresh
+    # mtime and a matching checksum entry, so it looks valid when it is not.
+    for kind in built:
         src_apk = signed_dir / f"{kind}.apk"
         src_idsig = signed_dir / f"{kind}.apk.idsig"
         target_apk = signed_dir / f"Leostryx-{version}-{kind}.apk"
@@ -211,16 +219,16 @@ def main():
     ], cwd=str(ROOT))
     os.utime(zip_path, None)
 
-    # 3. Checksums
+    # Checksums cover every variant that is present, so building one variant
+    # never drops the other one from the published list.
     sums_path = signed_dir / f"SHA256SUMS-{version}.txt"
     sums_plain = signed_dir / "SHA256SUMS.txt"
+    present = [f"Leostryx-{version}-{k}.apk" for k in ("standard", "bypass")
+               if (signed_dir / f"Leostryx-{version}-{k}.apk").exists()]
     with open(sums_path, "w", encoding="utf-8") as sf:
-        subprocess.check_call([
-            "sha256sum",
-            f"Leostryx-{version}-standard.apk",
-            f"Leostryx-{version}-bypass.apk",
-            "Leostryx-repo.zip",
-        ], cwd=str(signed_dir), stdout=sf)
+        subprocess.check_call(
+            ["sha256sum"] + present + ["Leostryx-repo.zip"],
+            cwd=str(signed_dir), stdout=sf)
     shutil.copy2(sums_path, sums_plain)
     os.utime(sums_path, None)
     os.utime(sums_plain, None)
@@ -231,11 +239,11 @@ def main():
         if p.exists():
             p.unlink()
 
-    for item in [
-        f"Leostryx-{version}-standard.apk",
-        f"Leostryx-{version}-standard.apk.idsig",
-        f"Leostryx-{version}-bypass.apk",
-        f"Leostryx-{version}-bypass.apk.idsig",
+    artifacts = []
+    for kind in built:
+        artifacts.append(f"Leostryx-{version}-{kind}.apk")
+        artifacts.append(f"Leostryx-{version}-{kind}.apk.idsig")
+    for item in artifacts + [
         "Leostryx-repo.zip",
         f"SHA256SUMS-{version}.txt",
         "SHA256SUMS.txt"
