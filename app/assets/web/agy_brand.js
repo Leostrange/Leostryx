@@ -605,7 +605,7 @@
     dropdown.setAttribute("role", "listbox");
     dropdown.style.cssText = "display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;width:100%;" +
       "max-height:280px;overflow-y:auto;z-index:9999;border-radius:14px;background:var(--agy-glass-surface,rgba(24,24,28,.95));" +
-      "backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--agy-glass-border,rgba(127,127,127,.25));" +
+      "border:1px solid var(--agy-glass-border,rgba(127,127,127,.25));" +
       "box-shadow:var(--agy-glass-shadow,0 16px 40px rgba(0,0,0,.5));padding:6px;box-sizing:border-box";
 
     FONTS.forEach(function (f) {

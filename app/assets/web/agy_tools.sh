@@ -3014,7 +3014,72 @@ except Exception as e:
 PYUD
 }
 
+# ------------------------------------------------------------ power / doze
+# Background sessions die when the OS suspends the app's network. On MIUI/HyperOS
+# `mDozeAfterScreenOff=true`, so Doze (and its network block) starts the moment
+# the screen turns off. Three independent gates decide whether the app may keep
+# running; all three are set here, idempotently:
+#   1. Doze / battery-optimisation whitelist   (`deviceidle whitelist`)
+#   2. App-standby bucket                        (`am set-standby-bucket exempted`)
+#   3. Background app-ops                        (`RUN_ANY_IN_BACKGROUND allow`)
+# With Shizuku present this needs no user prompt. Without it we report `unknown`
+# (never `no`) so the UI does not raise a false "battery optimisation is ON".
+op_power() {
+    local pkg="${AGY_APPLICATION_ID:-com.agyru.t2}"
+    local rish_bin="" cand="" out="" state="unknown" bucket="" doze=""
+
+    for cand in "$(command -v rish 2>/dev/null || true)" \
+                "${PREFIX:-}/bin/rish" \
+                "${HOME:-}/usr/bin/rish"; do
+        if [ -n "$cand" ] && [ -x "$cand" ]; then rish_bin="$cand"; break; fi
+    done
+
+    if [ -z "$rish_bin" ]; then
+        say "@@power pkg=$pkg whitelisted=unknown reason=no-rish"
+        say "@@done"
+        return 0
+    fi
+
+    # 1) Doze / battery-optimisation whitelist. Match the package name as a
+    # substring — the whitelist prints lines like "user,$pkg,10586".
+    out="$(timeout 12 "$rish_bin" -c "dumpsys deviceidle whitelist" 2>/dev/null | tr -d '\r')"
+    case "$out" in
+        *"$pkg"*) state="yes" ;;
+        "")       state="unknown" ;;
+        *)        state="no" ;;
+    esac
+    if [ "$state" = "no" ]; then
+        timeout 12 "$rish_bin" -c "cmd deviceidle whitelist +$pkg" >/dev/null 2>&1
+        out="$(timeout 12 "$rish_bin" -c "dumpsys deviceidle whitelist" 2>/dev/null | tr -d '\r')"
+        case "$out" in
+            *"$pkg"*) state="yes" ;;
+            "")       state="unknown" ;;
+            *)        state="no" ;;
+        esac
+    fi
+
+    # 2) App-standby bucket: 5 == EXEMPTED.
+    bucket="$(timeout 8 "$rish_bin" -c "am get-standby-bucket $pkg" 2>/dev/null | tr -dc '0-9' | head -c 3)"
+    if [ -n "$bucket" ] && [ "$bucket" != "5" ]; then
+        timeout 8 "$rish_bin" -c "am set-standby-bucket $pkg exempted" >/dev/null 2>&1
+        bucket="$(timeout 8 "$rish_bin" -c "am get-standby-bucket $pkg" 2>/dev/null | tr -dc '0-9' | head -c 3)"
+    fi
+
+    # 3) Background app-ops (best effort; some builds reject the second name).
+    timeout 8 "$rish_bin" -c "cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow" >/dev/null 2>&1
+    timeout 8 "$rish_bin" -c "cmd appops set $pkg RUN_IN_BACKGROUND allow" >/dev/null 2>&1
+
+    doze="$(timeout 8 "$rish_bin" -c "dumpsys power" 2>/dev/null \
+        | grep -m1 mDozeAfterScreenOff \
+        | sed -n 's/.*\(mDozeAfterScreenOff=[A-Za-z0-9]*\).*/\1/p' | head -1)"
+
+    say "@@power pkg=$pkg whitelisted=$state bucket=${bucket:-unknown}"
+    [ -n "$doze" ] && say "@@power doze=$doze"
+    say "@@done"
+}
+
 case "$OP" in
+    power)          op_power ;;      # AGY-POWER
     termopen)       op_termopen ;;
     terminput)      op_terminput ;;
     termkill)       op_termkill ;;  # AGY-P2-15

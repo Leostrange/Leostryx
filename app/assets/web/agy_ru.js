@@ -86,15 +86,26 @@
 
     var bgRgb = parseColorToRgb(bg, isDark ? { r: 24, g: 24, b: 28 } : { r: 255, g: 255, b: 255 });
     var fgRgb = parseColorToRgb(fg, isDark ? { r: 220, g: 220, b: 220 } : { r: 20, g: 20, b: 20 });
-    var priRgb = parseColorToRgb(primary, isDark ? { r: 163, g: 230, b: 53 } : { r: 11, g: 132, b: 255 });
 
-    // Тёмная тема: плотность 88% цвета темы, чистая прозрачность БЕЗ мутного блюра ("не тупо стекло").
-    // Светлая тема: плотность 38%, выразительная прозрачность как на эталонном фото.
+    // Чистая прозрачность (релиз 3.1.0): тёмные 0.88, светлые 0.72.
+    // Цвет поверхности — ровно --background активной темы, БЕЗ подмешивания
+    // акцента: оттенок стекла обязан совпадать с фоном темы (Monokai, Dracula,
+    // Nord и т.д. уже сами задают нужный тон). --primary остаётся только в
+    // рамке, ховере, активном состоянии и тени.
+    // Светлое стекло затемняем на 12%: белое на белой странице выглядит
+    // полностью непрозрачным, затемнение делает прозрачность видимой.
     var sR = bgRgb.r;
     var sG = bgRgb.g;
     var sB = bgRgb.b;
-    var alpha = isDark ? 0.88 : 0.38;
-    var surface = "rgba(" + sR + ", " + sG + ", " + sB + ", " + alpha + ")";
+    if (!isDark) {
+      var k = 0.12;
+      sR = sR * (1 - k);
+      sG = sG * (1 - k);
+      sB = sB * (1 - k);
+    }
+    var alpha = isDark ? 0.88 : 0.72;
+    var surface = "rgba(" + Math.round(sR) + ", " + Math.round(sG) + ", " +
+      Math.round(sB) + ", " + alpha + ")";
 
     var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "25%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.14)") + ")";
     var hover = "color-mix(in srgb, " + primary + " " + (isDark ? "15%" : "14%") + ", transparent)";
@@ -235,6 +246,10 @@
     var item = t.closest("[role='menuitem'],[role='option'],button");
     var label = item ? (item.textContent || "").trim() : "";
     var needsInput = /^(Mentions|Actions|Browser|Упоминания|Действия|Браузер)$/.test(label);
+    /* File picker (Media/Folder) needs a clean user-gesture context on Android.
+       If we blur/block here, input.click() won't open the system file dialog.
+       Return early — let React's onClick handle everything. */
+    if (/^(Media|Медиа|Folder|Папка)$/.test(label)) return;
     var onEditor = isEditor(t) || !!t.closest(BOX + " [contenteditable='true']");
     var onControls = !!t.closest(MENUISH) || !!t.closest("#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']");
 
@@ -269,11 +284,154 @@
         var n = added[j];
         if (n.nodeType === 1 && (n.matches("[data-testid='input-attachment']") || n.querySelector("[data-testid='input-attachment']"))) {
           guard = { t: 0, block: false };
+          setTimeout(focusEditor, 120);
           return;
         }
       }
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
+
+  /* ---- Focus the chat input (after an action / after an attachment) ------ */
+  function focusEditor() {
+    var box = document.querySelector(BOX);
+    if (!box) return;
+    var el = box.querySelector("[contenteditable='true']");
+    if (!el || box.contains(document.activeElement)) return;
+    guard = { t: 0, block: false };
+    try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (_) {} }
+  }
+
+  /* ---- Attach: Media must be as fast as Folder ---------------------------
+   * `Folder` creates a *bare* <input type=file> (no accept) and Chromium hands
+   * it to DocumentsUI at once. `Media` reuses the composer input; if that input
+   * carries a long accept list (~80 MIME entries) the WebView resolves every
+   * entry before the chooser is created — that is the visible delay.
+   * The fix lives in the bundle (`generated/main.js`: PYb is the wildcard MIME),
+   * so normally nothing is intercepted here. This listener is only a safety net
+   * for a bundle update that brings the heavy list back: collapse `accept` to the
+   * wildcard MIME and let the native path run unchanged.
+   *
+   * IMPORTANT: never preventDefault / stopPropagation on this click. React's
+   * onClick is what calls input.click(); cancelling it (the old fast-picker
+   * workaround did exactly that) leaves the dialog closed when the synthetic
+   * picker fails, which is worse than the delay it tried to remove.
+   * MainActivity.onShowFileChooser ignores `accept` entirely (always
+   * ACTION_OPEN_DOCUMENT + ALLOW_MULTIPLE), so both entries behave identically. */
+  function composerFileInput() {
+    var box = document.querySelector(BOX) || document;
+    var list;
+    try { list = box.querySelectorAll("input[type='file']"); } catch (e) { return null; }
+    for (var i = 0; i < list.length; i++) {
+      if (!list[i].hasAttribute("webkitdirectory")) return list[i];
+    }
+    return null;
+  }
+
+  var MEDIA_LABEL = /^(Media|Медиа)$/;
+  var ACTION_LABEL = /^(Mentions|Actions|Browser|Упоминания|Действия|Браузер)$/;
+
+  function menuItemOf(el) {
+    if (!el || !el.closest) return null;
+    return el.closest("[role='menuitem'],[role='option']") ||
+      el.closest("[role='menu'] button,[data-testid='bottom-sheet'] button");
+  }
+
+  document.addEventListener("click", function (e) {
+    var item = menuItemOf(e.target);
+    if (!item) return;
+    var label = (item.textContent || "").trim();
+    if (MEDIA_LABEL.test(label)) {
+      var target = composerFileInput();
+      var accept = target ? (target.getAttribute("accept") || "").trim() : "";
+      if (accept.length > 40 && accept !== "*/*") {
+        /* Heavy MIME list came back (bundle update): drop it. The native
+           chooser ignores accept, so this only removes the pre-dialog stall. */
+        target.setAttribute("accept", "*/*");
+      }
+      return;
+    }
+    /* Mentions / Actions / Browser insert a chip — the user types next, so the
+       keyboard must come back without an extra tap. */
+    if (ACTION_LABEL.test(label)) setTimeout(focusEditor, 140);
+  }, true);
+
+  /* ---- Mention chip (/browser, @file …) is removable -------------------- */
+  var CHIP_SEL = "[data-beautiful-mention],[data-lexical-beautiful-mention]";
+
+  function chipText(chip) {
+    var holder = chip.parentElement && chip.parentElement.closest
+      ? chip.parentElement : chip;
+    return ((holder.textContent || chip.textContent || "")).trim();
+  }
+
+  function removeMentionNode(root, label) {
+    var editor = root.__lexicalEditor;
+    if (!editor || typeof editor.update !== "function") return false;
+    var removed = false;
+    try {
+      editor.update(function () {
+        var map = editor.getEditorState()._nodeMap;
+        var victims = [];
+        map.forEach(function (node) {
+          try {
+            if (node && typeof node.getType === "function" &&
+                node.getType() === "beautifulMention" &&
+                (node.getTextContent() || "").trim() === label) victims.push(node.getKey());
+          } catch (e) {}
+        });
+        for (var i = 0; i < victims.length; i++) {
+          var node = map.get(victims[i]);
+          try { node.remove(); removed = true; } catch (e) {}
+        }
+      }, { discrete: true });
+    } catch (e) { return false; }
+    return removed;
+  }
+
+  function caretAfter(chip, root) {
+    try {
+      var sel = window.getSelection();
+      var r = document.createRange();
+      r.setStartAfter(chip);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      root.focus({ preventScroll: true });
+    } catch (e) {}
+  }
+
+  function synthKey(root, key, keyCode) {
+    try {
+      root.dispatchEvent(new KeyboardEvent("keydown", {
+        key: key, code: key, keyCode: keyCode, which: keyCode,
+        bubbles: true, cancelable: true
+      }));
+    } catch (e) {}
+  }
+
+  function removeChip(root, chip) {
+    guard = { t: 0, block: false };
+    var label = chipText(chip);
+    if (removeMentionNode(root, label)) { setTimeout(focusEditor, 60); return; }
+    /* Fallback: Lexical's own Backspace handler with the caret right after it. */
+    caretAfter(chip, root);
+    synthKey(root, "Backspace", 8);
+    setTimeout(function () {
+      if (!document.contains(chip)) { setTimeout(focusEditor, 60); return; }
+      caretAfter(chip, root);
+      synthKey(root, "Backspace", 8);
+    }, 130);
+  }
+
+  document.addEventListener("click", function (e) {
+    var chip = e.target && e.target.closest ? e.target.closest(CHIP_SEL) : null;
+    if (!chip) return;
+    var root = chip.closest("[contenteditable='true']");
+    if (!root) return;
+    e.preventDefault();
+    e.stopPropagation();
+    removeChip(root, chip);
+  }, true);
 
   /* ---- Chat input repaint nudge (No scroll jiggle) ------------------------ */
   function nudge() {
@@ -1506,15 +1664,44 @@
    * chat disconnects or streaming aborts when the app is in the background. */
   var bgAudio = null;
   var isKeepAliveActive = false;
+  var lastUserActivity = 0;
 
+  /* A user who touched the app within this window may still have an agent run
+     in flight — or, more importantly, may just have put the phone down with the
+     screen about to lock. Keeping the audio session armed for that long is
+     essentially free (silent, volume 0.001) and removes the dependence on
+     fragile DOM probing. */
+  var PROTECT_WINDOW_MS = 30 * 60 * 1000;
+
+  function markUserActivity() {
+    lastUserActivity = Date.now();
+  }
+
+  /* Detection against the real shipped bundle (generated/main.js):
+       data-tooltip-id="input-send-button-cancel-tooltip"  – cancel/stop button
+       data-testid="send-button-pending"                   – request in flight
+     The remaining selectors are defensive fallbacks for other bundle versions
+     and for the RU localisation. */
   function isChatRunning() {
-    if (document.querySelector("[data-tooltip-id='input-send-button-cancel-tooltip'],[aria-label='Stop'],[aria-label='Остановить'],[aria-label='Cancel'],[aria-label='Отмена'],[data-testid='send-button-pending']")) {
-      return true;
-    }
-    if (document.querySelector(".animate-spin,[data-state='streaming'],[data-streaming='true'],.agy-streaming-indicator")) {
-      return true;
-    }
+    try {
+      if (document.querySelector(
+        "[data-tooltip-id='input-send-button-cancel-tooltip']," +
+        "[data-tooltip-id='input-send-button-cancel']," +
+        "[data-testid='send-button-pending']," +
+        "[aria-label='Stop'],[aria-label='Остановить']," +
+        "[aria-label='Cancel'],[aria-label='Отмена']," +
+        "[data-state='streaming'],[data-streaming='true']," +
+        ".agy-streaming-indicator")) {
+        return true;
+      }
+    } catch (e) {}
     return false;
+  }
+
+  function shouldProtect() {
+    if (isChatRunning()) return true;
+    if (!lastUserActivity) return false;
+    return (Date.now() - lastUserActivity) < PROTECT_WINDOW_MS;
   }
 
   function startKeepAlive() {
@@ -1525,47 +1712,100 @@
         bgAudio.loop = true;
         bgAudio.volume = 0.001;
       }
-      var p = bgAudio.play();
-      if (p && p.catch) p.catch(function () {});
       isKeepAliveActive = true;
-    } catch (e) {}
+      var p = bgAudio.play();
+      if (p && p.catch) p.catch(function () { isKeepAliveActive = false; });
+    } catch (e) {
+      isKeepAliveActive = false;
+    }
   }
 
   function stopKeepAlive() {
     if (!isKeepAliveActive) return;
     try {
       if (bgAudio) bgAudio.pause();
-      isKeepAliveActive = false;
     } catch (e) {}
+    isKeepAliveActive = false;
   }
 
   function checkBackgroundState() {
     if (document.hidden) {
-      if (isChatRunning()) {
-        startKeepAlive();
-      }
-    } else {
-      if (!isChatRunning()) {
-        stopKeepAlive();
-      }
+      /* Arm unconditionally on hide: a process kill loses the chat whether or
+         not the stop button happened to be mounted at that instant. */
+      markUserActivity();
+      startKeepAlive();
+    } else if (isChatRunning()) {
+      startKeepAlive();
+    } else if (isKeepAliveActive) {
+      stopKeepAlive();
     }
   }
 
   document.addEventListener("visibilitychange", checkBackgroundState);
-  document.addEventListener("pointerdown", function (e) {
-    var t = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
-    if (t && t.closest && t.closest("[data-testid='send-button'],[data-testid='agent-input-box'] form")) {
-      startKeepAlive();
-    }
-  }, true);
+  document.addEventListener("pointerdown", markUserActivity, true);
+  document.addEventListener("keydown", markUserActivity, true);
+  document.addEventListener("input", markUserActivity, true);
+
+  /* First paint: the user is obviously present, open the protection window. */
+  markUserActivity();
 
   setInterval(function () {
-    if (isChatRunning()) {
-      if (document.hidden) startKeepAlive();
-    } else {
-      if (isKeepAliveActive) stopKeepAlive();
-    }
+    if (isKeepAliveActive) return;
+    if (document.hidden && shouldProtect()) startKeepAlive();
   }, 1500);
+
+  /* ---- Return from background / screen lock -------------------------------
+   * The host dispatches `agy:host-resume` from WebViewLifecycle.resume(). After
+   * a screen-off the silent media session is usually torn down by the system,
+   * so the next background period would lose its protection. Re-arm it, and
+   * nudge the reconnectable streams (`$i` in main.js retries every 1s, but its
+   * timer can be throttled while the page is hidden). */
+  function recoverAfterBackground() {
+    markUserActivity();
+    if (document.hidden || shouldProtect()) startKeepAlive();
+    try { window.dispatchEvent(new Event("online")); } catch (e) {}
+  }
+  window.addEventListener("agy:host-resume", recoverAfterBackground);
+  document.addEventListener("resume", recoverAfterBackground);
+  window.addEventListener("focus", recoverAfterBackground);
+  window.addEventListener("pageshow", recoverAfterBackground);
+
+  /* ---- Battery optimisation (Doze) bootstrap ------------------------------
+   * With an active screen-off Doze the OS blocks the app's network, the
+   * core↔gateway stream stalls and the running session is dropped. The native
+   * `power` op whitelists the app through Shizuku when it is available, and
+   * always reports the state to the log so the cause is diagnosable. Runs at
+   * most once every 6 hours, silently. */
+  (function ensurePowerExemption() {
+    var KEY = "agyPowerExemptCheck", SIX_H = 6 * 60 * 60 * 1000;
+    try {
+      if (Date.now() - parseInt(localStorage.getItem(KEY) || "0", 10) < SIX_H) return;
+    } catch (e) { return; }
+    var bridge = window.AgyTools;
+    if (!bridge || typeof bridge.start !== "function" || typeof bridge.read !== "function") return;
+    var job = "";
+    try { job = bridge.start("power", ""); } catch (e) { return; }
+    if (!job || /^ERR/.test(job)) return;
+    try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries++;
+      var res = {};
+      try { res = JSON.parse(bridge.read(job) || "{}"); } catch (e) {}
+      var done = res && res.rc !== undefined && res.rc !== "";
+      if (!done && tries < 20) return;
+      clearInterval(timer);
+      var log = (res && res.log) || "";
+      var m = /whitelisted=([A-Za-z-]+)/.exec(log);
+      var st = m ? m[1] : "";
+      if (st === "no") {
+        console.warn("[AGY power] Battery optimisation is ON for the app: " +
+          "background sessions may drop when the screen turns off.");
+      } else if (st && st !== "yes") {
+        console.warn("[AGY power] Battery optimisation state unavailable (" + st + ").");
+      }
+    }, 700);
+  })();
 
   try { sessionStorage.removeItem("agy_composer_draft"); } catch (e) {}
 })();
