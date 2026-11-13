@@ -63,17 +63,17 @@ html[data-agy-language="ru"] .capitalize {
 }
 
 /* ---- Unified Glass & Theme Variables (Release 3.1.0) -------------------- */
-/* Fallback values for light and dark themes. The exact RGBA surface, border
-   and hover colors are dynamically updated from the active theme's background
-   and foreground tokens by updateGlassTheme() in agy_ru.js, supporting ALL
-   custom themes (Dracula, Catppuccin, One Dark, Monokai, etc.) */
+/* Fallback values. Exact RGBA is set by updateGlassTheme() in agy_ru.js.
+   Dark: theme background at 88%, no accent in the fill.
+   Light: theme background at 82% with a slight accent wash — never mixed
+   toward black (that reads as a grey film on every light theme). */
 :root,
 html.light,
 html:not(.dark),
 body.theme-light,
 body:not(.dark) {
   --agy-glass-surface: color-mix(in srgb,
-    color-mix(in srgb, var(--background, #ffffff) 88%, #000) 72%,
+    color-mix(in srgb, var(--background, #ffffff) 94%, var(--primary, #0b84ff)) 82%,
     transparent);
   --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 25%, rgba(0, 0, 0, 0.14));
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
@@ -97,13 +97,13 @@ body.theme-dark {
   --popover: var(--agy-glass-surface);
 }
 
-/* Light theme: фон темы, затемнённый на 12%, плотность 72% — лёгкая дымка.
-   Белое стекло на белой странице выглядело полностью непрозрачным. */
+/* Light theme: фон темы + лёгкий акцент, без затемнения в серый.
+   Чёрная подмесь выглядела одинаковой плёнкой на любой светлой теме. */
 html.light,
 body.light,
 body.theme-light {
   --agy-glass-surface: color-mix(in srgb,
-    color-mix(in srgb, var(--background, #ffffff) 88%, #000) 72%,
+    color-mix(in srgb, var(--background, #ffffff) 94%, var(--primary, #0b84ff)) 82%,
     transparent);
   --agy-glass-border: color-mix(in srgb, var(--primary, #0b84ff) 25%, rgba(0, 0, 0, 0.14));
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);

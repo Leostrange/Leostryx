@@ -87,23 +87,21 @@
     var bgRgb = parseColorToRgb(bg, isDark ? { r: 24, g: 24, b: 28 } : { r: 255, g: 255, b: 255 });
     var fgRgb = parseColorToRgb(fg, isDark ? { r: 220, g: 220, b: 220 } : { r: 20, g: 20, b: 20 });
 
-    // Чистая прозрачность (релиз 3.1.0): тёмные 0.88, светлые 0.72.
-    // Цвет поверхности — ровно --background активной темы, БЕЗ подмешивания
-    // акцента: оттенок стекла обязан совпадать с фоном темы (Monokai, Dracula,
-    // Nord и т.д. уже сами задают нужный тон). --primary остаётся только в
-    // рамке, ховере, активном состоянии и тени.
-    // Светлое стекло затемняем на 12%: белое на белой странице выглядит
-    // полностью непрозрачным, затемнение делает прозрачность видимой.
+    // Чистая прозрачность: тёмные 0.88 — ровно --background, без акцента в заливке.
+    // Светлые 0.82: фон темы + ~6% --primary. Затемнение к чёрному давало
+    // одинаковую серую плёнку на любой светлой теме.
     var sR = bgRgb.r;
     var sG = bgRgb.g;
     var sB = bgRgb.b;
+    var alpha = 0.88;
     if (!isDark) {
-      var k = 0.12;
-      sR = sR * (1 - k);
-      sG = sG * (1 - k);
-      sB = sB * (1 - k);
+      var accent = parseColorToRgb(primary, { r: 11, g: 132, b: 255 });
+      var wash = 0.06;
+      sR = sR * (1 - wash) + accent.r * wash;
+      sG = sG * (1 - wash) + accent.g * wash;
+      sB = sB * (1 - wash) + accent.b * wash;
+      alpha = 0.82;
     }
-    var alpha = isDark ? 0.88 : 0.72;
     var surface = "rgba(" + Math.round(sR) + ", " + Math.round(sG) + ", " +
       Math.round(sB) + ", " + alpha + ")";
 
