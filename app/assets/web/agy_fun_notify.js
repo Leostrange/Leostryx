@@ -138,16 +138,10 @@
     };
   }
 
-  /* --- Блок настроек в «Оформление» (Appearance) --- */
-  function ensureSettingsBlock() {
-    if (document.getElementById("agy-fun-done-settings")) return;
-    // ищем секцию Appearance по заголовку
-    var heading = null, hs = document.querySelectorAll("h1,h2,h3,span,div");
-    for (var i = 0; i < hs.length; i++) {
-      var t = (hs[i].textContent || "").trim();
-      if (t === "Appearance" || t === "Оформление") { heading = hs[i]; break; }
-    }
-    var anchor = heading && (heading.closest("[class]") || heading);
+  /* --- Блок настроек в «Оформление» (Appearance) ---
+     Использует mount-хост div.agy-fun-done-host, вставленный в экран Appearance
+     (как у brand/customizations), плюс polling-fallback на заголовок. */
+  function buildSettingsBox() {
     var box = document.createElement("div");
     box.id = "agy-fun-done-settings";
     box.setAttribute("style",
@@ -179,13 +173,16 @@
       '<input id="agy-fd-sound-url" placeholder="Ссылка на свой звук (https://...mp3)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
       '<button id="agy-fd-sound-apply" style="padding:8px 14px;border-radius:8px;border:none;background:var(--primary,#4f7cff);color:#fff;cursor:pointer">ОК</button></div>' +
       '<button id="agy-fd-test" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border,#444);background:transparent;color:inherit;cursor:pointer">Показать пример</button>';
-    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(box, anchor.nextSibling);
-    else document.body.appendChild(box);
 
     var on = box.querySelector("#agy-fd-on");
     on.checked = get("agy.funDoneEnabled", "1") !== "0";
     on.addEventListener("change", function () {
       try { localStorage.setItem("agy.funDoneEnabled", on.checked ? "1" : "0"); } catch (e) {}
+    });
+    var chat = box.querySelector("#agy-fd-chat");
+    chat.checked = get("agy.funDoneInChat", "0") === "1";
+    chat.addEventListener("change", function () {
+      try { localStorage.setItem("agy.funDoneInChat", chat.checked ? "1" : "0"); } catch (e) {}
     });
     box.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -196,11 +193,6 @@
     url.value = get("agy.funDoneGif", "");
     box.querySelector("#agy-fd-apply").addEventListener("click", function () {
       try { localStorage.setItem("agy.funDoneGif", url.value.trim()); localStorage.removeItem("agy.funDonePreset"); } catch (e) {}
-    });
-        var chat = box.querySelector("#agy-fd-chat");
-    chat.checked = get("agy.funDoneInChat", "0") === "1";
-    chat.addEventListener("change", function () {
-      try { localStorage.setItem("agy.funDoneInChat", chat.checked ? "1" : "0"); } catch (e) {}
     });
     box.querySelectorAll("[data-sound]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -216,13 +208,33 @@
       funShow();
       try { new Audio(soundSrc()).play().catch(function (e) {}); } catch (e) {}
     });
+    return box;
   }
 
-  // попытки вставить блок настроек (панель настроек рисуется лениво)
+  window.__agyFunDoneMount = function (el) {
+    if (!el) return;
+    var existing = el.querySelector("#agy-fun-done-settings");
+    if (existing) return;      // React перемонтировал тот же хост — блок уже внутри
+    el.style.cssText = "padding:4px 4px 24px;max-width:620px;box-sizing:border-box";
+    el.appendChild(buildSettingsBox());
+  };
+
+  // fallback: если хоста нет (старый main.js), ищем заголовок Appearance
   var tries = 0;
   var t = setInterval(function () {
     tries++;
-    if (tries > 120) return clearInterval(t);
-    try { ensureSettingsBlock(); } catch (e) {}
+    if (tries > 120 || document.getElementById("agy-fun-done-settings")) return clearInterval(t);
+    try {
+      if (document.querySelector(".agy-fun-done-host")) return; // хост появится от React
+      var heading = null, hs = document.querySelectorAll("h1,h2,h3,span,div");
+      for (var i = 0; i < hs.length; i++) {
+        var txt = (hs[i].textContent || "").trim();
+        if (txt === "Appearance" || txt === "Оформление") { heading = hs[i]; break; }
+      }
+      if (!heading) return;
+      var anchor = heading.closest("[class]") || heading;
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(buildSettingsBox(), anchor.nextSibling);
+      clearInterval(t);
+    } catch (e) {}
   }, 1000);
 })();
