@@ -84,9 +84,15 @@
       }
 
       var packId = (props && props.pack) || brand.pack || "02_lynx";
-      var hasCustomColor = !!(props && (props.color || props.forceRecolor));
+      /* props.color === true (LeostryxBrowserIcon) means "use the brand colour",
+         NOT "force recolor" — otherwise the in-app logo stays tinted when the
+         "Перекрашивать логотипы и значки" toggle is off while the launcher icon
+         correctly reverts to original colours. Only an explicit colour STRING
+         (or forceRecolor) forces recoloring. */
+      var explicitColor = typeof (props && props.color) === "string" ? props.color : null;
+      var hasCustomColor = !!(explicitColor || (props && props.forceRecolor));
       var force = (brand.recolorLogo !== false) || hasCustomColor;
-      var activeColor = (props && typeof props.color === "string" ? props.color : null) || brand.color || "#ec4899";
+      var activeColor = explicitColor || brand.color || "#ec4899";
       var logo = LOGOS[packId] || LOGOS["02_lynx"];
       var className = (props && props.className) || "shrink-0 object-contain";
       var sz = (props && (props.size || props.width || props.height)) || void 0;

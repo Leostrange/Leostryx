@@ -203,7 +203,7 @@ web/
 
 ### 6.5. Оверлей настроек AGY (Settings Overlay)
 Оверлейные скрипты `agy_*.js` / `agy_tools.sh` не входят в бандлы `generated/`, они инжектируются нативным слоем поверх UI настроек:
-- **`agy_tools.sh`** — бэкенд «Настройки → Инструменты» (запускается только нативным мостом `AgyTools`). Содержит операции `status/install/remove/upgrade/npm/sdk/ndk/policy/verify`.
+- **`agy_tools.sh`** — бэкенд «Настройки → Инструменты» (запускается только нативным мостом `AgyTools`). Содержит операции `status/install/remove/upgrade/npm/sdk/ndk/policy/verify/repairbt`. `status` дополнительно сообщает `@@sdkhome shared|internal <path>` (где установлен SDK; shared-хранилище смонтировано noexec) и `@@stub <build-tools/N/tool> foreign-shebang` (битые заглушки с shebang чужой песочницы); операция `repairbt` перепривязывает `aidl/aapt/aapt2/zipalign/d8/apksigner` в build-tools на рабочие бинарники из `$PREFIX/bin`. Операции `gradle`/`gradleremove` переключают версию Gradle (дистрибутивы в `$HOME/gradle-dist`, симлинк `$PREFIX/bin/gradle`, статус `@@gradle-active`), операция `agp` записывает выбранную версию AGP в `AGENTS.md` (статус `@@agp-active`).
   - Все сетевые операции (`pkg update`, `pkg install`, `npm install`, загрузка SDK/NDK) обёрнуты в `pkg_retry` (до 3 попыток с бэкоффом) и используют curl с `--retry-all-errors`: без этого обрывы соединения (curl error 35 «Recv failure: Connection reset by peer», частые в мобильных/VPN-сетях) приводили к сбоям установки с 3–4 попыток.
   - Загрузка NDK (~1 ГБ) докачивается с `-C -` с фолбэком на полную перезагрузку.
 - **`agy_providers.js`** — страница «Провайдеры» (Claude/OpenAI/Gemini-совместимые API).

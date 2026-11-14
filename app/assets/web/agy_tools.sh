@@ -298,6 +298,39 @@ refresh_bridges() {
 op_status() {
     # Fast: read pkg's own index/db files with one awk each (no pkg calls,
     # no network). Index is refreshed only by install/upgrade.
+    # Shared-storage SDK guard: /storage/emulated/0 is mounted noexec, so
+    # ELF build-tools binaries there cannot run (Permission denied). Also
+    # detect stub scripts with a shebang from a foreign sandbox (e.g. the
+    # historical com.agr path) — Gradle fails with "cannot start process".
+    case "$SDK" in
+        /storage/*|/sdcard/*|/mnt/*)
+            say "@@sdkhome shared $SDK" ;;
+        *)
+            say "@@sdkhome internal $SDK" ;;
+    esac
+    local stub_t stub_f stub_head
+    for stub_f in "$SDK"/build-tools/*/aidl "$SDK"/build-tools/*/apksigner "$SDK"/build-tools/*/d8; do
+        [ -f "$stub_f" ] || continue
+        stub_head="$(head -c 80 "$stub_f" 2>/dev/null || true)"
+        case "$stub_head" in
+            "#!"*) case "$stub_head" in
+                *"$PREFIX"*) : ;; # our own sandbox: fine
+                *) stub_t="${stub_f#$SDK/build-tools/}"; say "@@stub $stub_t foreign-shebang" ;;
+            esac ;;
+        esac
+    done
+    # Active Gradle distribution and selected AGP version.
+    local gl ga
+    if [ -L "$PREFIX/bin/gradle" ]; then
+        gl="$(readlink "$PREFIX/bin/gradle")"
+        case "$gl" in
+            */gradle-*/bin/gradle) gl="$(printf '%s' "$gl" | sed -n 's|.*/gradle-\([0-9][0-9.]*\)/bin/gradle$|\1|p')" ;;
+            *) gl=""
+        esac
+        [ -n "$gl" ] && say "@@gradle-active $gl"
+    fi
+    ga="$(grep -m1 '^# AGY-AGP: ' "$HOME/AGENTS.md" 2>/dev/null | sed 's/^# AGY-AGP: //')"
+    [ -n "$ga" ] && say "@@agp-active $ga"
     local IDX="$PREFIX/var/lib/pkg/index" DB="$PREFIX/var/lib/pkg/installed"
     # Ensure TSV index exists if Packages file is available; fetch index if missing
     if [ -z "$(ls "$IDX"/repo.*.tsv 2>/dev/null)" ]; then
@@ -703,6 +736,93 @@ PY
 }
 
 # ------------------------------------------------------------ verify
+op_repairbt() {
+    # Re-link broken/foreign build-tools stubs (e.g. shebangs pointing to a
+    # foreign sandbox) onto the working binaries from $PREFIX/bin. Also used
+    # to repair SDKs found on shared (noexec) storage where ELF binaries
+    # cannot execute directly.
+    say "@@repairbt start"
+    refresh_build_tools
+    say "@@repairbt done count=$(find "$SDK"/build-tools -maxdepth 2 -type l -name aidl 2>/dev/null | wc -l)"
+    say "@@done"
+}
+
+# ------------------------------------------------------------ gradle/agp
+GRDIST="$HOME/gradle-dist"
+GRADLE_URL_VER() { # version -> distribution URL
+    printf 'https://services.gradle.org/distributions/gradle-%s-bin.zip' "$1"
+}
+gradle_write_agents_note() { # agp-version, gradle-min, jdk
+    local agp="$1" gmin="$2" jdk="$3"
+    local note="# AGY-AGP: $agp"
+    local block
+    block="$(printf '## Android Gradle Plugin (выбрано в Инструментах)\n- AGP: %s (минимальный Gradle: %s, JDK: %s)\n- В проекте: plugins { id '"'"'com.android.application'"'"' version '"'"'%s'"'"' }\n- %s ставится через Инструменты › Gradle & AGP › Gradle (симлинк $PREFIX/bin/gradle переключается на выбранную версию).\n' "$agp" "$gmin" "$jdk" "$agp" "$gmin")"
+    local f="$HOME/AGENTS.md" tmp
+    if [ -f "$f" ] && grep -q '^# AGY-AGP:' "$f"; then
+        tmp="$PREFIX/tmp/agy-agp-$$"
+        awk -v n="$note" -v b="$block" '
+            !done && /^# AGY-AGP:/ {
+                print n; print ""; print b; skip=1; done=1; next
+            }
+            skip && $0 == "" { skip=0; next }
+            skip { next }
+            { print }
+        ' "$f" > "$tmp" && mv -f "$tmp" "$f" || { rm -f "$tmp"; fail "update AGP note"; }
+    else
+        printf '\n%s\n%s\n' "$note" "$block" >> "$f"
+    fi
+    say "@@agp $agp"
+}
+op_gradle() { # ARG = version, e.g. 8.14 / 9.0 / 9.9
+    local ver="${ARG:-}"
+    case "$ver" in ''|*[!0-9.]*) fail "bad gradle version: $ver" ;; esac
+    command -v unzip >/dev/null 2>&1 || pkg install unzip || fail "unzip"
+    local url name z dir
+    url="$(GRADLE_URL_VER "$ver")"; name="gradle-$ver-bin.zip"
+    mkdir -p "$GRDIST"
+    dir="$GRDIST/gradle-$ver"
+    if [ ! -x "$dir/bin/gradle" ]; then
+        step "Download Gradle $ver"
+        z="$PREFIX/tmp/$name"
+        curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -C - -o "$z" "$url" \
+            || curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -o "$z" "$url" \
+            || fail "download $name"
+        step "Unpack"
+        rm -rf "$dir"; mkdir -p "$GRDIST/.agy-unpack-$$"
+        unzip -q "$z" -d "$GRDIST/.agy-unpack-$$" || fail "unpack $name"
+        mv "$GRDIST/.agy-unpack-$$/gradle-$ver" "$dir" || fail "move gradle-$ver"
+        rm -rf "$GRDIST/.agy-unpack-$$" "$z"
+    fi
+    step "Switch gradle -> $ver"
+    if [ -e "$PREFIX/bin/gradle" ] && [ ! -L "$PREFIX/bin/gradle" ] && [ ! -e "$PREFIX/bin/gradle.agy-original" ]; then
+        cp -p "$PREFIX/bin/gradle" "$PREFIX/bin/gradle.agy-original" || fail "backup pkg gradle"
+    fi
+    ln -sf "$dir/bin/gradle" "$PREFIX/bin/gradle.agy-new" && mv -f "$PREFIX/bin/gradle.agy-new" "$PREFIX/bin/gradle" || fail "switch gradle"
+    refresh_bridges
+    say "@@gradle $ver"
+    say "@@done"
+}
+op_gradleremove() {
+    step "Restore packaged gradle"
+    if [ -e "$PREFIX/bin/gradle.agy-original" ]; then
+        mv -f "$PREFIX/bin/gradle.agy-original" "$PREFIX/bin/gradle" || fail "restore gradle"
+    elif [ -L "$PREFIX/bin/gradle" ]; then
+        case "$(readlink "$PREFIX/bin/gradle")" in "$GRDIST"/*) rm -f "$PREFIX/bin/gradle"; ensure_index; pkg install gradle || true ;; esac
+    fi
+    refresh_bridges
+    say "@@done"
+}
+op_agp() { # ARG = AGP version id, e.g. 8.7.3 / 9.0.0
+    local agp="${ARG:-}" gmin jdk
+    case "$agp" in
+        8.*) gmin="8.9";  jdk="17" ;;
+        9.*) gmin="9.1";  jdk="17+" ;;
+        *) fail "unknown AGP version: $agp" ;;
+    esac
+    gradle_write_agents_note "$agp" "$gmin" "$jdk"
+    say "@@done"
+}
+
 op_verify() {
     local ok=0 bad=0
     verify_aidl() {
@@ -3110,6 +3230,10 @@ case "$OP" in
     flutterremove)  op_flutterremove ;;
     policy)         op_policy ;;
     verify)         op_verify ;;
+    repairbt)       op_repairbt ;;
+    gradle)         op_gradle ;;
+    gradleremove)   op_gradleremove ;;
+    agp)            op_agp ;;
     mcp)            op_mcp ;;
     customizations) op_customizations ;;
     *)              fail "unknown op: $OP" ;;
