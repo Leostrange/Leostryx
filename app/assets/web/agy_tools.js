@@ -1212,7 +1212,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.1.0";
+    appVer.textContent = "3.1.1 fix";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1324,7 +1324,7 @@
     btnUpd.textContent = T("Проверить обновления", "Check for updates");
     c3.appendChild(btnUpd);
 
-    var CURRENT_VERSION = "3.1.0";
+    var CURRENT_VERSION = "3.1.1 fix";
     var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
     var pendingApkUrl = null;
     var updState = "check"; // "check" | "available" | "downloading" | "ready"
@@ -1415,7 +1415,14 @@
           return;
         }
 
-        /* Continuous progress polling */
+        /* Continuous progress polling with smooth interpolation */
+        var dlTarget = 0, dlShown = 0;
+        var dlSmoothTimer = setInterval(function () {
+          if (dlShown < dlTarget) {
+            dlShown = Math.min(dlTarget, dlShown + Math.max(1, Math.ceil((dlTarget - dlShown) / 4)));
+            btnUpd.textContent = T("Скачивание… " + dlShown + "%", "Downloading… " + dlShown + "%");
+          }
+        }, 100);
         var dlPollTimer = setInterval(function () {
           var chunk = b.read(dlId);
           if (chunk) {
@@ -1426,17 +1433,18 @@
                 var done = parseInt(pm[1], 10);
                 var total = parseInt(pm[2], 10);
                 if (total > 0) {
-                  var pct = Math.min(100, Math.round((done * 100) / total));
-                  btnUpd.textContent = T("Скачивание… " + pct + "%", "Downloading… " + pct + "%");
+                  dlTarget = Math.min(100, Math.round((done * 100) / total));
                 }
                 break;
               }
             }
           }
-        }, 350);
+        }, 250);
 
         pollStandalone(dlId, function (r2) {
           clearInterval(dlPollTimer);
+          clearInterval(dlSmoothTimer);
+          dlShown = dlTarget = 100;
           var log = r2.log || "";
           if (log.indexOf("@@UPDOK installed") >= 0) {
             btnUpd.disabled = false;

@@ -844,6 +844,7 @@ op_gradle() { # ARG = version(s), space-separated, e.g. "8.9 8.14.7 9.1.0 9.9.1"
         else
             step "Gradle $ver already cached"
         fi
+        say "@@gradle-cached $ver"
     done
     # Активируется последняя версия из списка; остальные предзагружены
     # и переключаются мгновенно (симлинк) без повторного скачивания.
@@ -854,6 +855,7 @@ op_gradle() { # ARG = version(s), space-separated, e.g. "8.9 8.14.7 9.1.0 9.9.1"
     fi
     ln -sf "$dir/bin/gradle" "$PREFIX/bin/gradle.agy-new" && mv -f "$PREFIX/bin/gradle.agy-new" "$PREFIX/bin/gradle" || fail "switch gradle"
     refresh_bridges
+    say "@@gradle-active $ver"
     say "@@gradle $ver"
     say "@@done"
 }

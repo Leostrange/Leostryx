@@ -1,23 +1,23 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.0-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.1 fix-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.0).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.1 fix).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.1 fix"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.1 fix">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 ---
 
-## Leostryx для Android 3.1.0
+## Leostryx для Android 3.1.1 fix
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -47,8 +47,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.0-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.0-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.1 fix-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.1 fix) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.1 fix-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.1 fix) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -57,25 +57,15 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.0](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.0) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.0/SHA256SUMS.txt).
-2. Установите скачанный APK 3.1.0 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.1 fix](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.1 fix) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.1 fix/SHA256SUMS-3.1.1 fix.txt).
+2. Установите скачанный APK 3.1.1 fix (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.0
+## Что нового в 3.1.1 fix (см. также [CHANGELOG.md](CHANGELOG.md))
 
-- **полное устранение спама уведомлений из шторки**:
-  - уведомления шторки подавляются, пока приложение открыто на переднем плане;
-  - в режиме «Не спрашивать» (EAGER) approve-уведомления с кнопками не создаются вовсе;
-  - дедупликация подтверждений по тексту сниппета исключает повторные уведомления одной и той же кнопки;
-  - уведомление шторки автоматически отменяется при подтверждении действия;
-  - события завершения `agent-finished-*` стали строго пассивными;
-  - в пассивном уведомлении «Агент работает» отображается актуальный текст текущего шага агента;
-- **логотип акцентного цвета при запуске приложения**:
-  - сплэш-скрин APK и логотип экрана запуска/входа автоматически окрашиваются в выбранный акцентный цвет бренда (`recolorLogo: true` по умолчанию);
-  - мгновенный бутстрап акцентных CSS-переменных из `localStorage` до первой отрисовки;
-- **селектор моделей — разделители и названия провайдеров**:
-  - кастомные модели снабжены атрибутами селектора, отсортированы по провайдерам и разделены аккуратными заголовками (OpenAI, Claude, Gemini и др.);
-- **устранение фейкового чата с точкой** при переключении на кастомный провайдер.
-- подробный справочник первопричин и исправлений: [`docs/BUGFIXES_3.1.0.md`](docs/BUGFIXES_3.1.0.md).
+- **плавный прогресс загрузки во встроенном обновлении** («О приложении → Обновить»): процент больше не «прыгает» (0 → 7 → 100) — добавлен интерполяционный тикер (100 мс), опрос прогресса ускорен до 250 мс, по завершении значение гарантированно доводится до 100 %;
+- **статус Gradle в «Инструментах»**: скачанная, но неактивная версия стабильно показывает бейдж «Скачана — переключение мгновенное» и кнопку «Переключить» вместо «Установить» (передача `@@gradle-cached` в статусе);
+- **версия 3.1.1 fix** в манифесте и «О приложении».
+- подробный справочник изменений: [`CHANGELOG.md`](CHANGELOG.md).
 
 - **чистая прозрачность попапов вместо «матового стекла»** — все меню, списки и диалоги окрашиваются ровно в `--background` активной темы (Monokai, Dracula, Catppuccin, One Dark, Gruvbox, Light и любые кастомные) с плотностью `0.88` в тёмных и `0.72` в светлых темах; в светлой теме фон дополнительно затемняется на 12 %, иначе белое стекло поверх белой страницы визуально не даёт прозрачности; `backdrop-filter` принудительно отключён, поэтому под попапом виден контент, а не размытая заливка;
 - **истинная прозрачность выпадающих списков и попапов в светлой теме** — убраны непрозрачные белые подложки внутри всплывающих списков, контекстных меню и Radix Popper контейнеров;

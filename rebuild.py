@@ -186,7 +186,7 @@ def main():
         sign(unsigned)
 
     # Finalize release 3.1.0 artifacts
-    version = "3.1.1"
+    version = "3.1.1 fix"
     signed_dir = ROOT / "dist/signed"
     parent_dir = ROOT.parent
     built = [name for name, _ in jobs]
