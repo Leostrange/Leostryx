@@ -335,7 +335,15 @@ op_status() {
         cb="${cd_#"$GRDIST/gradle-"}"; cb="${cb%/bin/gradle}"
         say "@@gradle-cached $cb"
     done
-    ga="$(grep -m1 '^# AGY-AGP: ' "$HOME/AGENTS.md" 2>/dev/null | sed 's/^# AGY-AGP: //')"
+    ga="$(agp_read_state)"
+    if [ -z "$ga" ]; then
+        ga="$(grep -m1 '^# AGY-AGP: ' "$HOME/AGENTS.md" 2>/dev/null | sed 's/^# AGY-AGP: //')"
+        # migrate to persistent state if AGENTS.md still carries a valid selection
+        case "$ga" in [0-9]*[0-9])
+            mkdir -p "$(dirname "$AGP_STATE")" 2>/dev/null
+            printf '%s\n' "$ga" > "$AGP_STATE" 2>/dev/null || true
+        ;; esac
+    fi
     [ -n "$ga" ] && say "@@agp-active $ga"
     local IDX="$PREFIX/var/lib/pkg/index" DB="$PREFIX/var/lib/pkg/installed"
     # Ensure TSV index exists if Packages file is available; fetch index if missing
@@ -755,6 +763,12 @@ op_repairbt() {
 
 # ------------------------------------------------------------ gradle/agp
 GRDIST="$HOME/gradle-dist"
+AGP_STATE="$HOME/.gemini/config/agy-agp.state" # selected AGP version; survives AGENTS.md rewrites
+agp_read_state() { # -> prints selected AGP version or ""
+    local v=""
+    [ -r "$AGP_STATE" ] && v="$(tr -d '[:space:]' < "$AGP_STATE" 2>/dev/null)"
+    case "$v" in [0-9]*[0-9]) printf '%s' "$v" ;; esac
+}
 GRADLE_URL_VER() { # version -> distribution URL
     printf 'https://services.gradle.org/distributions/gradle-%s-bin.zip' "$1"
 }
@@ -792,9 +806,10 @@ gradle_pick_auto() { # -> prints version to stdout, rc!=0 on failure
         wv="$(sed -n 's|^distributionUrl=.*gradle-\([0-9][0-9.]*\)-.*zip$|\1|p' "$props" | head -n1)"
         case "$wv" in [0-9]*) echo "$wv"; return 0 ;; esac
     fi
-    # 2) Заметка AGP из AGENTS.md -> минимальный Gradle
+    # 2) Заметка AGP (постоянный файл состояния -> AGENTS.md) -> минимальный Gradle
     local agp gmin
-    agp="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$HOME/AGENTS.md" | head -n1)"
+    agp="$(agp_read_state)"
+    [ -n "$agp" ] || agp="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$HOME/AGENTS.md" 2>/dev/null | head -n1)"
     case "$agp" in
         9.*) gmin="9.1.0" ;;
         8.*) gmin="8.9" ;;
@@ -879,6 +894,8 @@ op_agp() { # ARG = AGP version id(s), space-separated, e.g. "8.7.3 9.0.0"
             *) fail "unknown AGP version: $agp" ;;
         esac
         gradle_write_agents_note "$agp" "$gmin" "$jdk"
+        mkdir -p "$(dirname "$AGP_STATE")"
+        printf '%s\n' "$agp" > "$AGP_STATE" || fail "save AGP state"
         last="$agp"
     done
     [ -n "$last" ] || fail "no AGP version"
