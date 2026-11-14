@@ -210,14 +210,25 @@ def main():
             shutil.copy2(src_idsig, target_idsig)
             os.utime(target_idsig, None)
 
-    # 2. Re-pack source code zip
+    # 2. Re-pack source code zip (fast, exclude .git and dist to avoid hangs)
     zip_path = signed_dir / "Leostryx-repo.zip"
     if zip_path.exists():
         zip_path.unlink()
-    subprocess.check_call([
-        "zip", "-q", "-r", "-9", str(zip_path), ".", "-x", "dist/*"
-    ], cwd=str(ROOT))
+    print("packing source archive Leostryx-repo.zip...")
+    sys.stdout.flush()
+    exclude_dirs = {".git", "dist", ".brand", "__pycache__", ".idea", ".vscode"}
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        for dirpath, dirnames, filenames in os.walk(ROOT):
+            dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
+            for f in filenames:
+                if f.endswith((".pyc", ".tmp", ".log")) or (f.startswith(".") and f != ".gitignore"):
+                    continue
+                full = Path(dirpath) / f
+                rel = full.relative_to(ROOT).as_posix()
+                zf.write(full, rel)
     os.utime(zip_path, None)
+    print("source archive created:", zip_path.stat().st_size)
+    sys.stdout.flush()
 
     # Checksums cover every variant that is present, so building one variant
     # never drops the other one from the published list.
