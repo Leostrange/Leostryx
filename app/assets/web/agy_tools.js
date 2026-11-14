@@ -40,7 +40,6 @@
       { id: "openjdk-17", kind: "pkg", ru: "OpenJDK 17", en: "OpenJDK 17", dru: "Для Gradle и Android Gradle Plugin 8.x.", den: "For Gradle and Android Gradle Plugin 8.x.", verify: "java17,javac17" },
       { id: "openjdk-21", kind: "pkg", ru: "OpenJDK 21", en: "OpenJDK 21", dru: "Новее; AGP 8.x работает и с 17.", den: "Newer; AGP 8.x works with 17 as well.", verify: "java21,javac21" },
       { id: "kotlin", kind: "pkg", ru: "Kotlin (kotlinc)", en: "Kotlin (kotlinc)", dru: "Компилятор языка Kotlin.", den: "Kotlin language compiler.", verify: "kotlin" },
-      { id: "gradle", kind: "pkg", ru: "Gradle", en: "Gradle", dru: "Сборка Android-проектов.", den: "Builds Android projects.", verify: "gradle" },
       { id: "maven", kind: "pkg", ru: "Maven", en: "Maven", dru: "Система сборки и управления зависимостями для Java.", den: "Build and dependency management system for Java." }
     ] },
     { id: "android", ru: "Android: сборка APK", en: "Android: APK build", items: [
@@ -72,10 +71,11 @@
     { id: "flutter", ru: "Flutter & Dart", en: "Flutter & Dart", note: { ru: "Кроссплатформенный SDK для создания Android/Web-приложений. Автоматически настраивается для Android bionic через agy-fix-flutter.", en: "Cross-platform SDK for Android/Web apps. Automatically patched for Android bionic userspace via agy-fix-flutter." }, items: [
       { id: "flutter-sdk", kind: "flutter", ru: "Flutter SDK (stable)", en: "Flutter SDK (stable)", dru: "SDK для Flutter-приложений.", den: "Flutter SDK + Dart + bionic libc autopatch.", verify: "flutter,dart" }
     ] },
-    { id: "gradle", ru: "Gradle & AGP", en: "Gradle & AGP", note: { ru: "Выбор версии Gradle переключает симлинк $PREFIX/bin/gradle (мосты с JAVA_TOOL_OPTIONS обновляются автоматически). Выбор AGP записывает совместимую версию в AGENTS.md проекта. AGP 8.x → Gradle ≥ 8.9, JDK 17; AGP 9.x → Gradle ≥ 9.1, JDK 17+.", en: "Picking a Gradle version repoints the $PREFIX/bin/gradle symlink (bridges with JAVA_TOOL_OPTIONS refresh automatically). Picking AGP writes the compatible version to the project AGENTS.md. AGP 8.x → Gradle ≥ 8.9, JDK 17; AGP 9.x → Gradle ≥ 9.1, JDK 17+." }, items: [
-      { id: "gradle-9.9", kind: "gradle", ru: "Gradle 9.9", en: "Gradle 9.9", dru: "Свежая мажорная версия; для AGP 9.x.", den: "Latest major; needed for AGP 9.x." },
-      { id: "gradle-9.0", kind: "gradle", ru: "Gradle 9.0", en: "Gradle 9.0", dru: "Минимум для AGP 9.x.", den: "Minimum for AGP 9.x." },
-      { id: "gradle-8.14", kind: "gradle", ru: "Gradle 8.14", en: "Gradle 8.14", dru: "Для AGP 8.x. Рекомендуется.", den: "For AGP 8.x. Recommended." },
+    { id: "gradle", ru: "Gradle & AGP", en: "Gradle & AGP", note: { ru: "Версии Gradle скачиваются один раз и кэшируются во внутреннем хранилище ($HOME/gradle-dist) — переключение между скачанными версиями мгновенное, без повторной загрузки. Можно выбрать несколько версий сразу: установятся все, активной станет последняя выбранная. Выбор AGP записывает совместимую версию в AGENTS.md проекта. AGP 8.x → Gradle ≥ 8.9, JDK 17; AGP 9.x → Gradle ≥ 9.1, JDK 17+.", en: "Gradle versions are downloaded once and cached in internal storage ($HOME/gradle-dist) — switching between downloaded versions is instant, with no re-download. Multiple versions can be selected at once: all are installed, the last one becomes active. Picking AGP writes the compatible version to the project AGENTS.md. AGP 8.x → Gradle ≥ 8.9, JDK 17; AGP 9.x → Gradle ≥ 9.1, JDK 17+." }, items: [
+      { id: "gradle-auto", kind: "gradle", ru: "Gradle (авто)", en: "Gradle (auto)", dru: "Версия подбирается по проекту: wrapper → заметка AGP → последняя стабильная.", den: "Version picked from the project: wrapper → AGP note → latest stable." },
+      { id: "gradle-9.9.1", kind: "gradle", ru: "Gradle 9.9.1", en: "Gradle 9.9.1", dru: "Последняя стабильная; для AGP 9.x.", den: "Latest stable; for AGP 9.x." },
+      { id: "gradle-9.1.0", kind: "gradle", ru: "Gradle 9.1.0", en: "Gradle 9.1.0", dru: "Минимум для AGP 9.x.", den: "Minimum for AGP 9.x." },
+      { id: "gradle-8.14.7", kind: "gradle", ru: "Gradle 8.14.7", en: "Gradle 8.14.7", dru: "Для AGP 8.x. Рекомендуется.", den: "For AGP 8.x. Recommended." },
       { id: "gradle-8.9", kind: "gradle", ru: "Gradle 8.9", en: "Gradle 8.9", dru: "Минимум для AGP 8.x.", den: "Minimum for AGP 8.x." },
       { id: "agp-9.0.0", kind: "agp", ru: "Android Gradle Plugin 9.0.0", en: "Android Gradle Plugin 9.0.0", dru: "Новейшая ветка AGP; требует Gradle ≥ 9.1.", den: "Newest AGP branch; needs Gradle ≥ 9.1." },
       { id: "agp-8.7.3", kind: "agp", ru: "Android Gradle Plugin 8.7.3", en: "Android Gradle Plugin 8.7.3", dru: "Стабильная ветка AGP; Gradle ≥ 8.9. Рекомендуется.", den: "Stable AGP branch; Gradle ≥ 8.9. Recommended." }
@@ -111,7 +111,7 @@
     { id: "plugins", ru: "Плагины приложения", en: "App plugins", dru: "Node.js LTS, Python, clang, make, openssl", den: "Node.js LTS, Python, clang, make, openssl",
       items: ["nodejs-lts", "python", "clang", "make", "pkg-config", "openssl-tool"] },
     { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35",
-      items: ["openjdk-17", "gradle", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
+      items: ["openjdk-17", "gradle-8.14.7", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
     { id: "native", ru: "Нативный код (NDK)", en: "Native code (NDK)", dru: "clang, CMake, Ninja, NDK sysroot/multilib", den: "clang, CMake, Ninja, NDK sysroot/multilib",
       items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] }
   ];
@@ -139,7 +139,7 @@
     if (it.kind === "ndk") return special.ndk.length > 0;
     if (it.kind === "flutter") return !!special.flutter;
     if (it.kind === "npm") { var n = status["npm:" + it.id]; return !!(n && n.inst); }
-    if (it.kind === "gradle") return special.gradle === it.id.slice(7);
+    if (it.kind === "gradle") return it.id === "gradle-auto" ? !!special.gradle : special.gradle === it.id.slice(7);
     if (it.kind === "agp") return special.agp === it.id.slice(4);
     return false;
   }
@@ -214,7 +214,7 @@
   var lastDone = null, hiddenJob = null;
 
   function parse(j) {
-    if (j.op === "status") special = { cmdline: false, platforms: {}, buildtools: {}, ndk: [], flutter: false, sdkhome: null, stubs: [], gradle: "", agp: "" };
+    if (j.op === "status") special = { cmdline: false, platforms: {}, buildtools: {}, ndk: [], flutter: false, sdkhome: null, stubs: [], gradle: "", agp: "", gradlecached: [] };
     (j.log || "").split("\n").forEach(function (line) {
       var m;
       if ((m = /^@@pkg (\S+) (\S+) (\S+)/.exec(line))) status[m[1]] = { avail: m[2], inst: m[3] };
@@ -226,6 +226,7 @@
       else if ((m = /^@@sdkhome (\S+) ?(.*)$/.exec(line))) special.sdkhome = { mode: m[1], path: m[2] };
       else if ((m = /^@@stub (\S+) (\S+)/.exec(line))) { if (special.stubs.indexOf(m[1]) < 0) special.stubs.push(m[1]); }
       else if ((m = /^@@gradle-active (\S+)/.exec(line))) special.gradle = m[1];
+      else if ((m = /^@@gradle-cached (\S+)/.exec(line))) { special.gradlecached = special.gradlecached || []; special.gradlecached.push(m[1]); }
       else if ((m = /^@@agp-active (\S+)/.exec(line))) special.agp = m[1];
       else if ((m = /^@@(ok|fail) (\S+) ?(.*)$/.exec(line))) checks[m[2]] = { ok: m[1] === "ok", text: m[3] };
       else if ((m = /^@@npm (\S+) (\S+)/.exec(line))) status["npm:" + m[1]] = { inst: m[2] !== "-" };
@@ -270,7 +271,7 @@
   function installIds(ids) {
     var conflict = nodeConflict(ids); if (conflict) { alert(conflict); return; }
     batchLog = ""; logOpen = true;
-    var pk = [], sdk = [], npm = [], ndk = false, flutter = false, gradle = "", agp = "";
+    var pk = [], sdk = [], npm = [], ndk = false, flutter = false, gradles = [], agps = [];
     var failures = [];
     function recordFailure(j) {
       if (!j) return;
@@ -285,16 +286,16 @@
       else if (it.kind === "npm") npm.push(id);
       else if (it.kind === "ndk") ndk = true;
       else if (it.kind === "flutter") flutter = true;
-      else if (it.kind === "gradle") gradle = it.id.slice(7);
-      else if (it.kind === "agp") agp = it.id.slice(4);
+      else if (it.kind === "gradle") gradles.push(it.id.slice(7));
+      else if (it.kind === "agp") agps.push(it.id.slice(4));
     });
     if (pk.length) run("install", pk.join(" "), T("Установка: ", "Install: ") + pk.join(", "), recordFailure, true);
     if (npm.length) run("npm", npm.join(" "), "npm -g " + npm.join(" "), recordFailure, true);
     if (sdk.length) run("sdk", sdk.join(" "), "sdkmanager " + sdk.join(" "), recordFailure, true);
     if (ndk) run("ndk", "", T("Полный NDK", "Full NDK"), recordFailure, true);
     if (flutter) run("flutter", "", T("Flutter SDK", "Flutter SDK"), recordFailure, true);
-    if (gradle) run("gradle", gradle, T("Gradle ", "Gradle ") + gradle, recordFailure, true);
-    if (agp) run("agp", agp, "AGP " + agp, recordFailure, true);
+    if (gradles.length) run("gradle", gradles.join(" "), T("Gradle: ", "Gradle: ") + gradles.join(", "), recordFailure, true);
+    if (agps.length) run("agp", agps.join(" "), "AGP: " + agps.join(", "), recordFailure, true);
     refresh(true, function () {
       if (batchLog) {
         lastDone = {op: "install", label: failures.length ? T("Ошибки установки", "Installation errors") : T("Установка завершена", "Installation complete"), rc: failures.length ? "1" : "0", log: batchLog};
@@ -335,7 +336,12 @@
       return '<span class="agy-t-badge">' + esc(T("Доступно ", "Available ") + s.avail) + "</span>";
     }
     if (!loaded) return '<span class="agy-t-badge">…</span>';
-    if (it.kind === "gradle") return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Активна", "Active")) + '</span>' : '<span class="agy-t-badge">' + esc(T("Не активна", "Not active")) + '</span>';
+    if (it.kind === "gradle") {
+      if (it.id === "gradle-auto") return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Активна: ", "Active: ") + special.gradle) + '</span>' : '<span class="agy-t-badge">' + esc(T("Не активна", "Not active")) + '</span>';
+      if (installed(it)) return '<span class="agy-t-badge ok">' + esc(T("Активна", "Active")) + '</span>';
+      if (special.gradlecached && special.gradlecached.indexOf(it.id.slice(7)) >= 0) return '<span class="agy-t-badge ok">' + esc(T("Скачана — переключение мгновенное", "Cached — instant switch")) + '</span>';
+      return '<span class="agy-t-badge">' + esc(T("Не активна", "Not active")) + '</span>';
+    }
     if (it.kind === "agp") return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Выбрано", "Selected")) + '</span>' : '<span class="agy-t-badge">' + esc(T("Не выбрано", "Not selected")) + '</span>';
     if (it.kind === "sdk") { var p = it.id.split(";"); if ((p[0] === "platforms" ? special.platforms[p[1]] : special.buildtools[p[1]]) === "incomplete") return '<span class="agy-t-badge off">' + esc(T("Не хватает файлов", "Missing files")) + '</span>'; }
     return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Установлено", "Installed")) + "</span>"
@@ -351,7 +357,7 @@
     java: [{title: ["OpenJDK", "OpenJDK"], ids: ["openjdk-17", "openjdk-21"]}],
     sdk: [{title: ["Платформа Android", "Android platform"], ids: ["platforms;android-37.1", "platforms;android-37.0", "platforms;android-36", "platforms;android-35", "platforms;android-34"]},
           {title: ["Android Build-tools", "Android Build-tools"], ids: ["build-tools;37.0.0", "build-tools;36.0.0", "build-tools;35.0.0", "build-tools;34.0.0"]}],
-    gradle: [{title: ["Gradle", "Gradle"], ids: ["gradle-9.9", "gradle-9.0", "gradle-8.14", "gradle-8.9"]},
+    gradle: [{title: ["Gradle", "Gradle"], ids: ["gradle-auto", "gradle-9.9.1", "gradle-9.1.0", "gradle-8.14.7", "gradle-8.9"]},
              {title: ["Android Gradle Plugin", "Android Gradle Plugin"], ids: ["agp-9.0.0", "agp-8.7.3"]}]
   };
 
@@ -404,7 +410,11 @@
           (T(it.dru, it.den) ? '<div class="agy-t-desc">' + esc(T(it.dru, it.den)) + "</div>" : "") + checkLine(it) + "</div>" +
           (inst
             ? ((it.verify && it.verify.split(",").some(function(v) { return checks[v] && !checks[v].ok; })) ? '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Починить", "Repair")) + "</button>" : (it.kind !== "npm" ? '<button type="button" class="agy-t-btn sec" data-rm="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Удалить", "Remove")) + "</button>" : ""))
-            : (!inst && av ? '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Установить", "Install")) + "</button>" : "")) +
+            : (!inst && av
+              ? (it.kind === "gradle" && it.id !== "gradle-auto" && special.gradlecached && special.gradlecached.indexOf(it.id.slice(7)) >= 0
+                ? '<button type="button" class="agy-t-btn sec" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Переключить", "Switch")) + "</button>"
+                : '<button type="button" class="agy-t-btn" data-in="' + esc(it.id) + '"' + (busy ? " disabled" : "") + ">" + esc(T("Установить", "Install")) + "</button>")
+              : "")) +
           "</div>";
       }
       var rendered = {};

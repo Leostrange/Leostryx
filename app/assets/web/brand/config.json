@@ -1,6 +1,6 @@
 {
   "pack": "02_lynx",
   "name": "Leostryx",
-  "recolorLogo": true,
-  "color": "#8b5cf6"
+  "color": "#8b5cf6",
+  "recolorLogo": false
 }

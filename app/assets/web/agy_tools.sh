@@ -329,6 +329,12 @@ op_status() {
         esac
         [ -n "$gl" ] && say "@@gradle-active $gl"
     fi
+    local cd_ cb
+    for cd_ in "$GRDIST"/gradle-*/bin/gradle; do
+        [ -x "$cd_" ] || continue
+        cb="${cd_#"$GRDIST/gradle-"}"; cb="${cb%/bin/gradle}"
+        say "@@gradle-cached $cb"
+    done
     ga="$(grep -m1 '^# AGY-AGP: ' "$HOME/AGENTS.md" 2>/dev/null | sed 's/^# AGY-AGP: //')"
     [ -n "$ga" ] && say "@@agp-active $ga"
     local IDX="$PREFIX/var/lib/pkg/index" DB="$PREFIX/var/lib/pkg/installed"
@@ -773,26 +779,75 @@ gradle_write_agents_note() { # agp-version, gradle-min, jdk
     fi
     say "@@agp $agp"
 }
-op_gradle() { # ARG = version, e.g. 8.14 / 9.0 / 9.9
-    local ver="${ARG:-}"
-    case "$ver" in ''|*[!0-9.]*) fail "bad gradle version: $ver" ;; esac
+gradle_pick_auto() { # -> prints version to stdout, rc!=0 on failure
+    # 1) Gradle wrapper проекта (в cwd или в AGY_PROJECT_DIR)
+    local props f
+    for f in "$PWD/gradle/wrapper/gradle-wrapper.properties" "${AGY_PROJECT_DIR:-$PWD}/gradle/wrapper/gradle-wrapper.properties"; do
+        if [ -r "$f" ]; then
+            props="$f"; break
+        fi
+    done
+    if [ -n "$props" ]; then
+        local wv
+        wv="$(sed -n 's|^distributionUrl=.*gradle-\([0-9][0-9.]*\)-.*zip$|\1|p' "$props" | head -n1)"
+        case "$wv" in [0-9]*) echo "$wv"; return 0 ;; esac
+    fi
+    # 2) Заметка AGP из AGENTS.md -> минимальный Gradle
+    local agp gmin
+    agp="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$HOME/AGENTS.md" | head -n1)"
+    case "$agp" in
+        9.*) gmin="9.1.0" ;;
+        8.*) gmin="8.9" ;;
+    esac
+    if [ -n "$gmin" ]; then echo "$gmin"; return 0; fi
+    # 3) Последняя стабильная из официального реестра версий
+    local latest
+    latest="$(curl -fsSL --max-time 20 https://services.gradle.org/versions/current 2>/dev/null \
+        | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' | head -n1)"
+    case "$latest" in [0-9]*) echo "$latest"; return 0 ;; esac
+    echo "9.9.1" # проверенный fallback, если сеть недоступна
+    return 0
+}
+
+op_gradle() { # ARG = version(s), space-separated, e.g. "8.9 8.14.7 9.1.0 9.9.1" or "auto"
+    local vers="${ARG:-}" ver pick="" auto=""
+    # "auto" может идти вместе с явными версиями — резолвим его отдельно
+    local resolved=""
+    for ver in $vers; do
+        if [ "$ver" = "auto" ]; then auto=1; else resolved="$resolved $ver"; fi
+    done
+    if [ -n "$auto" ]; then
+        step "Pick Gradle version for the project"
+        pick="$(gradle_pick_auto)" || fail "pick gradle version"
+        step "Selected: Gradle $pick"
+        resolved="$resolved $pick"
+    fi
+    vers="${resolved# }"
     command -v unzip >/dev/null 2>&1 || pkg install unzip || fail "unzip"
     local url name z dir
-    url="$(GRADLE_URL_VER "$ver")"; name="gradle-$ver-bin.zip"
-    mkdir -p "$GRDIST"
-    dir="$GRDIST/gradle-$ver"
-    if [ ! -x "$dir/bin/gradle" ]; then
-        step "Download Gradle $ver"
-        z="$PREFIX/tmp/$name"
-        curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -C - -o "$z" "$url" \
-            || curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -o "$z" "$url" \
-            || fail "download $name"
-        step "Unpack"
-        rm -rf "$dir"; mkdir -p "$GRDIST/.agy-unpack-$$"
-        unzip -q "$z" -d "$GRDIST/.agy-unpack-$$" || fail "unpack $name"
-        mv "$GRDIST/.agy-unpack-$$/gradle-$ver" "$dir" || fail "move gradle-$ver"
-        rm -rf "$GRDIST/.agy-unpack-$$" "$z"
-    fi
+    for ver in $vers; do
+        case "$ver" in ''|*[!0-9.]*) fail "bad gradle version: $ver" ;; esac
+        url="$(GRADLE_URL_VER "$ver")"; name="gradle-$ver-bin.zip"
+        mkdir -p "$GRDIST"
+        dir="$GRDIST/gradle-$ver"
+        if [ ! -x "$dir/bin/gradle" ]; then
+            step "Download Gradle $ver"
+            z="$PREFIX/tmp/$name"
+            curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -C - -o "$z" "$url" \
+                || curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -o "$z" "$url" \
+                || fail "download $name"
+            step "Unpack"
+            rm -rf "$dir"; mkdir -p "$GRDIST/.agy-unpack-$$"
+            unzip -q "$z" -d "$GRDIST/.agy-unpack-$$" || fail "unpack $name"
+            mv "$GRDIST/.agy-unpack-$$/gradle-$ver" "$dir" || fail "move gradle-$ver"
+            rm -rf "$GRDIST/.agy-unpack-$$" "$z"
+        else
+            step "Gradle $ver already cached"
+        fi
+    done
+    # Активируется последняя версия из списка; остальные предзагружены
+    # и переключаются мгновенно (симлинк) без повторного скачивания.
+    ver="${vers##* }"
     step "Switch gradle -> $ver"
     if [ -e "$PREFIX/bin/gradle" ] && [ ! -L "$PREFIX/bin/gradle" ] && [ ! -e "$PREFIX/bin/gradle.agy-original" ]; then
         cp -p "$PREFIX/bin/gradle" "$PREFIX/bin/gradle.agy-original" || fail "backup pkg gradle"
@@ -812,14 +867,19 @@ op_gradleremove() {
     refresh_bridges
     say "@@done"
 }
-op_agp() { # ARG = AGP version id, e.g. 8.7.3 / 9.0.0
-    local agp="${ARG:-}" gmin jdk
-    case "$agp" in
-        8.*) gmin="8.9";  jdk="17" ;;
-        9.*) gmin="9.1";  jdk="17+" ;;
-        *) fail "unknown AGP version: $agp" ;;
-    esac
-    gradle_write_agents_note "$agp" "$gmin" "$jdk"
+op_agp() { # ARG = AGP version id(s), space-separated, e.g. "8.7.3 9.0.0"
+    local list="${ARG:-}" agp gmin jdk last=""
+    for agp in $list; do
+        case "$agp" in ''|*[!0-9.]*) fail "unknown AGP version: $agp" ;; esac
+        case "$agp" in
+            8.*) gmin="8.9";  jdk="17" ;;
+            9.*) gmin="9.1";  jdk="17+" ;;
+            *) fail "unknown AGP version: $agp" ;;
+        esac
+        gradle_write_agents_note "$agp" "$gmin" "$jdk"
+        last="$agp"
+    done
+    [ -n "$last" ] || fail "no AGP version"
     say "@@done"
 }
 
