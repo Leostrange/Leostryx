@@ -111,7 +111,7 @@
     { id: "plugins", ru: "Плагины приложения", en: "App plugins", dru: "Node.js LTS, Python, clang, make, openssl", den: "Node.js LTS, Python, clang, make, openssl",
       items: ["nodejs-lts", "python", "clang", "make", "pkg-config", "openssl-tool"] },
     { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35",
-      items: ["openjdk-17", "gradle-8.14.7", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
+      items: ["openjdk-17", "gradle-auto", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
     { id: "native", ru: "Нативный код (NDK)", en: "Native code (NDK)", dru: "clang, CMake, Ninja, NDK sysroot/multilib", den: "clang, CMake, Ninja, NDK sysroot/multilib",
       items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] }
   ];
