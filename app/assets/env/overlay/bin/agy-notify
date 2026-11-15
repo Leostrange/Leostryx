@@ -5,13 +5,44 @@ set -e
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 PREFIX="${PREFIX:-$(cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd)}"
 RISH_BIN="$PREFIX/bin/rish"
+HOME="${HOME:-$(cd -- "$PREFIX/.." 2>/dev/null && pwd)}"
 
-USAGE="Usage: agy-notify [post|cancel|list] [options]
+# Язык интерфейса. Приложение пишет его в "$HOME/.agy_lang" (op setlang),
+# поэтому уведомления в шторке говорят на том же языке, что и остальной UI.
+# Приоритет: --lang/-L > $AGY_LANG > ~/.agy_lang > $LANG > ru.
+agy_detect_lang() {
+    local v="${1:-}"
+    [ -n "$v" ] || v="${AGY_LANG:-}"
+    [ -n "$v" ] || v="$(head -c 8 "$HOME/.agy_lang" 2>/dev/null || true)"
+    [ -n "$v" ] || v="${LANG:-}"
+    case "$v" in
+        en*) printf '%s' "en" ;;
+        ru*) printf '%s' "ru" ;;
+        *)   printf '%s' "ru" ;;
+    esac
+}
+
+# L "русский" "english" — строка под текущий язык уведомлений.
+L() {
+    if [ "$AGY_LANG" = "en" ]; then printf '%s' "$2"; else printf '%s' "$1"; fi
+}
+
+usage() {
+    L 'Использование: agy-notify [post|cancel|list] [options]
+Команды:
+  post    -t <заголовок> [-s <подзаголовок>] [-m <сообщение>] [--tag <метка>]
+  cancel  <метка>       Убрать уведомление с этой меткой
+  list                  Показать активные уведомления
+Общие опции:
+  -L, --lang <ru|en>    Язык уведомления (по умолчанию из ~/.agy_lang)' \
+'Usage: agy-notify [post|cancel|list] [options]
 Commands:
   post    -t <title> [-s <subtitle>] [-m <message>] [--tag <tag>]
-  cancel  <tag>
+  cancel  <tag>         Remove the notification with this tag
   list    Show active notifications
-"
+Common options:
+  -L, --lang <ru|en>    Notification language (default from ~/.agy_lang)'
+}
 
 CMD="${1:-post}"
 shift || true
@@ -20,37 +51,62 @@ TITLE="Antigravity"
 SUBTITLE=""
 MESSAGE=""
 TAG="agy_$(date +%s)"
+LANG_OVERRIDE=""
+# Pick up --lang before validation, so even argument errors use the right
+# language. Iterates over a copy: the real "$@" is consumed by the parser below.
+_scan=("$@")
+_i=0
+while [ "$_i" -lt "${#_scan[@]}" ]; do
+    case "${_scan[$_i]}" in
+        -L|--lang) LANG_OVERRIDE="${_scan[$((_i + 1))]:-}" ;;
+    esac
+    _i=$((_i + 1))
+done
+unset _scan _i
+AGY_LANG="$(agy_detect_lang "$LANG_OVERRIDE")"
+export AGY_LANG
 
 if [ "$CMD" = "cancel" ]; then
     if [ "$#" -ne 1 ] || [ -z "$1" ]; then
-        echo "agy-notify: cancel requires exactly one tag" >&2
-        echo "$USAGE" >&2
+        echo "agy-notify: $(L 'cancel требует ровно одну метку' 'cancel requires exactly one tag')" >&2
+        usage >&2
         exit 2
     fi
     TAG="$1"
     set --
 fi
 
+# $1 — имя опции, для сообщения об ошибке.
+missing_value() {
+    echo "agy-notify: $(L "не указано значение для $1" "missing value for $1")" >&2
+    exit 2
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -t|--title)
-            [ "$#" -ge 2 ] || { echo "agy-notify: missing value for $1" >&2; exit 2; }
+            [ "$#" -ge 2 ] || missing_value "$1"
             TITLE="$2"
             shift 2
             ;;
         -s|--subtitle)
-            [ "$#" -ge 2 ] || { echo "agy-notify: missing value for $1" >&2; exit 2; }
+            [ "$#" -ge 2 ] || missing_value "$1"
             SUBTITLE="$2"
             shift 2
             ;;
         -m|--message)
-            [ "$#" -ge 2 ] || { echo "agy-notify: missing value for $1" >&2; exit 2; }
+            [ "$#" -ge 2 ] || missing_value "$1"
             MESSAGE="$2"
             shift 2
             ;;
         --tag)
-            [ "$#" -ge 2 ] || { echo "agy-notify: missing value for $1" >&2; exit 2; }
+            [ "$#" -ge 2 ] || missing_value "$1"
             TAG="$2"
+            shift 2
+            ;;
+        -L|--lang)
+            [ "$#" -ge 2 ] || missing_value "$1"
+            LANG_OVERRIDE="$2"
             shift 2
             ;;
         *)
@@ -61,6 +117,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+AGY_LANG="$(agy_detect_lang "$LANG_OVERRIDE")"
+export AGY_LANG
 
 if [ "$CMD" = "post" ]; then
     if [ -z "$MESSAGE" ] && [ -n "$TITLE" ]; then
@@ -98,7 +157,7 @@ if [ "$CMD" = "post" ]; then
     fi
 
     cmd notification post -S bigtext -t "$TITLE" "$TAG" "$BODY_TEXT" 2>/dev/null && exit 0 || true
-    echo "[agy-notify] notification queued: $TITLE - $MESSAGE"
+    echo "[agy-notify] $(L 'уведомление поставлено в очередь' 'notification queued'): $TITLE - $MESSAGE"
 
 elif [ "$CMD" = "cancel" ]; then
     if [ -x "$RISH_BIN" ]; then
@@ -109,10 +168,10 @@ elif [ "$CMD" = "list" ]; then
     if [ -x "$RISH_BIN" ]; then
         "$RISH_BIN" -c "dumpsys notification --noredact" 2>/dev/null | grep -E "pkg=|android.title=|android.text=" | head -n 40
     else
-        echo "[agy-notify] rish unavailable to inspect system notification tray"
+        echo "[agy-notify] $(L 'rish недоступен, шторка уведомлений недоступна' 'rish unavailable to inspect system notification tray')"
     fi
 
 else
-    echo "$USAGE"
+    usage
     exit 1
 fi
