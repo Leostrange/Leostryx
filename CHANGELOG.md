@@ -65,6 +65,7 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
 <!-- RU -->
 Раньше композер принимал только изображения, PDF, офисные документы, zip, текст, аудио и видео. Любой другой файл — скрипт без известного расширения, `Dockerfile`, `Makefile`, `.env`, дамп, конфиг, неизвестный бинарник — упирался в тупиковое `Unsupported file format`. Причём до этой проверки дело часто даже не доходило: `drag&drop` отбрасывал файл раньше.
 
+- **Включает исправление из сборки 3.1.7** — фикс конвертера сторонних провайдеров (`liblanguage_server.so`, не-графические `inlineData`) вошёл в этот релиз: 3.1.7 выходила как промежуточная сборка, отдельно не публиковалась;
 - **Убрано сообщение `Unsupported file format`** (`app/assets/web/generated/main.js`, функция-валидатор `u5a`, терминальная ветка `else`). Вместо отказа работает общая ветка прикрепления: файл читается как `ArrayBuffer`, упаковывается в `I.MediaSchema` с блоком `inlineData` и добавляется к сообщению — тем же путём, что и уже поддерживаемые типы.
 - **Расширенный определитель MIME `agyMimeForName()`** — новая функция перед `u5a`. Таблица на ~120 расширений: код (`py`, `js`, `ts`, `tsx`, `go`, `rs`, `java`, `c`, `cpp`, `cs`, `rb`, `php`, `lua`, `kt`, `swift`, `dart`, `sql`, `proto`, `graphql`), конфиги (`json`, `jsonl`, `yaml`, `toml`, `ini`, `cfg`, `conf`, `properties`, `env`, `gradle`, `mk`, `dockerfile`, `gitignore`), разметка и текст (`md`, `rst`, `txt`, `log`, `csv`, `tsv`, `html`, `css`, `scss`, `xml`, `svg`, `tex`, `vtt`), скрипты (`sh`, `bash`, `zsh`, `fish`, `bat`, `cmd`, `ps1`), архивы (`zip`, `gz`, `tgz`, `tar`, `7z`, `rar`, `apk`), шрифты (`ttf`, `otf`, `woff`, `woff2`), а также изображения, аудио, видео и офисные форматы — они нужны, когда браузер отдаёт пустой `File.type`.
 - **Определение по содержимому**: если тип остался пустым или равен `application/octet-stream`, проверяются первые 64 КБ. Наличие нулевых байтов, `0x7F` или служебных управляющих символов (более 2 % выборки) означает бинарник — он уходит как `application/octet-stream`, иначе как `text/plain`. Проверка не читает файл целиком и не влияет на скорость.
@@ -81,6 +82,7 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
 
 Previously the composer accepted only images, PDFs, office documents, zip, text, audio and video. Every other file — a script with an unknown extension, `Dockerfile`, `Makefile`, `.env`, a dump, a config, an unknown binary — hit the dead-end `Unsupported file format`. And often it never even reached that check: `drag&drop` dropped the file earlier.
 
+- **Includes the fix from build 3.1.7** — the third-party provider converter fix (`liblanguage_server.so`, non-image `inlineData`) shipped in this release; 3.1.7 was an intermediate build and was not published separately;
 - **Removed the `Unsupported file format` message** (`app/assets/web/generated/main.js`, the validator function `u5a`, terminal `else` branch). Instead of refusing, the generic attachment path runs: the file is read as an `ArrayBuffer`, packed into `I.MediaSchema` with an `inlineData` block and added to the message — the same path already supported types use.
 - **Extended MIME resolver `agyMimeForName()`** — a new function in front of `u5a`. A table of ~120 extensions: code (`py`, `js`, `ts`, `tsx`, `go`, `rs`, `java`, `c`, `cpp`, `cs`, `rb`, `php`, `lua`, `kt`, `swift`, `dart`, `sql`, `proto`, `graphql`), configs (`json`, `jsonl`, `yaml`, `toml`, `ini`, `cfg`, `conf`, `properties`, `env`, `gradle`, `mk`, `dockerfile`, `gitignore`), markup and text (`md`, `rst`, `txt`, `log`, `csv`, `tsv`, `html`, `css`, `scss`, `xml`, `svg`, `tex`, `vtt`), scripts (`sh`, `bash`, `zsh`, `fish`, `bat`, `cmd`, `ps1`), archives (`zip`, `gz`, `tgz`, `tar`, `7z`, `rar`, `apk`), fonts (`ttf`, `otf`, `woff`, `woff2`), plus images, audio, video and office formats — the latter are needed when the browser reports an empty `File.type`.
 - **Content-based detection**: if the type is still empty or equals `application/octet-stream`, the first 64 KB are inspected. The presence of zero bytes, `0x7F` or service control characters (more than 2 % of the sample) means a binary — it is sent as `application/octet-stream`, otherwise as `text/plain`. The check does not read the whole file and does not affect speed.
@@ -101,6 +103,7 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
     Из-за этого чат, в который был прикреплён скрипт или документ, перманентно крашился при любых последующих запросах к сторонним моделям (включая этап суммаризации контекста `context summarization`).
   - **Исправление ядра (`liblanguage_server.so`)**: в процедуре конвертации медиа-частей запроса (`0x667dfa8–0x667dfdc`) проверки длины MIME-типа (`b.lt`) и префикса `"image/"` (`tbz`) перенаправлены с блока генерации ошибки (`0x667e0b4`) на метку перехода к следующей части сообщения (`0x667ddbc`). Не-графические `inlineData` теперь безопасно пропускаются конвертером OpenAI-формата, запрос формируется корректно, а модель получает текстовый запрос и доступ к файлам на диске без сбоя.
   - Обновлены хеши SHA-256 в манифестах `app/assets/runtime/manifest.json` и `variants/bypass/assets/runtime/manifest.json`.
+- **Сборка не публиковалась отдельно** — правки вошли в релиз 3.1.8; отдельного коммита у 3.1.7 нет, изменения зафиксированы вместе с 3.1.8;
 - **Версия 3.1.7** (`versionCode` 32) в манифесте и «О приложении».
 <!-- /RU -->
 
@@ -111,12 +114,14 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
     As a result, a conversation with an attached script or document crashed permanently on every subsequent request to third-party models (including the `context summarization` stage).
   - **Core fix (`liblanguage_server.so`)**: in the media-part conversion routine (`0x667dfa8–0x667dfdc`) the MIME-length check (`b.lt`) and the `"image/"` prefix check (`tbz`) were redirected from the error-generation block (`0x667e0b4`) to the label that jumps to the next message part (`0x667ddbc`). Non-image `inlineData` is now safely skipped by the OpenAI-format converter, the request is built correctly, and the model receives the text prompt plus access to the files on disk without failing.
   - SHA-256 hashes updated in the manifests `app/assets/runtime/manifest.json` and `variants/bypass/assets/runtime/manifest.json`.
+- **Not published as a standalone build** — its changes shipped in release 3.1.8; 3.1.7 has no commit of its own, the changes were recorded together with 3.1.8;
 - **Version 3.1.7** (`versionCode` 32) in the manifest and in "About the app".
 <!-- /EN -->
 
 ## v3.1.6 — 2026-11-15 (Собственные звуки завершения: Bell и Portal)
 
 <!-- RU -->
+- **Объединённый релиз: включает правки 3.1.3, 3.1.4 и 3.1.5** — эти сборки выходили как промежуточные и отдельно не публиковались; всё, что в них было (гифка в старой переписке, «отрыв» чата от клавиатуры и его настоящая причина, положение гифки под ответом), собрано здесь;
 - **Пресеты звука `Chime` и `Pop` больше не зависят от интернета**: раньше `SOUNDS` в `agy_fun_notify.js` указывал на `https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/{chime,pop}.mp3`. Без сети `new Audio(url).play()` молча падал (ошибка гасилась пустым `catch`), а при наличии сети каждый показ гифки тянул файл со стороннего CDN;
 - **в APK добавлены два собственных файла**: `app/assets/web/leostryx_bell.mp3` (31 808 Б) и `app/assets/web/leostryx_portal.mp3` (43 354 Б) — исходники `Bell.mp3` и `Portal.mp3` из каталога проекта. Они пакуются в APK штатным обходом `app/` в `rebuild.py`, отдельного кода сборки не потребовалось;
 - **`SOUNDS`**: `pop → /leostryx_bell.mp3`, `chime → /leostryx_portal.mp3`. Ключи `pop`/`chime` намеренно оставлены прежними — в `localStorage` у пользователя уже может быть сохранён `agy.funDoneSound`, и смена ключей сбросила бы выбор на «Стандартный»;
@@ -126,6 +131,7 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
 <!-- /RU -->
 
 <!-- EN -->
+- **Merged release: includes the changes from 3.1.3, 3.1.4 and 3.1.5** — those builds were intermediate and were never published on their own; everything they contained (the gif in an old conversation, the chat detaching from the keyboard and its real cause, the gif position under the answer) is collected here;
 - **The `Chime` and `Pop` sound presets no longer depend on the internet**: previously `SOUNDS` in `agy_fun_notify.js` pointed at `https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/{chime,pop}.mp3`. Offline, `new Audio(url).play()` failed silently (the error was swallowed by an empty `catch`), and online every gif display pulled the file from a third-party CDN;
 - **two of our own files added to the APK**: `app/assets/web/leostryx_bell.mp3` (31 808 B) and `app/assets/web/leostryx_portal.mp3` (43 354 B) — the sources `Bell.mp3` and `Portal.mp3` from the project directory. They are packed into the APK by the standard `app/` walk in `rebuild.py`, so no separate build code was needed;
 - **`SOUNDS`**: `pop → /leostryx_bell.mp3`, `chime → /leostryx_portal.mp3`. The `pop`/`chime` keys are deliberately kept as before — a user may already have `agy.funDoneSound` stored in `localStorage`, and renaming the keys would reset their choice to "Standard";
@@ -142,6 +148,7 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
 - заодно: удаление старой гифки ищется по всему документу (`.agy-fun-chat`), а не только внутри контейнера; отступы карточки уменьшены (`margin: 8px auto 4px` вместо `14px auto`);
 - fallback-ветки (без `[data-turn-content]`) сохранены — вставка перед блоком ввода или в конец контейнера;
 - cache-buster `agy_fun_notify.js` → `?v=3.1.7`;
+- **Сборка не публиковалась отдельно** — APK этой версии не выпускался, правки вошли в релиз 3.1.6;
 - **Версия 3.1.5** (`versionCode` 30) в манифесте и «О приложении».
 <!-- /RU -->
 
@@ -151,6 +158,7 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
 - as a bonus: removal of the old gif now searches the whole document (`.agy-fun-chat`) instead of only inside the container; the card margins were reduced (`margin: 8px auto 4px` instead of `14px auto`);
 - the fallback branches (without `[data-turn-content]`) are preserved — insertion before the input block or at the end of the container;
 - cache-buster `agy_fun_notify.js` → `?v=3.1.7`;
+- **Not published as a standalone build** — no APK was produced for this version, its changes shipped in release 3.1.6;
 - **Version 3.1.5** (`versionCode` 30) in the manifest and in "About the app".
 <!-- /EN -->
 
@@ -166,6 +174,7 @@ Previously the composer accepted only images, PDFs, office documents, zip, text,
 - **`agy_ru.js`**: добавлен сторож `pinConvoScroll()` — обнуляет `scrollTop` / `scrollLeft` у всех `conversation-view`; вызывается из capture-обработчика `scroll` и в начале `nudge()`;
 - **`index.html`**: в `<meta name="viewport">` добавлен `interactive-widget=resizes-content` — без него `100dvh` в WebView не уменьшается под IME и оболочка приложения остаётся высотой в полный экран (переменная `--agy-vvh` вычислялась в `installViewport()`, но нигде не использовалась);
 - **cache-buster'ы**: `agy_ru.css` → `?v=3.1.7`, `agy_ru.js` → `?v=3.1.7`;
+- **Сборка не публиковалась отдельно** — APK этой версии не выпускался, правки вошли в релиз 3.1.6;
 - **Версия 3.1.4** (`versionCode` 29) в манифесте и «О приложении».
 <!-- /RU -->
 
@@ -179,6 +188,7 @@ The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body
 - **`agy_ru.js`**: added the guard `pinConvoScroll()` — it zeroes `scrollTop` / `scrollLeft` on every `conversation-view`; it is called from the capture `scroll` handler and at the start of `nudge()`;
 - **`index.html`**: added `interactive-widget=resizes-content` to `<meta name="viewport">` — without it `100dvh` does not shrink under the IME inside WebView and the app shell stays a full screen tall (the `--agy-vvh` variable was computed in `installViewport()` but never used);
 - **cache-busters**: `agy_ru.css` → `?v=3.1.7`, `agy_ru.js` → `?v=3.1.7`;
+- **Not published as a standalone build** — no APK was produced for this version, its changes shipped in release 3.1.6;
 - **Version 3.1.4** (`versionCode` 29) in the manifest and in "About the app".
 <!-- /EN -->
 
@@ -197,6 +207,7 @@ The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body
   - Вставка гифки прокручивает только список сообщений (`autoscroll-viewport`) и мгновенно (`scrollTop = scrollHeight`), без `smooth`-анимации всей панели чата.
   - Обновлены cache-buster'ы `agy_ru.css`, `web_optimizations.js`, `agy_fun_notify.js` (`?v=3.1.6`), чтобы WebView не держал старые файлы.
   - ⚠️ **Пометка из 3.1.4:** эти правки причину не устраняли — документ при открытии IME не скроллится вообще. Реальный виновник — `conversation-view` (см. раздел v3.1.4).
+- **Сборка не публиковалась отдельно** — правки вошли в релиз 3.1.6 вместе с исправлениями 3.1.4 и 3.1.5; отдельного коммита у 3.1.3 нет;
 - **Версия 3.1.3** (`versionCode` 28) в манифесте и «О приложении».
 <!-- /RU -->
 
@@ -213,6 +224,7 @@ The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body
   - Inserting the gif scrolls only the message list (`autoscroll-viewport`) and does it instantly (`scrollTop = scrollHeight`), without a `smooth` animation of the whole chat panel.
   - Cache-busters updated for `agy_ru.css`, `web_optimizations.js`, `agy_fun_notify.js` (`?v=3.1.6`) so the WebView does not keep old files.
   - ⚠️ **Note added in 3.1.4:** these changes did not remove the cause — the document does not scroll at all when the IME opens. The real culprit is `conversation-view` (see the v3.1.4 section).
+- **Not published as a standalone build** — its changes shipped in release 3.1.6 together with the 3.1.4 and 3.1.5 fixes; 3.1.3 has no commit of its own;
 - **Version 3.1.3** (`versionCode` 28) in the manifest and in "About the app".
 <!-- /EN -->
 
