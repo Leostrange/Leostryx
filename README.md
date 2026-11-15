@@ -1,23 +1,26 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.2-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.6-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.2).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.6).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.2"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.2">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+
+> [!NOTE]
+> **3.1.6 — актуальный релиз.** APK `Leostryx-3.1.6-standard.apk` и `Leostryx-3.1.6-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.6.txt` и архивом исходников `Leostryx-repo.zip`.
 
 ---
 
-## Leostryx для Android 3.1.2
+## Leostryx для Android 3.1.6
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -47,8 +50,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.2-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.2) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.2-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.2) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.6-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.6-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -57,14 +60,35 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.2](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.2) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.2/SHA256SUMS-3.1.2.txt).
-2. Установите скачанный APK 3.1.2 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.6](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.6/SHA256SUMS-3.1.6.txt).
+2. Установите скачанный APK 3.1.6 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.2 (см. также [CHANGELOG.md](CHANGELOG.md))
+## Что нового в 3.1.6 (см. также [CHANGELOG.md](CHANGELOG.md))
 
-- **плавный прогресс загрузки во встроенном обновлении** («О приложении → Обновить»): процент больше не «прыгает» (0 → 7 → 100) — добавлен интерполяционный тикер (100 мс), опрос прогресса ускорен до 250 мс, по завершении значение гарантированно доводится до 100 %;
-- **статус Gradle в «Инструментах»**: скачанная, но неактивная версия стабильно показывает бейдж «Скачана — переключение мгновенное» и кнопку «Переключить» вместо «Установить» (передача `@@gradle-cached` в статусе);
-- **версия 3.1.2** в манифесте и «О приложении».
+- **свои звуки завершения задачи**: пресеты `Chime` и `Pop` больше не тянутся с CDN jsDelivr — вместо них в APK лежат собственные файлы `leostryx_portal.mp3` и `leostryx_bell.mp3`, а кнопки в настройках переименованы в **🌀 Portal** и **🛎 Bell**. Раньше без интернета звук молчал, а сам запрос уходил на сторонний сервер;
+- ключи настроек (`chime` / `pop`) сохранены прежними, поэтому уже выбранный звук продолжает работать без сброса;
+- cache-buster `agy_fun_notify.js` → `?v=3.1.8`;
+- **версия 3.1.6** в манифесте (`versionCode` 31) и «О приложении».
+
+### Что было в 3.1.5
+
+- **мем-гифка встаёт вплотную под текстом ответа**: раньше она вставлялась после всего списка сообщений, а внешний контейнер последнего хода в бандле растянут на `min-height: calc(100cqh - 50px)` — из-за этого гифка уезжала к самому низу экрана. Теперь она добавляется внутрь `[data-turn-content="latest"]`, сразу под блоком ответа агента;
+- отступы карточки уменьшены, старая гифка удаляется по всему документу, fallback-ветки для другой вёрстки сохранены;
+- cache-buster `agy_fun_notify.js` → `?v=3.1.7`;
+- **версия 3.1.5** в манифесте (`versionCode` 30) и «О приложении».
+
+### Что было в 3.1.4
+
+- **найдена настоящая причина «отрыва» чата от клавиатуры**: виноват был не документ (он при открытии IME вообще не скроллится), а **второй внешний скролл-контейнер** `[data-testid="conversation-view"]` — он держит соседями и ленту сообщений, и строку ввода, поэтому Chromium, прокручивая его ради каретки, уводил вверх всю панель чата;
+- **`conversation-view` больше не скроллится**: `overflow: hidden !important` в `agy_ru.css` плюс сторож `pinConvoScroll()` в `agy_ru.js`, который обнуляет `scrollTop`/`scrollLeft` на каждом `scroll`-событии и в начале `nudge()`;
+- **`interactive-widget=resizes-content`** добавлен в `<meta name="viewport">` — без него `100dvh` в WebView не уменьшался под клавиатуру;
+- cache-buster'ы `agy_ru.css` / `agy_ru.js` → `?v=3.1.7`;
+
+### Что было в 3.1.3
+
+- **гифка больше не появляется в старых чатах**: мем-анимация привязана к факту отправки запроса и к конкретной переписке (`data-cascade-id`). При открытии истории, листании старых диалогов и при завершении задачи в другом чате гифка не показывается — убрана отложенная очередь «показать при следующем открытии чата», которая и была причиной ложных срабатываний;
+- **плавное появление клавиатуры**: автопрокрутка к вставленной гифке стала мгновенной (`scrollTop = scrollHeight`) вместо `scrollTo({behavior:"smooth"})`, который двигал всю панель чата;
+- **версия 3.1.3** в манифесте (`versionCode` 28) и «О приложении».
 - подробный справочник изменений: [`CHANGELOG.md`](CHANGELOG.md).
 
 - **чистая прозрачность попапов вместо «матового стекла»** — все меню, списки и диалоги окрашиваются ровно в `--background` активной темы (Monokai, Dracula, Catppuccin, One Dark, Gruvbox, Light и любые кастомные) с плотностью `0.88` в тёмных и `0.72` в светлых темах; в светлой теме фон дополнительно затемняется на 12 %, иначе белое стекло поверх белой страницы визуально не даёт прозрачности; `backdrop-filter` принудительно отключён, поэтому под попапом виден контент, а не размытая заливка;

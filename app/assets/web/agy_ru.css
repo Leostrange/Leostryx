@@ -137,6 +137,40 @@ body,
   max-height: 100% !important;
 }
 
+/* The page itself never scrolls — only inner containers do.
+   Android pans the visual viewport when an input gets focus while the keyboard
+   animates. With a scrollable document that pan moved the WHOLE chat, so the
+   chat looked like it detached from its container and slid under the keyboard.
+   The app shell is already `h-[100dvh] overflow-hidden`, so locking the document
+   changes nothing else. */
+html,
+body,
+#root {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+/* Scroll chaining: when the message list reaches its end the scroll used to be
+   handed over to the ancestor container (same "detaching" effect). */
+[data-testid="conversation-view"],
+[data-testid="autoscroll-viewport"],
+[data-testid="agent-input-box"] {
+  overscroll-behavior: contain !important;
+}
+/* THE chat-scroll bug. `conversation-view` is `flex-col h-full overflow-y-auto`
+   and holds BOTH the message list (autoscroll-viewport) and the composer
+   (agent-input-box, shrink-0) as siblings. So it is a second, outer scroller
+   that contains the caret's ancestor. When the IME opens, Chromium scrolls the
+   nearest scrollable ancestor to keep the caret visible — it scrolls THIS box,
+   so the whole chat slides up and looks detached from the container, while the
+   keyboard stays put. The document never scrolls, which is why the html/body
+   overflow locks and installScrollGuard had no effect.
+   The real scroller is autoscroll-viewport (the message list), and the composer
+   is NOT inside it, so with this box unscrollable there is nothing for the
+   browser to pan. */
+[data-testid="conversation-view"] {
+  overflow: hidden !important;
+}
+
 /* Fix Base UI scroll-lock shifting page left and showing blank stripe on the right.
    Base UI JS sets scrollbar-gutter:stable inline on documentElement.style — that
    reserves gutter space and causes the phantom right stripe. Overriding it with

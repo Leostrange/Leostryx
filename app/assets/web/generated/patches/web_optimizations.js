@@ -36,6 +36,35 @@ function installViewport(global, doc) {
 }
 
 /**
+ * patches/web_optimizations/scroll_guard.js - the app shell is a fixed-height
+ * `h-[100dvh]` flex layout, so the document must never scroll. When the IME
+ * opens, Android pans the visual viewport to reveal the focused field; if the
+ * document (or #root) is scrollable at that moment the pan moves the whole
+ * conversation, which looks like the chat detaching from its container.
+ * Anything that scrolls the document is undone immediately.
+ */
+function installScrollGuard(global, doc) {
+  try {
+    function resetDoc() {
+      var de = doc.documentElement, b = doc.body;
+      if (de && (de.scrollTop || de.scrollLeft)) { de.scrollTop = 0; de.scrollLeft = 0; }
+      if (b && (b.scrollTop || b.scrollLeft)) { b.scrollTop = 0; b.scrollLeft = 0; }
+      if (global.scrollX || global.scrollY) {
+        try { global.scrollTo(0, 0); } catch (e) {}
+      }
+    }
+    global.addEventListener('scroll', function (e) {
+      var t = e.target;
+      if (!t || t === doc || t === doc.documentElement || t === doc.body) resetDoc();
+    }, { capture: true, passive: true });
+    if (global.visualViewport) {
+      global.visualViewport.addEventListener('scroll', resetDoc, { passive: true });
+      global.visualViewport.addEventListener('resize', resetDoc, { passive: true });
+    }
+  } catch (e) {}
+}
+
+/**
  * patches/web_optimizations/gpu.js - GPU-accelerate scroll/animation surfaces
  * and isolate layout for lists.
  */
@@ -70,6 +99,7 @@ if (!doc) return;
 
 installTaps(doc);
 installViewport(global, doc);
+installScrollGuard(global, doc);
 installGpu(doc);
 
 global.__agWebOptimizations = { installed: true };

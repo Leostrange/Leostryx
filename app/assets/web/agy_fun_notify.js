@@ -1,14 +1,22 @@
 /* Leostryx — fun completion overlay.
  *
- * Когда агент завершает задачу, приложение подгружает /antigravityCascadeDone.mp3
- * и проигрывает звук. Мы перехватываем этот момент:
- *   - приложение на экране (visible + focus) -> показываем гифку-прикол поверх UI
- *   - приложение в фоне -> звук играет штатно (ничего не показываем)
+ * Когда агент завершает задачу, показываем гифку (и играем звук):
+ *   - приложение на экране (visible) -> гифка прямо в переписке
+ *   - приложение в фоне -> ничего (там работает системное уведомление)
+ *
+ * Как определяется завершение (см. блок «ТРИГГЕР» ниже):
+ *   1. взвод ТОЛЬКО по реальной отправке сообщения (кнопка отправки,
+ *      Enter с опустевшим полем, RPC SendUserCascadeMessage);
+ *   2. затем агент должен реально поработать (Stop-кнопка композера /
+ *      agent-loading / GetTurnDiff) и замолчать на SETTLE_MS;
+ *   3. гифка показывается только в том каскаде (data-cascade-id), в котором
+ *      отправляли, — открытие старой переписки её не вызывает.
  *
  * Настройка (в «Оформление» приложения или напрямую):
  *   localStorage.setItem('agy.funDoneGif', 'https://.../funny.gif')  — своя гифка/картинка
  *   localStorage.setItem('agy.funDoneEnabled', '1' | '0')            — вкл/выкл
- *   localStorage.setItem('agy.funDonePreset', 'nyan'|'party'|'thumbs'|'none')
+ *   localStorage.setItem('agy.funDonePreset', 'michael'|'nice'|...)
+ *   localStorage.setItem('agy.funDoneInChat', '0')                   — оверлей вместо чата
  * Отключить показ: agy.funDoneEnabled = '0'
  */
 (function () {
@@ -39,11 +47,14 @@
   var DURATION_MS = 4000;
 
   /* Пресеты короткого звука. app-done — штатный звук приложения,
-     остальные — маленькие mp3 с CDN; можно указать свой URL. */
+     chime/pop — собственные mp3, лежащие прямо в assets/web (раньше тянулись
+     с CDN jsDelivr: без сети звук молчал, а сам запрос уходил наружу).
+     Ключи chime/pop оставлены прежними, чтобы уже сохранённый в localStorage
+     выбор пользователя продолжал работать; изменились только подписи и файлы. */
   var SOUNDS = {
     "app-done": "/antigravityCascadeDone.mp3", // встроенный звук приложения
-    chime: "https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/chime.mp3",
-    pop:   "https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/pop.mp3"
+    chime: "/leostryx_portal.mp3",             // Portal — «портальный» гул
+    pop:   "/leostryx_bell.mp3"                // Bell — короткий колокольчик
   };
 
   function soundSrc() {
@@ -160,44 +171,68 @@
   }
 
   /* --- In-chat mode: вставляем гифку прямо в переписку --- */
-  var pendingChatGif = false;
-  var watchChatTimer = null;
 
+  var CONVO_SEL = '[data-testid="conversation-view"]';
+  var VIEWPORT_SEL = '[data-testid="autoscroll-viewport"]';
+
+  function convoEl() {
+    try { return document.querySelector(CONVO_SEL); } catch (e) { return null; }
+  }
+  /* Каскад, открытый на экране. Именно этот id привязывает гифку к чату:
+     задачи в других чатах (и просто открытая история) её не показывают. */
+  function convoId() {
+    var el = convoEl();
+    try { return (el && el.getAttribute("data-cascade-id")) || ""; } catch (e) { return ""; }
+  }
+
+  /* Возвращает {host, scroller}:
+     host     — куда вставлять гифку (внутрь последнего хода агента),
+     scroller — что прокручивать (только он, не страница). */
   function findChatContainer() {
-    // 1. Точный селектор Antigravity conversation-view
-    var convo = document.querySelector('[data-testid="conversation-view"]');
-    if (convo) return convo;
+    var vp = null;
+    try { vp = document.querySelector(VIEWPORT_SEL); } catch (e) {}
+    if (vp) return { host: vp.firstElementChild || vp, scroller: vp };
 
-    // 2. Селектор по ролям / классам
+    var convo = convoEl();
+    if (convo) return { host: convo, scroller: convo };
+
     var alt = document.querySelector('[class*="conversation-view"], [class*="conversation"], main [role="log"]');
-    if (alt) return alt;
-
-    // 3. От поля ввода наверх
-    var inp = document.querySelector('textarea, [role="textbox"], [contenteditable="true"]');
-    if (inp) {
-      var cur = inp.parentElement;
-      while (cur && cur !== document.body) {
-        if (cur.clientHeight > 250 && (cur.scrollHeight > cur.clientHeight || cur.getAttribute("data-testid") === "conversation-view")) {
-          return cur;
-        }
-        cur = cur.parentElement;
-      }
-    }
+    if (alt) return { host: alt, scroller: alt };
     return null;
   }
 
+  /* Последний ход агента растянут на всю высоту ленты: в бандле внешний
+     контейнер хода получает `min-height: calc(100cqh - 50px)` (у вьюпорта
+     `container-type: size`). Поэтому всё, что вставлено ПОСЛЕ списка
+     сообщений, оказывалось у самого низа экрана — гифка «отрывалась» от
+     текста на пол-экрана. Внутренний `[data-turn-content]` — обычный
+     flex-столбец по высоте содержимого, поэтому гифка встаёт вплотную
+     под последним ответом. */
+  var TURN_SEL = "[data-turn-content]";
+  function lastTurnContent() {
+    var list;
+    try { list = document.querySelectorAll(TURN_SEL); } catch (e) { return null; }
+    if (!list || !list.length) return null;
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (list[i].getAttribute("data-turn-content") === "latest") return list[i];
+    }
+    return list[list.length - 1];
+  }
+
   function insertGifToElement(chat, dataUrl) {
-    if (!chat) return false;
-    // Проверим, нет ли уже свежей гифки
-    var existing = chat.querySelector(".agy-fun-chat");
-    if (existing) {
-      try { existing.remove(); } catch(e) {}
+    if (!chat || !chat.host) return false;
+    var host = chat.host, scroller = chat.scroller || host;
+    // Убираем предыдущую гифку (где бы она ни лежала)
+    var stale;
+    try { stale = document.querySelectorAll(".agy-fun-chat"); } catch (e) { stale = []; }
+    for (var s = 0; s < stale.length; s++) {
+      try { stale[s].remove(); } catch (e) {}
     }
 
     var wrap = document.createElement("div");
     wrap.className = "agy-fun-chat";
     wrap.setAttribute("style",
-      "display:flex;flex-direction:column;align-items:center;margin:14px auto;padding:8px 12px 10px;" +
+      "display:flex;flex-direction:column;align-items:center;margin:8px auto 4px;padding:8px 12px 10px;" +
       "background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;" +
       "box-shadow:0 4px 20px rgba(0,0,0,0.35);max-width:280px;box-sizing:border-box;pointer-events:auto;");
 
@@ -215,21 +250,28 @@
     wrap.appendChild(img);
     wrap.appendChild(caption);
 
-    // Если внутри chat есть блок формы ввода (в самом низу), вставляем ПЕРЕД ним,
-    // либо в конец контейнера сообщений
-    var inputRow = chat.querySelector('[class*="px-4 pb-2"], [class*="composer"], form, textarea')?.closest('div[class*="items-center"]');
-    if (inputRow && inputRow.parentElement === chat) {
-      chat.insertBefore(wrap, inputRow);
+    // Приоритет: конец последнего хода агента (там гифка встаёт сразу под
+    // текстом ответа). Fallback'и — на случай другой вёрстки.
+    var turn = lastTurnContent();
+    if (turn) {
+      turn.appendChild(wrap);
     } else {
-      chat.appendChild(wrap);
+      var inputRow = null;
+      try {
+        inputRow = host.querySelector('[class*="px-4 pb-2"], [class*="composer"], form, textarea')?.closest('div[class*="items-center"]');
+      } catch (e) {}
+      if (inputRow && inputRow.parentElement === host) {
+        host.insertBefore(wrap, inputRow);
+      } else {
+        host.appendChild(wrap);
+      }
     }
 
     dbg("chatInsert:inserted ok");
-    try {
-      chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
-    } catch(e) {
-      try { chat.scrollTop = chat.scrollHeight; } catch(e2) {}
-    }
+    // Только мгновенный скролл списка сообщений. smooth-скролл во время
+    // анимации клавиатуры WebView применял ко всей странице — чат «отрывался»
+    // от контейнера. Страницу не трогаем вообще.
+    try { scroller.scrollTop = scroller.scrollHeight; } catch (e) {}
 
     // Авто-удаление через 35 секунд
     setTimeout(function() {
@@ -238,37 +280,20 @@
     return true;
   }
 
-  function chatInsert() {
+  function chatInsert(expectedCascadeId) {
     var chat = findChatContainer();
     if (!chat) {
-      // Пользователь не на экране чата (в настройках / проектах).
-      // НЕ показываем оверлей на весь экран! Ждем перехода в чат:
-      dbg("chatInsert:not-on-chat-screen -> waiting");
-      pendingChatGif = true;
-      if (!watchChatTimer) {
-        var attempts = 0;
-        watchChatTimer = setInterval(function() {
-          attempts++;
-          var c = findChatContainer();
-          if (c && pendingChatGif) {
-            clearInterval(watchChatTimer);
-            watchChatTimer = null;
-            pendingChatGif = false;
-            dbg("chatInsert:deferred-found-chat");
-            loadGifDataUrl(gifSrc(), function(dataUrl) {
-              insertGifToElement(c, dataUrl);
-            });
-          } else if (attempts > 60) { // 30 секунд ждем
-            clearInterval(watchChatTimer);
-            watchChatTimer = null;
-            pendingChatGif = false;
-            dbg("chatInsert:deferred-timeout");
-          }
-        }, 500);
-      }
+      // Пользователь не в чате (настройки / проекты). Гифку НЕ откладываем:
+      // раньше она «ждала» до 30 секунд и потом появлялась в ЛЮБОМ открытом
+      // чате — отсюда баг «зашёл в старую переписку, а там гифка».
+      dbg("chatInsert:not-on-chat-screen -> skip");
       return;
     }
-
+    var cur = convoId();
+    if (expectedCascadeId && cur && cur !== expectedCascadeId) {
+      dbg("chatInsert:other-chat -> skip");
+      return;
+    }
     loadGifDataUrl(gifSrc(), function(dataUrl) {
       insertGifToElement(chat, dataUrl);
     });
@@ -280,13 +305,17 @@
   function dbg(s) {
     try { window.__agyFunDebug = (window.__agyFunDebug || []).concat([s]).slice(-40); } catch (e) {}
   }
-  function funShow() {
+  function funShow(expectedCascadeId) {
     var now = Date.now();
     if (now - scriptStart < 8000) { dbg("skip:warmup"); return; }
     if (now - lastShow < 12000) { dbg("skip:cooldown"); return; }
     lastShow = now;
     dbg("fire:inChat=" + get("agy.funDoneInChat", "1"));
-    if (get("agy.funDoneInChat", "1") === "0") show(); else chatInsert();
+    if (get("agy.funDoneInChat", "1") === "0") show(); else chatInsert(expectedCascadeId);
+    playSound();
+  }
+
+  function playSound() {
     try { new Audio(soundSrc()).play().catch(function (e) {}); } catch (e) {}
   }
 
@@ -296,75 +325,143 @@
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     ЕДИНСТВЕННЫЙ ТРИГГЕР: реальное завершение отправленной задачи
+     ТРИГГЕР: завершение задачи, которую отправил пользователь
      ───────────────────────────────────────────────────────────────
-     1. Активируется ТОЛЬКО когда пользователь отправил сообщение
-        (SendUserCascadeMessage или клик отправки / Enter).
-     2. Пока агент стримит ответ, идут GetTurnDiff (~каждые 1-2 сек).
-     3. Как только стрим остановился на 3 сек — задача завершена 🎉.
-     4. Если вы просто открыли старый чат — SendUserCascadeMessage
-        НЕ вызывался, поэтому открытие истории НИКОГДА не вызовет гифку!
+     Взводится ТОЛЬКО реальной отправкой сообщения:
+       • клик по кнопке отправки внутри блока ввода (send-button),
+       • Enter в поле ввода — и только если поле действительно опустело,
+       • RPC SendUserCascadeMessage (если fetch его видит).
+     Потом ждём, пока агент реально поработает (Stop-кнопка композера /
+     agent-loading / GetTurnDiff) и замолчит на SETTLE_MS.
+     Гифка показывается только в том же каскаде (data-cascade-id),
+     поэтому простое открытие старой переписки её не вызывает.
      ═══════════════════════════════════════════════════════════════ */
+  var SETTLE_MS = 4200;                 // столько тишины = задача завершена
+  var ARM_TTL_MS = 4 * 3600 * 1000;     // страховка от «вечного» взвода
+  var arm = null;                       // { at, cascadeId, seenBusy, lastActivity }
+  var armTicker = null;
+
+  /* Агент работает? Композер на время работы показывает кнопку Cancel
+     (data-tooltip-id="input-send-button-cancel-tooltip"), в переписке —
+     индикатор agent-loading. Ни тот, ни другой не появляется при
+     открытии истории. */
+  function isAgentBusy() {
+    try {
+      return !!document.querySelector(
+        '[data-tooltip-id="input-send-button-cancel-tooltip"],' +
+        '[data-testid="agent-loading"]');
+    } catch (e) { return false; }
+  }
+
+  function readComposer(el) {
+    try {
+      var v = (el.value !== undefined ? el.value : el.textContent) || "";
+      return v.replace(/\s+/g, " ").trim();
+    } catch (e) { return ""; }
+  }
+
+  function armTrigger(source) {
+    var now = Date.now();
+    var id = convoId();
+    arm = {
+      at: now,
+      cascadeId: (id && id !== "conversation") ? id : "",
+      seenBusy: false,
+      lastActivity: now
+    };
+    dbg("arm:" + source + " id=" + (arm.cascadeId || "?"));
+    if (!armTicker) armTicker = setInterval(armTick, 700);
+  }
+
+  function disarm(reason) {
+    if (!arm) return;
+    arm = null;
+    if (armTicker) { clearInterval(armTicker); armTicker = null; }
+    dbg("disarm:" + reason);
+  }
+
+  function armTick() {
+    if (!arm) { disarm("idle"); return; }
+    var now = Date.now();
+    if (now - arm.at > ARM_TTL_MS) { disarm("ttl"); return; }
+
+    // Новый чат: настоящий cascadeId появляется только после отправки
+    if (!arm.cascadeId) {
+      var id = convoId();
+      if (id && id !== "conversation") arm.cascadeId = id;
+    }
+    if (isAgentBusy()) {
+      arm.seenBusy = true;
+      arm.lastActivity = now;
+      return;
+    }
+    if (!arm.seenBusy) return;                       // работа ещё не началась
+    if (now - arm.lastActivity < SETTLE_MS) return;   // агент молчит недолго
+
+    var done = arm;
+    disarm("completed");
+    if (!isForeground()) { dbg("done:background -> skip"); return; }
+    var curId = convoId();
+    if (done.cascadeId && curId && curId !== done.cascadeId) {
+      dbg("done:other-chat -> skip");
+      return;
+    }
+    dbg("trigger:task-completed");
+    funShow(done.cascadeId);
+  }
+
+  /* Стриминг ответа лишь продлевает «тишину» — решение принимает armTick. */
+  function markActivity() {
+    if (!arm) return;
+    arm.lastActivity = Date.now();
+    arm.seenBusy = true;   // GetTurnDiff запрашивается только для активного хода
+  }
+
   try {
     var origFetch = window.fetch;
     if (typeof origFetch === "function") {
-
-      var userSentTask = false;      // пользователь отправил задачу в работу
-      var diffSeenCount = 0;         // счетчик шагов стриминга ответа
-      var turnDiffTimer = null;      // таймер завершения
-      var PAUSE_MS = 3000;           // 3 сек тишины после ответа
-
-      function armUserTask() {
-        userSentTask = true;
-        diffSeenCount = 0;
-        dbg("arm:task-started");
-      }
-
-      // Отслеживаем также отправку через Enter
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          var tg = e.target;
-          if (tg && (tg.tagName === "TEXTAREA" || tg.isContentEditable || tg.getAttribute("role") === "textbox")) {
-            armUserTask();
-          }
-        }
-      }, true);
-
-      function onTurnDiffSeen() {
-        if (!userSentTask) return;
-        diffSeenCount++;
-        if (turnDiffTimer) clearTimeout(turnDiffTimer);
-        turnDiffTimer = setTimeout(function () {
-          if (!userSentTask) return;
-          userSentTask = false;
-          diffSeenCount = 0;
-          dbg("trigger:task-completed");
-          if (isForeground()) funShow();
-        }, PAUSE_MS);
-      }
-
-      window.fetch = function (input, init) {
+      window.fetch = function (input) {
         try {
           var url = typeof input === "string" ? input : (input && input.url) || "";
           if (url) {
-            // Отправка запроса пользователем -> активируем триггер
-            if (url.indexOf("SendUserCascadeMessage") !== -1) {
-              armUserTask();
-            }
-            // Стриминг ответа агента
-            else if (url.indexOf("GetTurnDiff") !== -1) {
-              if (userSentTask) {
-                onTurnDiffSeen();
-              } else {
-                dbg("skip:GetTurnDiff-idle");
-              }
-            }
+            var low = url.toLowerCase();
+            if (low.indexOf("sendusercascademessage") !== -1) armTrigger("rpc");
+            else if (low.indexOf("getturndiff") !== -1) markActivity();
           }
         } catch (e) {}
         return origFetch.apply(this, arguments);
       };
     }
   } catch (e) {}
+
+  /* Кнопка отправки — самый надёжный сигнал на телефоне. */
+  document.addEventListener("click", function (e) {
+    try {
+      var b = e.target && e.target.closest && e.target.closest('[data-testid="send-button"]');
+      if (!b || b.disabled) return;
+      if (!b.closest('[data-testid="agent-input-box"]')) return;
+      armTrigger("send-button");
+    } catch (err) {}
+  }, true);
+
+  /* Enter в композере: взводим только если сообщение реально ушло (поле
+     опустело). Раньше Enter в ЛЮБОМ поле (поиск, переименование) взводил
+     триггер и не снимал его — из-за этого гифка выскакивала при открытии
+     старой переписки. */
+  document.addEventListener("keydown", function (e) {
+    try {
+      if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+      var tg = e.target;
+      if (!tg || !tg.closest || !tg.closest('[data-testid="agent-input-box"]')) return;
+      if (!(tg.tagName === "TEXTAREA" || tg.isContentEditable || tg.getAttribute("role") === "textbox")) return;
+      if (!readComposer(tg)) return;      // пустой Enter — не отправка
+      setTimeout(function () {
+        try { if (!tg.isConnected) return; } catch (err) {}
+        if (readComposer(tg) === "") armTrigger("enter");
+        else { try { dbg("skip:enter-not-sent"); } catch (err2) {} }
+      }, 450);
+    } catch (err) {}
+  }, true);
 
   /* --- Блок настроек в «Оформление» (Appearance) ---
      Использует mount-хост div.agy-fun-done-host, вставленный в экран Appearance
@@ -395,7 +492,7 @@
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       Object.keys(SOUNDS).map(function (k) {
         return '<button data-sound="' + k + '" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#222);color:inherit;cursor:pointer">' +
-          ({ "app-done": "🔔 Стандартный", chime: "🎵 Chime", pop: "💧 Pop" })[k] + '</button>';
+          ({ "app-done": "🔔 Стандартный", chime: "🌀 Portal", pop: "🛎 Bell" })[k] + '</button>';
       }).join("") + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
       '<input id="agy-fd-sound-url" placeholder="Ссылка на свой звук (https://...mp3)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
@@ -436,8 +533,11 @@
       try { localStorage.setItem("agy.funDoneSoundUrl", surl.value.trim()); } catch (e) {}
     });
     box.querySelector("#agy-fd-test").addEventListener("click", function () {
-      funShow();
-      try { new Audio(soundSrc()).play().catch(function (e) {}); } catch (e) {}
+      // Настройки открыты вне чата — in-chat вставка тут невозможна,
+      // поэтому пример всегда показываем оверлеем.
+      lastShow = 0;
+      show();
+      playSound();
     });
     return box;
   }

@@ -432,7 +432,31 @@
   }, true);
 
   /* ---- Chat input repaint nudge (No scroll jiggle) ------------------------ */
+  /* `conversation-view` must never scroll: it is the flex column that holds the
+   * message list AND the composer as siblings, so Chromium uses it to reveal the
+   * caret when the keyboard opens, dragging the whole chat up ("detached" bug).
+   * The only real scroller is `autoscroll-viewport` (the message list), which
+   * does not contain the caret, so it is never auto-scrolled by the IME.
+   * agy_ru.css already forces `overflow:hidden` here; this pins the offset in
+   * case something else nudged it (and neutralises a stale pan on keyboard
+   * open/close). Safe to run always — it is a no-op once the offset is 0. */
+  var CONVO = "[data-testid='conversation-view']";
+  function pinConvoScroll() {
+    var list;
+    try { list = document.querySelectorAll(CONVO); } catch (e) { return; }
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i];
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    }
+  }
+  document.addEventListener("scroll", function (e) {
+    var t = e.target;
+    if (t && t.matches && t.matches(CONVO)) pinConvoScroll();
+  }, { capture: true, passive: true });
+
   function nudge() {
+    pinConvoScroll();
     var box = document.querySelector(BOX);
     if (!box || !box.contains(document.activeElement)) return;
     compositingAncestors(document.activeElement || box).forEach(repaint);
