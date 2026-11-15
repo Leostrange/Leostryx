@@ -6,6 +6,28 @@
 
 ---
 
+<!-- AGY-LANG -->
+## 0. Language — always answer in the language the user writes in
+
+**RU**
+
+- **Отвечайте на том языке, на котором пишет пользователь.** Запрос по-русски → ответ по-русски; запрос по-английски → ответ по-английски. Не переходите на другой язык самовольно и не отвечайте по-английски на русский вопрос.
+- Язык интерфейса приложения, системы и встроенной документации роли не играет: имеет значение только последнее сообщение пользователя. Новое сообщение на другом языке меняет язык ответа с этого же сообщения.
+- Если в одном сообщении несколько языков, ориентируйтесь на язык самой просьбы. Технические идентификаторы, команды, пути, имена файлов, код и фрагменты логов оставляйте в исходном виде — их не переводят.
+- Правило распространяется на всё, что вы пишете от имени пользователя: сообщения коммитов в его проекте, записи `CHANGELOG.md`, тексты для форума и релизов, документацию, комментарии в его коде и ответы в его задачах.
+- Встроенная документация двуязычна намеренно (`CHANGELOG.md`, `README.md` используют пары `<!-- EN -->` … `<!-- /EN -->`). Правя такой файл, обновляйте обе половины согласованно, а не только ту, которую тронули.
+
+**EN**
+
+- **Reply in the language the user writes in.** A Russian request gets a Russian answer, an English request an English answer. Do not switch language on your own, and do not answer a Russian question in English.
+- The language of the app interface, of the OS and of the bundled documentation does not matter: only the user's latest message does. A new message in another language changes the language of the answer from that same message onward.
+- If one message mixes languages, follow the language of the request itself. Technical identifiers, commands, paths, file names, code and log excerpts stay in their original form — they are not translated.
+- The rule covers everything you write on the user's behalf: commit messages in their project, `CHANGELOG.md` entries, forum and release notes, documentation, comments in their code and answers in their tasks.
+- The bundled documentation is bilingual on purpose (`CHANGELOG.md`, `README.md` use `<!-- EN -->` … `<!-- /EN -->` pairs). When editing such a file, update both halves in sync instead of translating only the one you touched.
+<!-- /AGY-LANG -->
+
+---
+
 ## 1. Platform & Environment Identity
 
 - **Platform:** Native Android (Linux kernel 6.1+, ARM64 / `aarch64` architecture, **ARMv8.0-A+ baseline** with ARMv8.0 LSE emulation and native ARMv8.1-A+ LSE atomics).
@@ -210,3 +232,29 @@ Several Gradle distributions and several Android Gradle Plugin versions coexist 
   `bash $HOME/web/agy_tools.sh agp "8.7.3 9.0.0 9.1.1"` and `bash $HOME/web/agy_tools.sh gradle "8.14.7 auto"`.
 - **Verify** with `bash $HOME/web/agy_tools.sh verify jvm,agp,gradle` — `jvm` counts the anchors in the store **and** the anchors a flag-free JVM actually sees (`anchors=149 default=149`); both must be > 0, because `anchors>0` with `default=0` means the store is still PKCS12 and every HTTPS request will fail. `agp` checks that at least one AGP version is cached.
 - **`agy-selfheal`** repairs the whole toolchain (environment profile, bridges, Gradle symlink, AGP state/note pair, `AGENTS.md` blocks) and runs hourly through `agy-daemon`. Run it manually after an app update, or when `gradle`/AGP suddenly break — do not reinstall packages to fix a symlink.
+
+---
+
+<!-- AGY-BUILD-VERSION -->
+## 10. Build Versioning & Change Approval
+
+**RU**
+
+- **Версия поднимается ровно один раз за сборку.** Номер фиксируется, когда сборка объявлена, и до тех пор, пока APK не собран, подписан и проверен, он не меняется.
+- **Фиксы и фичи, найденные по ходу сборки, входят в текущую версию.** Не «перепрыгивайте» номер и не откладывайте их в следующую: иначе в `CHANGELOG.md` появятся версии, которых нет ни в одном APK, и текст разойдётся с реальностью.
+- **Перед добавлением фичи или фикса в идущую сборку — спросите пользователя.** Кратко: что меняется, зачем, какой риск и что это задержит. Без явного подтверждения новая функциональность в текущий билд не попадает. Исправления, ломающие саму сборку (сломанный симлинк, падающий инструмент), можно вносить без вопроса — но отметить их в отчёте.
+- **`CHANGELOG.md` пишется только после успешной сборки.** Секция версии появляется, когда `dist/signed/Leostryx-<version>-*.apk` существует, подписан и прошёл `apksigner verify`. Сначала артефакт — потом запись, никогда наоборот.
+- **Три источника обязаны совпадать:** заголовок версии в `CHANGELOG.md`, имя собранного APK `Leostryx-<version>-<variant>.apk` и `SHA256SUMS-<version>.txt`. Расхождение — это ошибка сборки, а не мелочь: остановитесь и приведите их в соответствие.
+- **Поднятие номера — отдельное решение, а не побочный эффект.** Если работа выходит за рамки текущей сборки (новая функциональность, а не исправление), спросите, поднимать ли версию, и только затем начинайте новую секцию.
+- Внутри одной версии изменения группируются по смыслу (`Исправлено`, `Добавлено`, `Изменено`), а не по датам коммитов — читатель форума видит один цельный список.
+
+**EN**
+
+- **The version is bumped exactly once per build.** It is fixed when the build is declared and does not change until the APK has been built, signed and verified.
+- **Fixes and features found mid-build belong to the current version.** Never skip a number or defer them to the next one: otherwise `CHANGELOG.md` ends up listing versions that no APK ever contained, and the text diverges from reality.
+- **Ask the user before adding a feature or a fix to an in-flight build.** Briefly: what changes, why, the risk, and what it delays. Without explicit confirmation, new functionality does not enter the current build. Changes that repair the build itself (a broken symlink, a crashing tool) may go in without asking — but must be reported.
+- **`CHANGELOG.md` is written only after a successful build.** A version section appears once `dist/signed/Leostryx-<version>-*.apk` exists, is signed and passes `apksigner verify`. Artifact first, entry second — never the reverse.
+- **Three sources must agree:** the version heading in `CHANGELOG.md`, the built APK name `Leostryx-<version>-<variant>.apk` and `SHA256SUMS-<version>.txt`. A mismatch is a build error, not a cosmetic issue: stop and reconcile them.
+- **Bumping the number is a decision, not a side effect.** If the work goes beyond the current build (new functionality rather than a fix), ask whether to bump, and only then start a new section.
+- Within one version, changes are grouped by meaning (`Fixed`, `Added`, `Changed`), not by commit date — a forum reader should see one coherent list.
+<!-- /AGY-BUILD-VERSION -->
