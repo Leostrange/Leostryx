@@ -1,8 +1,13 @@
 /* Leostryx — fun completion overlay.
  *
- * Когда агент завершает задачу, показываем гифку (и играем звук):
- *   - приложение на экране (visible) -> гифка прямо в переписке
- *   - приложение в фоне -> ничего (там работает системное уведомление)
+ * Когда агент завершает задачу, показываем гифку и играем звук:
+ *   - приложение на экране, тот же чат  -> гифка прямо в переписке;
+ *   - приложение на экране, другой чат  -> оверлей (в чужую переписку не лезем);
+ *   - приложение в фоне                 -> завершение запоминается (15 мин)
+ *                                          и отдаётся при возврате в приложение.
+ * Раньше фон и чужой чат просто выбрасывались (`done:background -> skip`),
+ * а системного уведомления на завершение хода нет — длинная сборка или
+ * установка заканчивалась полной тишиной.
  *
  * Как определяется завершение (см. блок «ТРИГГЕР» ниже):
  *   1. взвод ТОЛЬКО по реальной отправке сообщения (кнопка отправки,
@@ -11,6 +16,14 @@
  *      agent-loading / GetTurnDiff) и замолчать на SETTLE_MS;
  *   3. гифка показывается только в том каскаде (data-cascade-id), в котором
  *      отправляли, — открытие старой переписки её не вызывает.
+ * Таймеры в фоне Android замораживает, поэтому при возврате в приложение
+ * взвод «доседывается» через GRACE_MS, если индикатор занятости уже исчез.
+ *
+ * Звук: WebView требует жеста пользователя (setMediaPlaybackRequiresUserGesture),
+ * поэтому первый `play()` без жеста отклоняется с NotAllowedError. Общий
+ * элемент Audio разблокируется первым касанием беззвучным прогоном, а
+ * заблокированное воспроизведение встаёт в очередь и повторяется на следующем
+ * жесте — вместо того чтобы потеряться в пустом .catch().
  *
  * Настройка (в «Оформление» приложения или напрямую):
  *   localStorage.setItem('agy.funDoneGif', 'https://.../funny.gif')  — своя гифка/картинка
@@ -18,6 +31,11 @@
  *   localStorage.setItem('agy.funDonePreset', 'michael'|'nice'|...)
  *   localStorage.setItem('agy.funDoneInChat', '0')                   — оверлей вместо чата
  * Отключить показ: agy.funDoneEnabled = '0'
+ *
+ * Диагностика в консоли WebView:
+ *   __agyFunDiag()  — состояние (enabled, inChat, gif, sound, audioUnlocked,
+ *                     soundQueued, visible, armed, seenBusy, pending, log);
+ *   __agyFunFire()  — принудительно показать гифку и проиграть звук.
  */
 (function () {
   "use strict";
@@ -238,6 +256,7 @@
     var stale;
     try { stale = document.querySelectorAll(".agy-fun-chat"); } catch (e) { stale = []; }
     for (var s = 0; s < stale.length; s++) {
+      try { if (stale[s]._agyKeep) clearInterval(stale[s]._agyKeep); } catch (e) {}
       try { stale[s].remove(); } catch (e) {}
     }
 
@@ -262,22 +281,30 @@
     wrap.appendChild(img);
     wrap.appendChild(caption);
 
-    // Приоритет: конец последнего хода агента (там гифка встаёт сразу под
-    // текстом ответа). Fallback'и — на случай другой вёрстки.
-    var turn = lastTurnContent();
-    if (turn) {
-      turn.appendChild(wrap);
-    } else {
+    /* Вставка в последний ход агента. Узел живёт в дереве, которым владеет
+       React: любой его re-render (финализация хода, приход статуса
+       инструментов) выбрасывает наши элементы, и гифка исчезает через
+       мгновение. Поэтому тот же самый узел возвращается на место, пока не
+       истечёт его 35-секундный срок. */
+    function place() {
+      var turn = lastTurnContent();
+      if (turn) {
+        turn.appendChild(wrap);
+        return true;
+      }
       var inputRow = null;
       try {
         inputRow = host.querySelector('[class*="px-4 pb-2"], [class*="composer"], form, textarea')?.closest('div[class*="items-center"]');
       } catch (e) {}
       if (inputRow && inputRow.parentElement === host) {
         host.insertBefore(wrap, inputRow);
-      } else {
-        host.appendChild(wrap);
+        return true;
       }
+      if (host) { host.appendChild(wrap); return true; }
+      return false;
     }
+
+    if (!place()) return false;
 
     dbg("chatInsert:inserted ok");
     // Только мгновенный скролл списка сообщений. smooth-скролл во время
@@ -285,29 +312,57 @@
     // от контейнера. Страницу не трогаем вообще.
     try { scroller.scrollTop = scroller.scrollHeight; } catch (e) {}
 
-    // Авто-удаление через 35 секунд
-    setTimeout(function() {
-      try { wrap.remove(); } catch(e) {}
-    }, 35000);
+    // Авто-удаление через 35 секунд; до этого — удержание узла в дереве.
+    // Возвращать узел можно только в тот же каскад: иначе при переходе в
+    // другую переписку гифка «прилипала» к чужому последнему ходу.
+    var born = Date.now(), replaced = 0, atId = convoId();
+    wrap._agyKeep = setInterval(function () {
+      try {
+        if (Date.now() - born > 35000) {
+          clearInterval(wrap._agyKeep); wrap._agyKeep = null;
+          try { wrap.remove(); } catch (e) {}
+          return;
+        }
+        if (atId && convoId() && convoId() !== atId) {
+          clearInterval(wrap._agyKeep); wrap._agyKeep = null;
+          try { wrap.remove(); } catch (e) {}
+          dbg("chatInsert:left-chat -> drop");
+          return;
+        }
+        var inDoc = false;
+        try { inDoc = document.contains(wrap); } catch (e) { inDoc = !!wrap.parentNode; }
+        if (inDoc) return;
+        if (replaced >= 10) { clearInterval(wrap._agyKeep); wrap._agyKeep = null; return; }
+        replaced++;
+        place();
+        dbg("chatInsert:restored " + replaced);
+      } catch (e) {}
+    }, 800);
     return true;
   }
 
-  function chatInsert(expectedCascadeId) {
+  /* done(placed) вызывается всегда: true — гифка в чате, false — ставить
+     некуда (открыт не чат или другой каскад). Тогда funShow покажет
+     обычный оверлей вместо молчания. */
+  function chatInsert(expectedCascadeId, done) {
+    done = done || function () {};
     var chat = findChatContainer();
     if (!chat) {
       // Пользователь не в чате (настройки / проекты). Гифку НЕ откладываем:
       // раньше она «ждала» до 30 секунд и потом появлялась в ЛЮБОМ открытом
       // чате — отсюда баг «зашёл в старую переписку, а там гифка».
-      dbg("chatInsert:not-on-chat-screen -> skip");
+      dbg("chatInsert:not-on-chat-screen -> overlay");
+      done(false);
       return;
     }
     var cur = convoId();
     if (expectedCascadeId && cur && cur !== expectedCascadeId) {
-      dbg("chatInsert:other-chat -> skip");
+      dbg("chatInsert:other-chat -> overlay");
+      done(false);
       return;
     }
-    loadGifDataUrl(gifSrc(), function(dataUrl) {
-      insertGifToElement(chat, dataUrl);
+    loadGifDataUrl(gifSrc(), function (dataUrl) {
+      done(!!insertGifToElement(chat, dataUrl));
     });
   }
 
@@ -317,18 +372,103 @@
   function dbg(s) {
     try { window.__agyFunDebug = (window.__agyFunDebug || []).concat([s]).slice(-40); } catch (e) {}
   }
-  function funShow(expectedCascadeId) {
+  function funShow(expectedCascadeId, opts) {
+    opts = opts || {};
     var now = Date.now();
-    if (now - scriptStart < 8000) { dbg("skip:warmup"); return; }
-    if (now - lastShow < 12000) { dbg("skip:cooldown"); return; }
+    if (!opts.force) {
+      if (now - scriptStart < 8000) { dbg("skip:warmup"); return; }
+      // Только защита от двойного вызова в пределах одного хода: сам ход
+      // выдаётся один раз (disarm), поэтому длинное «окно тишины» лишь
+      // съедало завершение следующей, быстро прошедшей задачи.
+      if (now - lastShow < 2000) { dbg("skip:dup"); return; }
+    }
     lastShow = now;
-    dbg("fire:inChat=" + get("agy.funDoneInChat", "1"));
-    if (get("agy.funDoneInChat", "1") === "0") show(); else chatInsert(expectedCascadeId);
-    playSound();
+    var inChat = get("agy.funDoneInChat", "1") !== "0";
+    dbg("fire:inChat=" + inChat + (opts.force ? " force" : ""));
+    if (!inChat || opts.overlay) { show(); playSound(); return; }
+    chatInsert(expectedCascadeId, function (placed) {
+      if (!placed) { dbg("fallback:overlay"); show(); }
+      playSound();
+    });
   }
 
+  /* --- Звук ---
+     WebView по умолчанию требует «жеста» пользователя для воспроизведения
+     (setMediaPlaybackRequiresUserGesture). `new Audio(...).play()` без жеста
+     отклоняется с NotAllowedError, а ошибка глушилась — поэтому звук
+     завершения молчал. Теперь один общий элемент Audio создаётся заранее,
+     разблокируется первым же касанием беззвучным прогоном, а если play()
+     всё-таки отклонён, звук встаёт в очередь и повторяется на следующем
+     жесте вместо того, чтобы потеряться. */
+  var AUDIO = null, audioUnlocked = false, soundQueued = false;
+
+  function audioEl() {
+    if (AUDIO) return AUDIO;
+    try {
+      AUDIO = new Audio();
+      try { AUDIO.preload = "auto"; } catch (e) {}
+    } catch (e) { AUDIO = null; }
+    return AUDIO;
+  }
+
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    var a = audioEl();
+    if (!a) return;
+    try {
+      a.muted = true;
+      if (a.getAttribute("src") !== soundSrc()) a.setAttribute("src", soundSrc());
+      var p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(function () {
+          try { a.pause(); a.currentTime = 0; } catch (e) {}
+          try { a.muted = false; } catch (e) {}
+          audioUnlocked = true;
+          dbg("audio:unlocked");
+          if (soundQueued) { soundQueued = false; playSound(); }
+        }).catch(function (e) {
+          try { a.muted = false; } catch (e2) {}
+          dbg("audio:unlock-err=" + ((e && e.name) || "err"));
+        });
+      }
+    } catch (e) { dbg("audio:unlock-ex"); }
+  }
+
+  /* Жест пользователя: он и разблокирует Audio, и повторяет отложенный
+     звук. Проверять звук нужно независимо от audioUnlocked — иначе очередь
+     после первой же успешной разблокировки уже не проигрывалась. */
+  function onGesture() {
+    if (audioUnlocked) {
+      if (soundQueued) { soundQueued = false; playSound(); }
+      return;
+    }
+    unlockAudio();
+  }
+
+  ["pointerdown", "touchstart", "keydown"].forEach(function (ev) {
+    try { document.addEventListener(ev, onGesture, { capture: true, passive: true }); }
+    catch (e) { try { document.addEventListener(ev, onGesture, true); } catch (e2) {} }
+  });
+
   function playSound() {
-    try { new Audio(soundSrc()).play().catch(function (e) {}); } catch (e) {}
+    var a = audioEl();
+    if (!a) { dbg("audio:none"); return; }
+    try {
+      var src = soundSrc();
+      if (a.getAttribute("src") !== src) a.setAttribute("src", src);
+      try { a.currentTime = 0; } catch (e) {}
+      a.muted = false;
+      try { a.volume = 1; } catch (e) {}
+      var p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(function () { audioUnlocked = true; dbg("audio:ok"); })
+         .catch(function (e) {
+           var n = (e && e.name) || "err";
+           if (n === "NotAllowedError") { soundQueued = true; dbg("audio:blocked -> queued"); }
+           else dbg("audio:err=" + n);
+         });
+      }
+    } catch (e) { dbg("audio:ex"); }
   }
 
   function isForeground() {
@@ -361,6 +501,7 @@
     try {
       return !!document.querySelector(
         '[data-tooltip-id="input-send-button-cancel-tooltip"],' +
+        '[data-testid="send-button-pending"],' +
         '[data-testid="agent-loading"]');
     } catch (e) { return false; }
   }
@@ -392,6 +533,41 @@
     dbg("disarm:" + reason);
   }
 
+  /* ── Доставка завершения ────────────────────────────────────────
+     Раньше завершение в фоне или в другом чате просто выбрасывалось:
+     `done:background -> skip`. Для длинной задачи (сборка, установка, NDK)
+     это значило, что пользователь не увидит ни гифки, ни звука вообще —
+     уведомления-то в шторке на завершение хода нет. Теперь такое событие
+     запоминается и показывается при возврате в приложение. */
+  var PENDING_TTL_MS = 15 * 60 * 1000;
+  var pendingDone = null;
+
+  function announce(cascadeId) {
+    if (!isForeground()) {
+      pendingDone = { at: Date.now(), cascadeId: cascadeId || "" };
+      dbg("announce:background -> pending");
+      return;
+    }
+    var cur = convoId();
+    if (cascadeId && cur && cur !== cascadeId) {
+      // Открыт другой чат. Гифку в чужую переписку не вставляем, но и
+      // молчать не должны — показываем оверлей и играем звук.
+      dbg("announce:other-chat -> overlay");
+      funShow("", { force: true, overlay: true });
+      return;
+    }
+    funShow(cascadeId);
+  }
+
+  function flushPending() {
+    if (!pendingDone) return;
+    var p = pendingDone;
+    pendingDone = null;
+    if (Date.now() - p.at > PENDING_TTL_MS) { dbg("pending:expired"); return; }
+    dbg("pending:deliver");
+    announce(p.cascadeId);
+  }
+
   function armTick() {
     if (!arm) { disarm("idle"); return; }
     var now = Date.now();
@@ -412,14 +588,8 @@
 
     var done = arm;
     disarm("completed");
-    if (!isForeground()) { dbg("done:background -> skip"); return; }
-    var curId = convoId();
-    if (done.cascadeId && curId && curId !== done.cascadeId) {
-      dbg("done:other-chat -> skip");
-      return;
-    }
     dbg("trigger:task-completed");
-    funShow(done.cascadeId);
+    announce(done.cascadeId);
   }
 
   /* Стриминг ответа лишь продлевает «тишину» — решение принимает armTick. */
@@ -428,6 +598,37 @@
     arm.lastActivity = Date.now();
     arm.seenBusy = true;   // GetTurnDiff запрашивается только для активного хода
   }
+
+  /* Возврат в приложение.
+     Пока WebView в фоне, Android приостанавливает таймеры, поэтому за время
+     свёрнутого приложения armTick может не выполниться ни разу: индикатор
+     занятости уже исчез, `seenBusy` так и остался false — и завершение
+     терялось. Если нас вернули в приложение, а шаг был взведён и агент
+     сейчас не работает, считаем, что работа прошла, и отдаём решение
+     обычному SETTLE_MS вместо бесконечного ожидания.
+     Проверка отложена на GRACE_MS, чтобы дать индикатору занятости
+     отрисоваться: иначе мгновенный возврат после отправки засчитывался
+     как завершение. Порог не зависит от того, сколько пользователь
+     отсутствовал, — привязка к времени взвода оставляла взвод навсегда
+     в состоянии «работа ещё не началась». */
+  var GRACE_MS = 1500;
+  try {
+    document.addEventListener("visibilitychange", function () {
+      if (!isForeground()) return;
+      dbg("visible");
+      onGesture();
+      if (arm && !arm.seenBusy && !isAgentBusy()) {
+        setTimeout(function () {
+          if (arm && !arm.seenBusy && !isAgentBusy()) {
+            dbg("visible:settle-armed");
+            arm.seenBusy = true;
+            arm.lastActivity = Date.now();
+          }
+        }, GRACE_MS);
+      }
+      setTimeout(flushPending, 600);
+    }, false);
+  } catch (e) {}
 
   try {
     var origFetch = window.fetch;
@@ -579,6 +780,28 @@
     refreshSelection(box);
     el.appendChild(box);
   };
+
+  /* Диагностика для проверки на устройстве:
+       __agyFunDiag()  — текущее состояние и последние 20 шагов;
+       __agyFunFire()  — принудительный показ (как при завершении задачи). */
+  try {
+    window.__agyFunDiag = function () {
+      return {
+        enabled: get("agy.funDoneEnabled", "1") !== "0",
+        inChat: get("agy.funDoneInChat", "1") !== "0",
+        gif: gifSrc(),
+        sound: soundSrc(),
+        audioUnlocked: audioUnlocked,
+        soundQueued: soundQueued,
+        visible: isForeground(),
+        armed: !!arm,
+        seenBusy: arm ? !!arm.seenBusy : false,
+        pending: pendingDone ? { ageMs: Date.now() - pendingDone.at } : null,
+        log: (window.__agyFunDebug || []).slice(-20)
+      };
+    };
+    window.__agyFunFire = function () { lastShow = 0; announce(convoId()); return true; };
+  } catch (e) {}
 
   /* Блок настроек монтируется ТОЛЬКО через div.agy-fun-done-host на экране
      «Оформление» (Appearance). Без polling-fallback, чтобы не попадать в «Общие». */
