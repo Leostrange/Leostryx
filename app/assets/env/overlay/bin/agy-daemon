@@ -310,6 +310,24 @@ def cmd_task_add(args):
             print(f"[agy-daemon] Include header X-AGY-Token: {trigger['token']}")
 
 
+def describe_run_state(t):
+    """'running', 'aborted' or '' — computed from the persisted run marker.
+
+    A marker whose pid is gone is reported as aborted rather than running: the
+    daemon reaps it on the next tick, but `task list` must not lie in the
+    meantime, which is exactly what made finished tasks look stuck.
+    """
+    if t.get("state") != "running":
+        return ""
+    pid = t.get("run_pid")
+    if pid:
+        try:
+            os.kill(int(pid), 0)
+        except OSError:
+            return "aborted"
+    return "running"
+
+
 def cmd_task_list(args):
     tasks = load_tasks()
     if getattr(args, "active_only", False):
@@ -323,6 +341,11 @@ def cmd_task_list(args):
     for t in tasks:
         status = "Active" if t.get("enabled") else "Disabled"
         last_st = t.get("last_run_status", "never")
+        run = describe_run_state(t)
+        if run == "running":
+            last_st = "running"
+        elif run == "aborted" and last_st in ("never", "running"):
+            last_st = "aborted"
         print(f"- [{t['id']}] {t.get('name')} | Status: {status} | Last: {last_st}")
         print(f"  Trigger: {t.get('trigger', {}).get('type')} ({t.get('trigger', {})})")
         if t.get("command"):

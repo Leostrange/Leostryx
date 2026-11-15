@@ -12,7 +12,8 @@ from datetime import datetime
 from .executor import (
     log,
     load_tasks,
-    save_tasks,
+    patch_tasks,
+    reap_stale,
     execute_action_async,
     PID_FILE,
     STOP_EVENT,
@@ -112,26 +113,36 @@ def daemon_loop():
 
     while not STOP_EVENT.is_set():
         try:
+            # Clear markers left behind by a killed child or a previous daemon
+            # lifetime; otherwise execute_action_async refuses to run the task
+            # again and it hangs in "running" forever.
+            reap_stale()
+
             tasks = load_tasks()
             now = time.time()
             now_dt = datetime.now()
-            changed = False
+            # Only the fields this tick actually touched are written back. A
+            # whole-file save here would overwrite a worker that finished in
+            # the meantime and resurrect "running" / drop last_run_status.
+            patches = {}
 
             for task in tasks:
                 if not task.get("enabled", True):
                     continue
 
+                task_id = task.get("id")
                 trigger = task.get("trigger", {})
                 ttype = trigger.get("type", "delay")
                 should_run = False
+                touched = False
 
                 if ttype in ("once", "delay"):
                     run_at = trigger.get("run_at", 0)
                     if now >= run_at and not task.get("executed", False):
                         should_run = True
-                        task["executed"] = True
-                        task["enabled"] = False
-                        changed = True
+                        patches.setdefault(task_id, {})["executed"] = True
+                        patches.setdefault(task_id, {})["enabled"] = False
+                        touched = True
 
                 elif ttype == "interval":
                     interval = trigger.get("interval_sec", 300)
@@ -139,7 +150,7 @@ def daemon_loop():
                     if (now - last_run) >= interval:
                         should_run = True
                         trigger["last_run"] = now
-                        changed = True
+                        touched = True
 
                 elif ttype == "cron":
                     cron_expr = trigger.get("cron", "")
@@ -149,7 +160,7 @@ def daemon_loop():
                         if matches_cron(cron_expr, now_dt):
                             should_run = True
                             trigger["last_cron_min"] = curr_min_ts
-                            changed = True
+                            touched = True
 
                 elif ttype == "github_pr":
                     interval = trigger.get("interval_sec", 180)
@@ -157,7 +168,7 @@ def daemon_loop():
                     if (now - last_check) >= interval:
                         if check_github_repo(trigger, "pulls"):
                             should_run = True
-                        changed = True
+                        touched = True
 
                 elif ttype == "github_issue":
                     interval = trigger.get("interval_sec", 180)
@@ -165,7 +176,7 @@ def daemon_loop():
                     if (now - last_check) >= interval:
                         if check_github_repo(trigger, "issues"):
                             should_run = True
-                        changed = True
+                        touched = True
 
                 elif ttype == "watch_file":
                     interval = trigger.get("interval_sec", 15)
@@ -174,7 +185,7 @@ def daemon_loop():
                         trigger["last_check_ts"] = now
                         if check_file_watcher(trigger):
                             should_run = True
-                        changed = True
+                        touched = True
 
                 elif ttype == "battery":
                     interval = trigger.get("interval_sec", 300)
@@ -183,8 +194,8 @@ def daemon_loop():
                         trigger["last_check_ts"] = now
                         if check_battery_condition(trigger):
                             should_run = True
-                            task["enabled"] = False
-                        changed = True
+                            patches.setdefault(task_id, {})["enabled"] = False
+                        touched = True
 
                 elif ttype == "webhook":
                     port = trigger.get("port", 45199)
@@ -193,11 +204,14 @@ def daemon_loop():
                         t.start()
                         webhook_threads[port] = t
 
+                if touched:
+                    patches.setdefault(task_id, {})["trigger"] = trigger
+
                 if should_run:
                     execute_action_async(task)
 
-            if changed:
-                save_tasks(tasks)
+            if patches:
+                patch_tasks(patches)
 
         except Exception as e:
             log(f"Daemon scheduler error: {e}")

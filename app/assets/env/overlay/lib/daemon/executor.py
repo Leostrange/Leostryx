@@ -9,12 +9,41 @@ import sys
 import time
 import json
 import shlex
+import signal
+import fcntl
 import threading
+import contextlib
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 PREFIX = os.environ.get("PREFIX") or os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 HOME = os.environ.get("HOME") or os.path.dirname(PREFIX)
+
+
+def ui_language():
+    """Language of the interface: $AGY_LANG, then ~/.agy_lang, then ru.
+
+    The app writes the selected language into "$HOME/.agy_lang" (agy-tools op
+    setlang). Daemon notifications have to follow it, otherwise the shade keeps
+    answering in English while the UI is Russian.
+    """
+    value = os.environ.get("AGY_LANG", "")
+    if not value:
+        try:
+            with open(os.path.join(HOME, ".agy_lang"), "r", encoding="utf-8") as fh:
+                value = fh.read(8)
+        except OSError:
+            value = ""
+    value = value.strip().lower()
+    return "en" if value.startswith("en") else "ru"
+
+
+def L(ru, en):
+    """Pick the string matching the current interface language."""
+    return en if AGY_LANG == "en" else ru
+
+
+AGY_LANG = ui_language()
 
 
 def application_id_from_prefix():
@@ -90,6 +119,110 @@ def save_tasks(tasks):
     os.replace(tmp_path, TASKS_FILE)
 
 
+@contextlib.contextmanager
+def tasks_lock():
+    """Serialise read-modify-write cycles on tasks.json.
+
+    The scheduler and the task workers both rewrite this file. Without a lock a
+    tick that started before a worker finished could save its stale snapshot
+    afterwards and erase last_run_status/last_run_ts, which is why finished
+    tasks kept looking unfinished.
+    """
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(TASKS_FILE + ".lock", "a+") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def patch_tasks(patches):
+    """Merge-only update: writes just the given fields of the given task ids.
+
+    Fields the caller does not mention are left untouched, so the scheduler and
+    a finishing worker never overwrite each other's data.
+    """
+    if not patches:
+        return
+    with tasks_lock():
+        tasks = load_tasks()
+        for t in tasks:
+            fields = patches.get(t.get("id"))
+            if not fields:
+                continue
+            for k, v in fields.items():
+                t[k] = v
+        save_tasks(tasks)
+
+
+def task_is_stale(task, now=None, grace=60):
+    """True when a task claims to be running but cannot be any more.
+
+    A dead child pid alone is not proof: between the shell exiting and the
+    worker writing its result there is a window in which the marker still says
+    "running" while the pid is already gone. Reaping in that window would mark
+    a perfectly successful run as aborted — hence the grace period.
+    """
+    if task.get("state") != "running":
+        return False
+    now = time.time() if now is None else now
+    started = task.get("started_at") or 0
+    limit = int(task.get("timeout_sec", 600)) + 120
+    if not started or (now - started) > limit:
+        return True
+    pid = task.get("run_pid")
+    if pid:
+        try:
+            os.kill(int(pid), 0)
+        except OSError:
+            return (now - started) > grace
+    return False
+
+
+def reap_stale(tasks=None):
+    """Clear 'running' markers left behind by a killed daemon or a hung child.
+
+    Without this a stale marker is permanent: execute_action_async refuses to
+    start a task that looks like it is already running, so a single death in
+    the wrong place silently disabled the task forever.
+    """
+    own = tasks is None
+    tasks = load_tasks() if own else tasks
+    now = time.time()
+    patches = {}
+    for t in tasks:
+        if not task_is_stale(t, now):
+            continue
+        patches[t.get("id")] = {
+            "state": "idle",
+            "last_run_status": "aborted",
+            "last_run_ts": t.get("started_at") or now,
+            "last_output": L("запуск прерван (завершился демон или дочерний процесс)",
+                             "run was interrupted (daemon or child process died)"),
+            "run_pid": None,
+            "started_at": None,
+        }
+        t.update(patches[t.get("id")])
+    if patches:
+        if own:
+            with tasks_lock():
+                disk = load_tasks()
+                changed = False
+                for t in disk:
+                    patch = patches.get(t.get("id"))
+                    # Re-check against what is on disk right now: a worker may
+                    # have finished while this tick was inspecting its snapshot.
+                    if not patch or not task_is_stale(t, now):
+                        continue
+                    t.update(patch)
+                    changed = True
+                if changed:
+                    save_tasks(disk)
+        log(f"Reaped stale running marker(s): {', '.join(str(i) for i in patches)}")
+    return list(patches)
+
+
 def wake_antigravity_app():
     if not AGY_APPLICATION_ID:
         log("Cannot wake app: application id was not supplied or derived from PREFIX")
@@ -127,73 +260,111 @@ def _run_task_worker(task):
 
     # If prompt is set but command is not, generate a notification + prompt action
     if not command and prompt:
-        command = f"agy-notify post -t 'AI Task Trigger' -m '{prompt[:100]}'"
-
-    notify("Antigravity Daemon", f"Running task: {name}", tag=f"task_{task_id}")
+        trigger_title = L("Запуск задачи ИИ", "AI Task Trigger")
+        command = f"agy-notify post -t {shlex.quote(trigger_title)} -m {shlex.quote(prompt[:100])}"
 
     start_t = time.time()
     success = False
     output = ""
-    env = os.environ.copy()
-    env["PATH"] = f"/data/user/0/com.agyru.t2/files/usr/bin:{env.get('PATH', '')}"
-    env["HOME"] = "/data/user/0/com.agyru.t2/files"
-    if convo_id:
-        env["AGY_CONVERSATION_ID"] = convo_id
-    if project:
-        env["AGY_PROJECT_DIR"] = project
-
-    cwd = project if (project and os.path.isdir(project)) else "/data/user/0/com.agyru.t2/files"
-
+    duration = 0
     try:
-        res = subprocess.run(
+        # Persist the running marker BEFORE the command starts, so the UI can
+        # tell a live run from a finished one instead of guessing from a
+        # timestamp that only appears at the end. run_pid starts as the daemon
+        # (a marker that is at least alive) and is replaced by the real child
+        # pid below, which is what stale detection has to look at.
+        patch_tasks({task_id: {
+            "state": "running",
+            "started_at": start_t,
+            "run_pid": os.getpid(),
+        }})
+        notify(L("Демон Antigravity", "Antigravity Daemon"),
+               L(f"Выполняется задача: {name}", f"Running task: {name}"),
+               tag=f"task_{task_id}")
+
+        env = os.environ.copy()
+        env["PATH"] = f"{PREFIX}/bin:{env.get('PATH', '')}"
+        env["HOME"] = HOME
+        if convo_id:
+            env["AGY_CONVERSATION_ID"] = convo_id
+        if project:
+            env["AGY_PROJECT_DIR"] = project
+
+        cwd = project if (project and os.path.isdir(project)) else HOME
+        timeout = int(task.get("timeout_sec", 600))
+
+        # start_new_session puts the shell and everything it spawns in one
+        # process group. A plain timeout would kill only the shell and leave
+        # children holding the pipes open, which looked like a hung task.
+        proc = subprocess.Popen(
             command,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=task.get("timeout_sec", 600),
             env=env,
             cwd=cwd,
-            executable=BASH_BIN if os.path.isfile(BASH_BIN) else "/system/bin/sh"
+            start_new_session=True,
+            executable=BASH_BIN if os.path.isfile(BASH_BIN) else "/system/bin/sh",
         )
-        success = (res.returncode == 0)
-        output = res.stdout.strip()
-    except subprocess.TimeoutExpired:
-        output = "Task timed out."
-        log(f"Task [{name}] timed out.")
+        try:
+            patch_tasks({task_id: {"run_pid": proc.pid}})
+        except Exception as e:
+            log(f"Could not record child pid for [{name}]: {e}")
+        try:
+            output = (proc.communicate(timeout=timeout)[0] or "").strip()
+            success = (proc.returncode == 0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                time.sleep(1)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except OSError:
+                pass
+            try:
+                output = (proc.communicate(timeout=10)[0] or "").strip()
+            except Exception:
+                output = ""
+            output = (output + "\n" + L("Задача прервана по таймауту.",
+                                        "Task timed out.")).strip()
+            log(f"Task [{name}] timed out after {timeout}s; process group killed.")
     except Exception as e:
-        output = f"Execution error: {e}"
+        output = L(f"Ошибка выполнения: {e}", f"Execution error: {e}")
         log(f"Task [{name}] failed: {e}")
-
-    duration = int(time.time() - start_t)
-    status_str = "Completed successfully" if success else "Failed"
-    log(f"Task [{name}] {status_str} in {duration}s. Output summary: {output[:200]}")
-
-    notify(
-        f"Task {status_str}: {name}",
-        f"Finished in {duration}s. {output[:120]}",
-        tag=f"task_done_{task_id}"
-    )
-
-    if wake_app:
-        wake_antigravity_app()
-
-    # Update execution metadata in task record
-    try:
-        all_tasks = load_tasks()
-        for t in all_tasks:
-            if t.get("id") == task_id:
-                t["last_run_status"] = "success" if success else "failed"
-                t["last_run_duration"] = duration
-                t["last_run_ts"] = time.time()
-                t["last_output"] = output[:1000]
-                break
-        save_tasks(all_tasks)
-    except Exception as e:
-        log(f"Error saving task completion status: {e}")
-
-    with RUNNING_LOCK:
-        RUNNING_JOBS.discard(task_id)
+    finally:
+        duration = int(time.time() - start_t)
+        status_str = "Completed successfully" if success else "Failed"
+        status_ui = (L("Задача выполнена успешно", "Task Completed successfully") if success
+                     else L("Задача завершилась с ошибкой", "Task Failed"))
+        log(f"Task [{name}] {status_str} in {duration}s. Output summary: {output[:200]}")
+        try:
+            notify(
+                f"{status_ui}: {name}",
+                L(f"Выполнено за {duration} с. {output[:120]}",
+                  f"Finished in {duration}s. {output[:120]}"),
+                tag=f"task_done_{task_id}",
+            )
+        except Exception as e:
+            log(f"Notification failed, continuing: {e}")
+        try:
+            patch_tasks({task_id: {
+                "state": "idle",
+                "last_run_status": "success" if success else "failed",
+                "last_run_duration": duration,
+                "last_run_ts": time.time(),
+                "last_output": output[:1000],
+                "run_pid": None,
+                "started_at": None,
+            }})
+        except Exception as e:
+            log(f"Error saving task completion status: {e}")
+        if wake_app:
+            try:
+                wake_antigravity_app()
+            except Exception as e:
+                log(f"Wake failed: {e}")
+        with RUNNING_LOCK:
+            RUNNING_JOBS.discard(task_id)
 
 
 def execute_action_async(task):
@@ -201,5 +372,15 @@ def execute_action_async(task):
     with RUNNING_LOCK:
         if task_id in RUNNING_JOBS:
             log(f"Task [{task_id}] already running. Skipping overlap.")
-            return
-    TASK_EXECUTOR.submit(_run_task_worker, task)
+            return False
+        # Reserve the id in the same critical section as the check, otherwise
+        # two ticks can both pass the check and run the task twice.
+        RUNNING_JOBS.add(task_id)
+    try:
+        TASK_EXECUTOR.submit(_run_task_worker, task)
+        return True
+    except Exception as e:
+        with RUNNING_LOCK:
+            RUNNING_JOBS.discard(task_id)
+        log(f"Could not schedule task [{task_id}]: {e}")
+        return False
