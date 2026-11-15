@@ -89,8 +89,8 @@ java.security.InvalidAlgorithmParameterException:
 
 ```bash
 bash $HOME/web/agy_tools.sh verify jvm
-# @@ok jvm truststore ok: java-21-openjdk/cacerts anchors=149 default=149
-#                                                   ^ в файле   ^ без флагов
+# @@ok jvm truststore ok: java-17-openjdk anchors=149 default=149, java-21-openjdk anchors=149 default=149
+#                                          ^ в файле   ^ без флагов   ^ каждая установленная JDK
 
 java -cp "$PREFIX/etc/antigravity/truststore" AgyTruststore https
 # @@https 200 https://repo.maven.apache.org/maven2/

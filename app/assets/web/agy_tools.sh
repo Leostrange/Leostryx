@@ -130,13 +130,36 @@ jdk_home_active() { # -> the JDK a plain `java` resolves to
     return 1
 }
 
-ts_compile() { # compile AgyTruststore once; rc!=0 when javac or the source is missing
-    local cls="$TS_DIR/AgyTruststore.class"
+ts_compile() { # compile AgyTruststore once, portable across every installed JDK
+    local cls="$TS_DIR/AgyTruststore.class" rel="" v
     [ -f "$TS_SRC" ] || return 1
-    [ -f "$cls" ] && [ ! "$TS_SRC" -nt "$cls" ] && return 0
+    # A class built by JDK 21 is version 65 and JDK 17 refuses to load it
+    # (UnsupportedClassVersionError: file version 65, runtime accepts 61).
+    # The helper uses Java 7+ syntax only, so target 11 — loadable by 11/17/21/25
+    # — and fall back only when this javac does not know that release.
+    if [ -f "$cls" ] && [ ! "$TS_SRC" -nt "$cls" ]; then
+        case "$(cat "$TS_DIR/AgyTruststore.release" 2>/dev/null)" in
+            8|11|17) return 0 ;;
+            # Compiled without a release flag: accept only when the class is
+            # still loadable by Java 17 (61) and newer.
+            default) case "$(ts_class_version "$cls")" in 0|5[0-9]|6[0-9]) return 0 ;; esac ;;
+        esac
+    fi
     mkdir -p "$TS_DIR" 2>/dev/null || return 1
-    javac -d "$TS_DIR" "$TS_SRC" >/dev/null 2>&1 || return 1
+    for rel in 11 17 8 ""; do
+        v=""
+        [ -n "$rel" ] && v="--release $rel"
+        # shellcheck disable=SC2086
+        javac $v -d "$TS_DIR" "$TS_SRC" >/dev/null 2>&1 && break
+    done
+    [ -f "$cls" ] || return 1
+    printf '%s\n' "${rel:-default}" > "$TS_DIR/AgyTruststore.release" 2>/dev/null
     [ -f "$cls" ]
+}
+
+# ts_class_version <class> -> major class-file version (65 for Java 21, 61 for 17)
+ts_class_version() {
+    od -An -tu1 -j7 -N1 "$1" 2>/dev/null | tr -d ' \n' | sed 's/^$/0/'
 }
 
 ts_java() { java -cp "$TS_DIR" AgyTruststore "$@"; }
@@ -147,30 +170,98 @@ ts_selfsuff() { # <store> -> 0 when a flag-free JVM opens it with all certs
     [ "$(stat -c %s "$1" 2>/dev/null || echo 0)" -ge 100000 ] 2>/dev/null
 }
 
-jvm_truststore_normalize() { # -> 0 when this run installed/repaired the default store
-    local jdk ts spec n out
+# jdk_list — every JDK under $PREFIX/lib/jvm in a stable order.
+jdk_list() {
+    local j
+    for j in "$PREFIX"/lib/jvm/java-*-openjdk; do
+        [ -x "$j/bin/java" ] && printf '%s\n' "$j"
+    done
+}
+
+# ts_store_of <jdk> — the cacerts path of a JDK, following a link only when it
+# resolves inside our prefix. A dangling link (packages built for Termux point
+# at /data/data/com.termux/..., which does not exist here) yields the path
+# itself so the caller can replace it.
+ts_store_of() { printf '%s' "$1/lib/security/cacerts"; }
+
+# ts_source <path> — add <path> to the union sources when it is a real store.
+ts_source() {
+    local p="$1" magic
+    [ -f "$p" ] || return 0
+    [ -s "$p" ] || return 0
+    magic="$(ts_magic "$p")"
+    case "$magic" in
+        feedfeed) printf 'JKS:-:%s\n' "$p" ;;
+        3083*|3082*) printf 'PKCS12:changeit:%s\n' "$p" ;;
+    esac
+}
+
+jvm_truststore_normalize() { # -> 0 when this run installed/repaired at least one store
+    local jdk ts out n spec fixed=0
     local -a specs=()
-    jdk="$(jdk_home_active)" || return 1
-    ts="$jdk/lib/security/cacerts"
-    ts_selfsuff "$ts" && return 1
+
+    # The Termux CA bundle is the most complete source and it is a plain JKS.
+    while IFS= read -r spec; do specs+=("$spec"); done <<EOF
+$(ts_source "$PREFIX/etc/tls/certs/java/cacerts")
+$(ts_source "$PREFIX/etc/ssl/certs/java/cacerts")
+EOF
+
+    # Per-JDK stores (and their PKCS12 backups) are merged in as well, so a JDK
+    # that already has anchors does not lose them.
+    while IFS= read -r jdk; do
+        ts="$(ts_store_of "$jdk")"
+        if [ -L "$ts" ]; then
+            case "$(readlink -f "$ts" 2>/dev/null)" in
+                "$PREFIX"/*) while IFS= read -r spec; do specs+=("$spec"); done <<EOF
+$(ts_source "$(readlink -f "$ts")")
+EOF
+                ;;
+            esac
+        else
+            while IFS= read -r spec; do specs+=("$spec"); done <<EOF
+$(ts_source "$ts")
+$(ts_source "$ts.pkcs12.orig")
+EOF
+        fi
+    done < <(jdk_list)
+
+    # Deduplicate source paths while keeping order.
+    local -a uniq=()
+    local seen=" "
+    for spec in "${specs[@]}"; do
+        [ -n "$spec" ] || continue
+        case "$seen" in *" $spec "*) continue ;; esac
+        seen="$seen$spec "
+        uniq+=("$spec")
+    done
+    [ "${#uniq[@]}" -gt 0 ] || return 1
     ts_compile || return 1
-    # Sources worth merging: the store in place, our backup of it, the Termux
-    # CA bundle. Format "type:password:path", "-" meaning an empty password.
-    if [ -f "$ts" ]; then specs+=("PKCS12:changeit:$ts"); fi
-    if [ -f "$ts.pkcs12.orig" ]; then specs+=("PKCS12:changeit:$ts.pkcs12.orig"); fi
-    if [ -f "$PREFIX/etc/tls/certs/java/cacerts" ]; then specs+=("JKS:-:$PREFIX/etc/tls/certs/java/cacerts"); fi
-    [ "${#specs[@]}" -gt 0 ] || return 1
-    out="$(ts_java union "$TS_OUT" "${specs[@]}" 2>&1)" || return 1
+    out="$(ts_java union "$TS_OUT" "${uniq[@]}" 2>&1)" || return 1
     n="$(printf '%s\n' "$out" | sed -n 's/^@@entries \([0-9][0-9]*\)$/\1/p' | tail -n1)"
     [ "${n:-0}" -ge 100 ] 2>/dev/null || return 1
-    if [ -f "$ts" ] && [ ! -f "$ts.pkcs12.orig" ]; then cp -f "$ts" "$ts.pkcs12.orig" 2>/dev/null || :; fi
-    cp -f "$TS_OUT" "$ts" 2>/dev/null || return 1
-    # Prove it with the environment a Gradle daemon actually gets: no flags.
-    if ! env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck >/dev/null 2>&1; then
-        [ -f "$ts.pkcs12.orig" ] && cp -f "$ts.pkcs12.orig" "$ts" 2>/dev/null
-        return 1
-    fi
-    return 0
+
+    while IFS= read -r jdk; do
+        ts="$(ts_store_of "$jdk")"
+        ts_selfsuff "$ts" && continue          # already an empty-password JKS
+        # Keep the original once. A symlink is not backed up: its target may
+        # live in another sandbox and copying it would only copy brokenness.
+        if [ -f "$ts" ] && [ ! -L "$ts" ] && [ ! -f "$ts.pkcs12.orig" ]; then
+            cp -f "$ts" "$ts.pkcs12.orig" 2>/dev/null || :
+        fi
+        mkdir -p "$(dirname "$ts")" 2>/dev/null || continue
+        # Never write through a foreign link: replace it with a real file.
+        [ -L "$ts" ] && rm -f "$ts" 2>/dev/null
+        cp -f "$TS_OUT" "$ts" 2>/dev/null || continue
+        # Prove it with the environment a Gradle daemon actually gets: no flags.
+        if ! env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck >/dev/null 2>&1; then
+            if [ -f "$ts.pkcs12.orig" ]; then
+                cp -f "$ts.pkcs12.orig" "$ts" 2>/dev/null
+            fi
+            continue
+        fi
+        fixed=$((fixed + 1))
+    done < <(jdk_list)
+    [ "$fixed" -gt 0 ]
 }
 
 # pkg_retry <cmd...> — retry a pkg/network command on transient failures.
@@ -300,6 +391,11 @@ for _d in "$SDK"/ndk/*/; do [ -d "\$_d" ] && export ANDROID_NDK_HOME="\${_d%/}" 
 [ -n "\${JAVA_HOME:-}" ] && [ -x "\$JAVA_HOME/bin/java" ] && export PATH="\$JAVA_HOME/bin:\$PATH"
 [ -d "$HOME/flutter_sdk/bin" ] && export PATH="$HOME/flutter_sdk/bin:\$PATH" && export FLUTTER_ROOT="$HOME/flutter_sdk"
 export GRADLE_USER_HOME="\$HOME/.gradle"
+# tesseract is built for a /data/data/com.termux prefix and therefore looks for
+# its language data in a directory this sandbox cannot read. Point it at the
+# real models instead, otherwise "tesseract --list-langs" reports 0 languages
+# and every OCR run fails even though the package is installed.
+[ -d "$PREFIX/share/tessdata" ] && export TESSDATA_PREFIX="$PREFIX/share/tessdata"
 EOF
     # Only touch the file when the content really differs: selfheal counts a
     # repair by exit status, and an unconditional rewrite never reaches fixed=0.
@@ -367,7 +463,7 @@ EOF
 # scripts with "#!/usr/bin/env" / "#!/bin/sh" shebangs, which do not exist on
 # Android) need bridges of their own; the Android/Java env is loaded in each.
 RB="$PREFIX/../runtime/bin"
-BRIDGED="node npm npx corepack yarn pnpm pnpx tsc tsserver java javac javap jdeps jshell jar keytool kotlin kotlinc gradle mvn sdkmanager avdmanager apkanalyzer lint ndk-build aapt aapt2 aidl d8 apksigner zipalign adb apktool jadx"
+BRIDGED="node npm npx corepack yarn pnpm pnpx tsc tsserver java javac javap jdeps jshell jar keytool kotlin kotlinc gradle mvn sdkmanager avdmanager apkanalyzer lint ndk-build aapt aapt2 aidl d8 apksigner zipalign adb apktool jadx ffmpeg ffprobe tesseract magick convert"
 make_bridge() { # name
     local name="$1" target="$PREFIX/bin/$1" first runner="" tmp="$RB/.agy-bridge-$1-$$"
     [ -e "$target" ] || return 0
@@ -463,6 +559,51 @@ refresh_bridges() {
     fi
 }
 
+# ------------------------------------------------------------ broken entries
+# A tool can be "installed" and still be impossible to run: a dangling symlink,
+# or a script whose shebang names an interpreter that does not exist here
+# (packages built for Termux point at /data/data/com.termux/..., and Android has
+# no /bin/sh). Both fail with "No such file or directory" and look like a
+# missing tool. Report them so they can be repaired instead of guessed at.
+scan_broken() {
+    local f n h magic interp
+    [ -d "$PREFIX/bin" ] || return 0
+    for f in "$PREFIX"/bin/*; do
+        n="${f##*/}"
+        if [ -L "$f" ] && [ ! -e "$f" ]; then
+            say "@@broken $n dangling -> $(readlink "$f")"
+            continue
+        fi
+        [ -f "$f" ] || continue
+        magic="$(od -An -tx1 -N4 "$f" 2>/dev/null | tr -d ' \n')"
+        case "$magic" in 7f454c46) continue ;; esac   # ELF: the kernel runs it
+        h="$(head -c 160 "$f" 2>/dev/null | head -n1 | tr -d '\0\r')"
+        case "$h" in '#!'*) : ;; *) continue ;; esac
+        # Take the interpreter itself (first word after the shebang), so
+        # `#!/…/usr/bin/env python3` is judged by env and `#!/…/bin/sh` by sh.
+        interp="${h#\#!}"
+        interp="${interp%% *}"
+        [ -n "$interp" ] || continue
+        case "$interp" in
+            /data/data/com.termux/*)
+                say "@@broken $n foreign-shebang $interp" ; continue ;;
+        esac
+        if [ -x "$interp" ]; then
+            # A working interpreter; `env` additionally needs its target on PATH.
+            case "${h#\#!}" in
+                */env\ *)
+                    local target="${h#*env }"
+                    target="${target%% *}"
+                    command -v "$target" >/dev/null 2>&1 \
+                        || say "@@broken $n missing-interpreter $interp $target"
+                    ;;
+            esac
+            continue
+        fi
+        say "@@broken $n missing-interpreter $interp"
+    done
+}
+
 # ------------------------------------------------------------ status
 op_status() {
     # Fast: read pkg's own index/db files with one awk each (no pkg calls,
@@ -480,7 +621,7 @@ op_status() {
     local stub_t stub_f stub_head
     for stub_f in "$SDK"/build-tools/*/aidl "$SDK"/build-tools/*/apksigner "$SDK"/build-tools/*/d8; do
         [ -f "$stub_f" ] || continue
-        stub_head="$(head -c 80 "$stub_f" 2>/dev/null || true)"
+        stub_head="$(head -c 80 "$stub_f" 2>/dev/null | tr -d '\0' || true)"
         case "$stub_head" in
             "#!"*) case "$stub_head" in
                 *"$PREFIX"*) : ;; # our own sandbox: fine
@@ -562,6 +703,7 @@ op_status() {
     if [ -x "$HOME/flutter_sdk/bin/flutter" ] && [ -x "$HOME/flutter_sdk/bin/cache/dart-sdk/bin/dart" ] && [ -f "$HOME/flutter_sdk/bin/cache/flutter_tools.snapshot" ]; then say "@@special flutter ok"; else say "@@special flutter -"; fi
     command -v pnpm >/dev/null 2>&1 && say "@@npm pnpm ok" || say "@@npm pnpm -"
     command -v tsc  >/dev/null 2>&1 && say "@@npm typescript ok" || say "@@npm typescript -"
+    scan_broken
     say "@@done"
 }
 op_index() { step "pkg update"; pkg_retry pkg update || fail "pkg update"; say "@@done"; }
@@ -997,6 +1139,28 @@ agents_block_put() {
     mv -f "$out" "$f" 2>/dev/null || { rm -f "$out"; return 1; }
 }
 
+# agents_block_body <file> <tag> — prints the lines between <!-- tag --> and
+# <!-- /tag -->. Used so static rule blocks live in the shipped AGENTS.md only:
+# selfheal copies them into the live file instead of keeping a second, drifting
+# copy of the same text inside this script.
+agents_block_body() {
+    local f="$1" tag="$2"
+    [ -f "$f" ] && [ -n "$tag" ] || return 0
+    sed -n "/^<!-- $tag -->$/,/^<!-- \/$tag -->$/p" "$f" 2>/dev/null | sed '1d;$d'
+}
+
+# agents_block_sync <tag> — mirror a static block from the shipped template into
+# the live rules file the agent reads. Returns 0 only when the live file changed.
+agents_block_sync() {
+    local tag="$1" body
+    case "$AGENTS_LIVE" in
+        "$AGENTS_TEMPLATE"|"") return 1 ;;
+    esac
+    body="$(agents_block_body "$AGENTS_TEMPLATE" "$tag")"
+    [ -n "$body" ] || return 1
+    agents_block_put "$AGENTS_LIVE" "$tag" "$body"
+}
+
 gradle_write_agents_note() { # agp-version, gradle-min, jdk
     local agp="$1" gmin="$2" jdk="$3" body
     mkdir -p "$(dirname "$AGP_STATE")" 2>/dev/null
@@ -1311,6 +1475,12 @@ op_selfheal() {
         "$AGENTS_TEMPLATE"|"") : ;;
         *) agents_block_put "$AGENTS_LIVE" "AGY-GRADLE-AGP" "$GRADLE_AGP_DOC" && fixed=$((fixed + 1)) ;;
     esac
+    # Static rules shipped in AGENTS.md itself (language policy, build
+    # versioning). They live in the template only; the live copy is repaired
+    # from it, so an app update never leaves the agent with stale rules.
+    for _tag in AGY-LANG AGY-BUILD-VERSION; do
+        agents_block_sync "$_tag" && fixed=$((fixed + 1)) && say "@@selfheal rules $_tag"
+    done
     say "@@selfheal agents"
     # 4) Legacy duplicated "# AGY-AGP:" debris in $HOME/AGENTS.md (old bug)
     if [ -f "$HOME/AGENTS.md" ] && ! grep -qvE '^(# AGY-AGP:.*|## Android Gradle Plugin.*|-[[:space:]].*|[[:space:]]*)$' "$HOME/AGENTS.md"; then
@@ -1342,25 +1512,39 @@ op_verify() {
     # why it stayed green while every real build failed with
     # "the trustAnchors parameter must be non-empty".
     verify_truststore() {
-        local jdk ts spec n d
-        jdk="$(jdk_home_active)" || { echo "no usable JDK found"; return 1; }
-        ts="$jdk/lib/security/cacerts"
-        [ -f "$ts" ] || { echo "missing $ts"; return 1; }
-        case "$(ts_magic "$ts")" in
-            feedfeed) spec="JKS:-:$ts" ;;
-            *)        spec="PKCS12:changeit:$ts" ;;
-        esac
-        if ts_compile; then
-            n="$(ts_java check "$spec" 2>/dev/null | sed -n 's/^@@entries \([0-9][0-9]*\)$/\1/p' | head -n1)"
-            d="$(env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck 2>/dev/null \
-                 | sed -n 's/.*anchors=\([0-9][0-9]*\).*/\1/p' | head -n1)"
-        else
-            n="$(keytool -list -keystore "$ts" -storepass changeit 2>/dev/null | grep -c trustedCertEntry)"
-            d="$n"
-        fi
-        [ "${n:-0}" -ge 20 ] 2>/dev/null || { echo "store $ts holds ${n:-0} anchors"; return 1; }
-        [ "${d:-0}" -ge 20 ] 2>/dev/null || { echo "default JVM sees ${d:-0} anchors (flag-only repair)"; return 1; }
-        echo "truststore ok: $(basename "$jdk")/cacerts anchors=$n default=$d"
+        local jdk ts spec n d bad=0 seen=0 line=""
+        local -a jdks=()
+        while IFS= read -r jdk; do jdks+=("$jdk"); done < <(jdk_list)
+        [ "${#jdks[@]}" -gt 0 ] || { echo "no usable JDK found"; return 1; }
+        for jdk in "${jdks[@]}"; do
+            ts="$(ts_store_of "$jdk")"
+            seen=$((seen + 1))
+            if [ ! -f "$ts" ]; then
+                [ -L "$ts" ] && echo "$(basename "$jdk"): cacerts is a dangling link -> $(readlink "$ts")" \
+                              || echo "$(basename "$jdk"): missing $ts"
+                bad=$((bad + 1)); continue
+            fi
+            case "$(ts_magic "$ts")" in
+                feedfeed) spec="JKS:-:$ts" ;;
+                *)        spec="PKCS12:changeit:$ts" ;;
+            esac
+            if ts_compile; then
+                n="$(ts_java check "$spec" 2>/dev/null | sed -n 's/^@@entries \([0-9][0-9]*\)$/\1/p' | head -n1)"
+                d="$(env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck 2>/dev/null \
+                     | sed -n 's/.*anchors=\([0-9][0-9]*\).*/\1/p' | head -n1)"
+            else
+                n="$(keytool -list -keystore "$ts" -storepass changeit 2>/dev/null | grep -c trustedCertEntry)"
+                d="$n"
+            fi
+            if [ "${n:-0}" -lt 20 ] 2>/dev/null || [ "${d:-0}" -lt 20 ] 2>/dev/null; then
+                echo "$(basename "$jdk"): store holds ${n:-0} anchors, a flag-free JVM sees ${d:-0}"
+                bad=$((bad + 1))
+            else
+                line="${line:+$line, }$(basename "$jdk") anchors=$n default=$d"
+            fi
+        done
+        echo "truststore ok: $line"
+        [ "$bad" -eq 0 ]
     }
     verify_agp() {
         local v
@@ -1388,6 +1572,27 @@ op_verify() {
     # Run checks the way the agent does: core-like env, runtime/bin first.
     export PATH="$RB:$PREFIX/bin:/system/bin"
     unset LD_LIBRARY_PATH LD_PRELOAD
+    # `verify all` checks every tool that is actually present: optional tools
+    # must not turn a green run red, but every installed one has to work.
+    if [ "$ARG" = "all" ] || [ "${ARG%%,*}" = "all" ] || [ "${ARG##*,}" = "all" ]; then
+        local-verify-list() {
+            local t v
+            for t in node npm python python3 git curl openssl ffmpeg ffprobe tesseract \
+                     magick convert numpy kotlin gradle mvn cmake clang aapt aapt2 aidl \
+                     zipalign d8 apksigner apktool jadx adb rustc go dart tsc pnpm flutter; do
+                command -v "$t" >/dev/null 2>&1 && printf '%s\n' "$t"
+            done
+            for v in 17 21; do
+                [ -x "$PREFIX/lib/jvm/java-$v-openjdk/bin/java" ] && printf 'java%s\n' "$v"
+                [ -x "$PREFIX/lib/jvm/java-$v-openjdk/bin/javac" ] && printf 'javac%s\n' "$v"
+            done
+            printf 'jvm\n'
+        }
+        local all=""
+        for t in $(local-verify-list); do all="$all,$t"; done
+        ARG="${all#,}"
+        unset -f local-verify-list
+    fi
     local t
     for t in ${ARG//,/ }; do
         case "$t" in
@@ -1426,6 +1631,11 @@ op_verify() {
             ndk)     chk ndk sh -c 'ls "$ANDROID_NDK_HOME"/source.properties >/dev/null && grep Revision "$ANDROID_NDK_HOME/source.properties"' ;;
             rust)    chk rust rustc --version ;;
             go)      chk go go version ;;
+            ffmpeg)  chk ffmpeg sh -c 'ffmpeg -hide_banner -version 2>&1 | head -n1; o="$PREFIX/tmp/agy-ff-$$.mp4"; ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=32x32:rate=2 -t 1 -y "$o" >/dev/null 2>&1 && [ -s "$o" ] || { rm -f "$o"; echo "encode failed"; exit 1; }; rm -f "$o"; echo "encode ok"' ;;
+            ffprobe) chk ffprobe ffprobe -version ;;
+            tesseract) chk tesseract sh -c '[ -n "${TESSDATA_PREFIX:-}" ] || [ ! -d "$PREFIX/share/tessdata" ] || export TESSDATA_PREFIX="$PREFIX/share/tessdata"; tesseract --version 2>&1 | head -n1; langs="$(tesseract --list-langs 2>&1 | tail -n +2 | tr "\n" " " | sed "s/ *$//")"; [ -n "$langs" ] || { echo "no language data in ${TESSDATA_PREFIX:-<compiled-in path>}"; exit 1; }; echo "langs: $(echo $langs | cut -c1-80)"' ;;
+            magick|imagemagick) chk magick sh -c 'magick -version 2>/dev/null | head -n1 || convert -version | head -n1; o="$PREFIX/tmp/agy-im-$$.png"; magick -size 16x16 xc:red "$o" 2>/dev/null || convert -size 16x16 xc:red "$o"; [ -s "$o" ] && rm -f "$o" && echo "render ok"' ;;
+            numpy)   chk numpy python -c 'import numpy; print("numpy", numpy.__version__)' ;;
             flutter) chk flutter sh -c '[ -x "$HOME/flutter_sdk/bin/flutter" ] && "$HOME/flutter_sdk/bin/flutter" --version 2>&1 | head -n1' ;;
             dart)    chk dart dart --version ;;
             *)       chk "$t" sh -c "command -v '$t'" ;;

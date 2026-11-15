@@ -106,6 +106,12 @@
       { id: "lz4", kind: "pkg", ru: "lz4", en: "lz4", dru: "Сжатие .lz4.", den: "Compresses .lz4.", verify: "lz4" },
       { id: "lhasa", kind: "pkg", ru: "lhasa (.lzh)", en: "lhasa (.lzh)", dru: "Архивы LHA/LZH.", den: "LHA/LZH archives.", verify: "lha" },
       { id: "lrzip", kind: "pkg", ru: "lrzip (.lrz)", en: "lrzip (.lrz)", dru: "Долгое сжатие .lrz.", den: "Long-range .lrz compression.", verify: "lrzip" }
+    ] },
+    { id: "media", ru: "Медиа, распознавание и изображения", en: "Media, OCR and images", note: { ru: "Проверка каждого пункта — реальная операция: ffmpeg кодирует один кадр, ImageMagick рисует картинку, tesseract перечисляет языковые модели. Так видно, что инструмент не просто установлен, а работает.", en: "Each entry is checked with a real operation: ffmpeg encodes one frame, ImageMagick renders an image, tesseract lists its language models. This proves the tool works, not just that it is installed." }, items: [
+      { id: "ffmpeg", kind: "pkg", ru: "FFmpeg (ffmpeg + ffprobe)", en: "FFmpeg (ffmpeg + ffprobe)", dru: "Конвертация видео и звука, извлечение кадров и субтитров, работа с медиа для агента.", den: "Video and audio conversion, frame and subtitle extraction, media work for the agent.", verify: "ffmpeg,ffprobe" },
+      { id: "tesseract", kind: "pkg", ru: "Tesseract OCR", en: "Tesseract OCR", dru: "Распознавание текста на изображениях и скриншотах.", den: "Text recognition on images and screenshots.", verify: "tesseract" },
+      { id: "imagemagick", kind: "pkg", ru: "ImageMagick (magick, convert)", en: "ImageMagick (magick, convert)", dru: "Обрезка, масштабирование и конвертация изображений без графической программы.", den: "Crop, resize and convert images without a graphics app.", verify: "magick" },
+      { id: "python-numpy", kind: "pkg", ru: "NumPy", en: "NumPy", dru: "Массивы и математика для Python: нужен скриптам обработки изображений и данных.", den: "Arrays and maths for Python: needed by image and data processing scripts.", verify: "numpy" }
     ] }
   ];
   var PRESETS = [
@@ -114,7 +120,9 @@
     { id: "apk", ru: "Android-приложение (Gradle)", en: "Android app (Gradle)", dru: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35", den: "OpenJDK 17, Gradle, Kotlin, aapt2, d8, apksigner, apktool, jadx, openssl, SDK 35",
       items: ["openjdk-17", "gradle-auto", "kotlin", "aapt", "aapt2", "d8", "apksigner", "apktool", "jadx", "openssl-tool", "zip", "unzip", "android-tools", "platforms;android-35", "build-tools;35.0.0"] },
     { id: "native", ru: "Нативный код (NDK)", en: "Native code (NDK)", dru: "clang, CMake, Ninja, NDK sysroot/multilib", den: "clang, CMake, Ninja, NDK sysroot/multilib",
-      items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] }
+      items: ["clang", "lld", "cmake", "ninja", "make", "ndk-sysroot", "ndk-multilib"] },
+    { id: "media", ru: "Медиа и распознавание", en: "Media and OCR", dru: "FFmpeg, Tesseract, ImageMagick, NumPy", den: "FFmpeg, Tesseract, ImageMagick, NumPy",
+      items: ["ffmpeg", "tesseract", "imagemagick", "python-numpy"] }
   ];
   var ITEMS = {};
   GROUPS.forEach(function (g) { g.items.forEach(function (it) { it.group = g.id; ITEMS[it.id] = it; }); });
