@@ -51,8 +51,13 @@ def which_exe(name):
 
 def collect(overlay):
     files = {}
-    for dirpath, _, names in os.walk(APP):
+    for dirpath, dirnames, names in os.walk(APP):
+        # Байткод — мусор сборки: он не должен попадать в APK (в архиве
+        # исходников исключается тем же правилом ниже).
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
         for name in names:
+            if name.endswith(".pyc"):
+                continue
             full = Path(dirpath) / name
             rel = full.relative_to(APP).as_posix()
             files[rel] = full
