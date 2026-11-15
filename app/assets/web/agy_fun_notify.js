@@ -22,6 +22,18 @@
 (function () {
   "use strict";
   function get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }
+
+  /* Модуль рисует свои элементы поверх бандла, поэтому нужен локальный
+     выбор строки RU/EN по общему источнику языка. */
+  function ruT() {
+    try {
+      if (window.__agyI18n && typeof window.__agyI18n.getLanguage === "function") {
+        return window.__agyI18n.getLanguage() === "ru";
+      }
+    } catch (e) {}
+    return /^ru\b/i.test(navigator.language || "");
+  }
+  function T(r, e) { return ruT() ? r : e; }
   /* --- АВАРИЙНЫЙ KILL-SWITCH ---
      Если в localStorage agyFunSafeMode=1 — скрипт полностью отключён:
      никаких перехватов fetch/Audio/WebSocket, никакого DOM-демона.
@@ -133,7 +145,7 @@
       "max-width:76vw;max-height:60vh;border-radius:18px;box-shadow:0 12px 48px rgba(0,0,0,.8);" +
       "transform:scale(.85);transition:transform .25s cubic-bezier(.2,1.4,.4,1);background:#1a1a1a;");
     var label = document.createElement("div");
-    label.textContent = "Задача завершена! 🎉";
+    label.textContent = T("Задача завершена! 🎉", "Task complete! 🎉");
     label.setAttribute("style",
       "margin-top:20px;color:#fff;" +
       "font:600 20px/1.3 system-ui,sans-serif;text-shadow:0 2px 8px rgba(0,0,0,.8);pointer-events:none;");
@@ -243,7 +255,7 @@
       "max-width:260px;max-height:190px;border-radius:12px;object-fit:cover;display:block;background:#18181b;");
 
     var caption = document.createElement("div");
-    caption.textContent = "Задача выполнена 🎉";
+    caption.textContent = T("Задача выполнена 🎉", "Task done 🎉");
     caption.setAttribute("style",
       "margin-top:6px;font:500 12px/1.3 system-ui,sans-serif;color:var(--text-secondary,#94a3b8);text-align:center;");
 
@@ -473,11 +485,11 @@
       "margin:16px 0;padding:16px;border:1px solid var(--border,#333);border-radius:12px;" +
       "background:var(--background,transparent);color:var(--foreground,#eee);font:14px system-ui,sans-serif;");
     box.innerHTML =
-      '<div style="font-weight:600;margin-bottom:8px">🎉 Прикол при завершении задачи</div>' +
+      '<div style="font-weight:600;margin-bottom:8px">🎉 ' + T("Прикол при завершении задачи", "Fun on task completion") + '</div>' +
       '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-      '<input type="checkbox" id="agy-fd-on"> Показывать гифку, когда приложение на экране</label>' +
+      '<input type="checkbox" id="agy-fd-on"> ' + T("Показывать гифку, когда приложение на экране", "Show the GIF while the app is on screen") + '</label>' +
       '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-      '<input type="checkbox" id="agy-fd-chat"> Показывать гифку в чате (в переписке, а не на весь экран)</label>' +
+      '<input type="checkbox" id="agy-fd-chat"> ' + T("Показывать гифку в чате (в переписке, а не на весь экран)", "Show the GIF inline in the chat (instead of full screen)") + '</label>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       Object.keys(PRESETS).map(function (k) {
         return '<button data-preset="' + k + '" style="padding:4px;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#222);color:inherit;cursor:pointer">' +
@@ -486,18 +498,18 @@
           '</button>';
       }).join("") + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
-      '<input id="agy-fd-url" placeholder="Ссылка на свою гифку (https://...)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
-      '<button id="agy-fd-apply" style="padding:8px 14px;border-radius:8px;border:none;background:var(--primary,#4f7cff);color:#fff;cursor:pointer">ОК</button></div>' +
-      '<div style="font-weight:600;margin:10px 0 8px">🔊 Звук при завершении</div>' +
+      '<input id="agy-fd-url" placeholder="' + T("Ссылка на свою гифку (https://...)", "Link to your own GIF (https://...)") + '" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
+      '<button id="agy-fd-apply" style="padding:8px 14px;border-radius:8px;border:none;background:var(--primary,#4f7cff);color:#fff;cursor:pointer">' + T("ОК", "OK") + '</button></div>' +
+      '<div style="font-weight:600;margin:10px 0 8px">🔊 ' + T("Звук при завершении", "Completion sound") + '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
       Object.keys(SOUNDS).map(function (k) {
         return '<button data-sound="' + k + '" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#222);color:inherit;cursor:pointer">' +
-          ({ "app-done": "🔔 Стандартный", chime: "🌀 Portal", pop: "🛎 Bell" })[k] + '</button>';
+          ({ "app-done": "🔔 " + T("Стандартный", "Default"), chime: "🌀 Portal", pop: "🛎 Bell" })[k] + '</button>';
       }).join("") + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
-      '<input id="agy-fd-sound-url" placeholder="Ссылка на свой звук (https://...mp3)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
-      '<button id="agy-fd-sound-apply" style="padding:8px 14px;border-radius:8px;border:none;background:var(--primary,#4f7cff);color:#fff;cursor:pointer">ОК</button></div>' +
-      '<button id="agy-fd-test" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border,#444);background:transparent;color:inherit;cursor:pointer">Показать пример</button>';
+      '<input id="agy-fd-sound-url" placeholder="' + T("Ссылка на свой звук (https://...mp3)", "Link to your own sound (https://...mp3)") + '" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--secondary,#1a1a1a);color:inherit">' +
+      '<button id="agy-fd-sound-apply" style="padding:8px 14px;border-radius:8px;border:none;background:var(--primary,#4f7cff);color:#fff;cursor:pointer">' + T("ОК", "OK") + '</button></div>' +
+      '<button id="agy-fd-test" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border,#444);background:transparent;color:inherit;cursor:pointer">' + T("Показать пример", "Show a preview") + '</button>';
 
     var on = box.querySelector("#agy-fd-on");
     on.checked = get("agy.funDoneEnabled", "1") !== "0";

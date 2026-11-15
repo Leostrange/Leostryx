@@ -59,6 +59,7 @@
       ru: "Системный (По умолчанию)",
       en: "System (Default)",
       desc: "Roboto / MiSans / UI",
+      den: "Roboto / MiSans / UI",
       family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'MiSans', sans-serif",
       license: "System",
       isMono: false
@@ -68,6 +69,7 @@
       ru: "Inter",
       en: "Inter",
       desc: "Современный UI-гротеск",
+      den: "Modern UI grotesque",
       family: "'Inter', system-ui, -apple-system, sans-serif",
       license: "SIL OFL 1.1",
       isMono: false
@@ -77,6 +79,7 @@
       ru: "JetBrains Mono",
       en: "JetBrains Mono",
       desc: "Шрифт разработчиков",
+      den: "Developer font",
       family: "'JetBrains Mono', ui-monospace, monospace",
       license: "SIL OFL 1.1",
       isMono: true
@@ -86,6 +89,7 @@
       ru: "Fira Code",
       en: "Fira Code",
       desc: "Моноширинный с лигатурами",
+      den: "Monospaced with ligatures",
       family: "'Fira Code', ui-monospace, monospace",
       license: "SIL OFL 1.1",
       isMono: true
@@ -95,6 +99,7 @@
       ru: "Roboto",
       en: "Roboto",
       desc: "Классический Android",
+      den: "Classic Android",
       family: "'Roboto', 'RobotoFlex', sans-serif",
       license: "Apache 2.0",
       isMono: false
@@ -104,6 +109,7 @@
       ru: "Geist",
       en: "Geist",
       desc: "Чистый технический",
+      den: "Clean technical",
       family: "'Geist', sans-serif",
       license: "SIL OFL 1.1",
       isMono: false
@@ -113,6 +119,7 @@
       ru: "Montserrat",
       en: "Montserrat",
       desc: "Геометрический гротеск",
+      den: "Geometric grotesque",
       family: "'Montserrat', sans-serif",
       license: "SIL OFL 1.1",
       isMono: false
@@ -122,6 +129,7 @@
       ru: "Ubuntu",
       en: "Ubuntu",
       desc: "Гуманистический гротеск",
+      den: "Humanist grotesque",
       family: "'Ubuntu', sans-serif",
       license: "Ubuntu Font Licence",
       isMono: false
@@ -131,6 +139,7 @@
       ru: "PT Root UI",
       en: "PT Root UI",
       desc: "Создан для кириллицы",
+      den: "Designed for Cyrillic",
       family: "'PT Root UI', 'PT Sans', sans-serif",
       license: "SIL OFL 1.1",
       isMono: false
@@ -555,7 +564,7 @@
     previewText.id = "agy-font-preview-text";
     previewText.style.cssText = "font-size:13.5px;line-height:1.45;color:var(--foreground,#eee);font-family:" + currentFont.family;
     previewText.innerHTML =
-      "<strong>Leostryx AI</strong> — умный агент для Android.<br>" +
+      "<strong>Leostryx AI</strong> — " + T("умный агент для Android.", "a smart agent for Android.") + "<br>" +
       "The quick brown fox jumps over the lazy dog.<br>" +
       "<span style='font-size:11.5px;opacity:0.8'>0123456789 • АБВГДЕёжзийклмноп • ABCDEF • { ok: true }</span>";
     previewCol.appendChild(previewText);
@@ -626,7 +635,7 @@
 
       var itemDesc = document.createElement("span");
       itemDesc.style.cssText = "font-size:10.5px;color:var(--muted-foreground,#888)";
-      itemDesc.textContent = f.desc + " · " + f.license;
+      itemDesc.textContent = T(f.desc, f.den || f.desc) + " · " + f.license;
       itemInfo.appendChild(itemDesc);
 
       item.appendChild(itemInfo);

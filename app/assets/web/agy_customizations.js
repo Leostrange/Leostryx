@@ -57,6 +57,28 @@
   var pollTimers = {};      // jobId -> setTimeout handle (per-job polling)
   var logText = "";
 
+  /* Теги каталога агентов/плагинов заданы по-русски; для английского
+     интерфейса переводим их на лету, латинские теги не трогаем. */
+  var TAG_EN = {
+    "Ревью": "Review",
+    "Безопасность": "Security",
+    "Тесты": "Tests",
+    "Автоматизация": "Automation",
+    "Документация": "Documentation",
+    "Облако": "Cloud",
+    "Документы": "Documents",
+    "Данные": "Data",
+    "БД": "DB",
+    "Секреты": "Secrets",
+    "Воркфлоу": "Workflow",
+    "Агенты": "Agents",
+    "Наука": "Science",
+    "Исследования": "Research",
+    "Статистика": "Statistics",
+    "Бэкенд": "Backend"
+  };
+  function tagText(t) { return ru() ? t : (TAG_EN[t] || t); }
+
   var CATALOG_AGENTS = [
     {
       id: "code-reviewer",
@@ -703,7 +725,7 @@
         html += '    <div class="agy-cust-preset-desc">' + esc(pa.desc) + '</div>';
         html += '    <div class="agy-cust-preset-tags">';
         pa.tags.forEach(function (t) {
-          html += '    <span class="agy-cust-preset-tag">' + esc(t) + '</span>';
+          html += '    <span class="agy-cust-preset-tag">' + esc(tagText(t)) + '</span>';
         });
         html += '    </div>';
         html += '  </div>';
@@ -846,7 +868,7 @@
         html += '    <div class="agy-cust-preset-desc">' + esc(preset.desc) + '</div>';
         html += '    <div class="agy-cust-preset-tags">';
         preset.tags.forEach(function (t) {
-          html += '    <span class="agy-cust-preset-tag">' + esc(t) + '</span>';
+          html += '    <span class="agy-cust-preset-tag">' + esc(tagText(t)) + '</span>';
         });
         html += '    </div>';
         html += '  </div>';
@@ -1091,11 +1113,20 @@
         var pType = pr.getAttribute("data-preset");
         var appendStr = "";
         if (pType === "concise") {
-          appendStr = "\n\n## Правило краткости\n- Отвечай предельно лаконично, структурированно и сразу по существу вопроса.\n- Не повторяй формулировку вопроса и избегай шаблонных вводных фраз.\n";
+          appendStr = T(
+            "\n\n## Правило краткости\n- Отвечай предельно лаконично, структурированно и сразу по существу вопроса.\n- Не повторяй формулировку вопроса и избегай шаблонных вводных фраз.\n",
+            "\n\n## Brevity rule\n- Answer as concisely as possible, well structured and straight to the point.\n- Do not restate the question and avoid boilerplate lead-in phrases.\n"
+          );
         } else if (pType === "strict") {
-          appendStr = "\n\n## Строгая разработка\n- Всегда используй строгую типизацию, проверку ошибок и пиши готовый к продакшну код.\n- Сохраняй целостность документации и существующих комментариев.\n";
+          appendStr = T(
+            "\n\n## Строгая разработка\n- Всегда используй строгую типизацию, проверку ошибок и пиши готовый к продакшну код.\n- Сохраняй целостность документации и существующих комментариев.\n",
+            "\n\n## Strict engineering\n- Always use strict typing, error handling and ship production-ready code.\n- Preserve documentation integrity and all existing comments.\n"
+          );
         } else if (pType === "russian") {
-          appendStr = "\n\n## Язык общения\n- Всегда общайся, объясняй и комментируй код на русском языке, кроме стандартных системных идентификаторов.\n";
+          appendStr = T(
+            "\n\n## Язык общения\n- Всегда общайся, объясняй и комментируй код на русском языке, кроме стандартных системных идентификаторов.\n",
+            "\n\n## Communication language\n- Always communicate, explain and comment code in English, except for standard system identifiers.\n"
+          );
         }
         var txtArea = root.querySelector("#agy-cust-instr-textarea");
         if (txtArea) {

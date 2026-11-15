@@ -22,6 +22,34 @@
   var host = null, root = null;
   var activeTab = "servers"; // "servers" | "utcp" | "components"
   var activeCategory = "all";
+
+  /* Теги каталога MCP пишутся по-русски; для английского интерфейса
+     переводим их на лету. Ключ не найден — тег остаётся как есть
+     (латинские теги reasoning/local/memory/... уже английские). */
+  var TAG_EN = {
+    "мышление": "thinking",
+    "планирование": "planning",
+    "логика": "logic",
+    "память": "memory",
+    "граф знаний": "knowledge graph",
+    "контекст": "context",
+    "файлы": "files",
+    "хранилище": "storage",
+    "диск": "disk",
+    "тестирование": "testing",
+    "промпты": "prompts",
+    "инструменты": "tools",
+    "поиск": "search",
+    "веб": "web",
+    "нейропоиск": "neural search",
+    "документация": "documentation",
+    "библиотеки": "libraries",
+    "фреймворки": "frameworks",
+    "репозитории": "repositories",
+    "коммиты": "commits",
+    "облако": "cloud"
+  };
+  function tagText(t) { return ru() ? t : (TAG_EN[t] || t); }
   var searchQuery = "";
   var showAddModal = false;
   var showAddUtcpModal = false;
@@ -42,12 +70,12 @@
     exa: { label: "Exa AI Search", desc: "exa-mcp-server", ok: false, val: "" },
     context7: { label: "Context7 Docs", desc: "@upstash/context7-mcp", ok: false, val: "" },
     brave: { label: "Brave Search", desc: "@modelcontextprotocol/server-brave-search", ok: false, val: "" },
-    remote: { label: "MCP Remote Proxy (Stitch)", desc: "mcp-remote (для HTTP/SSE серверов)", ok: false, val: "" },
+    remote: { label: "MCP Remote Proxy (Stitch)", desc: T("mcp-remote (для HTTP/SSE серверов)", "mcp-remote (for HTTP/SSE servers)"), ok: false, val: "" },
     github: { label: "GitHub MCP Server", desc: "@modelcontextprotocol/server-github", ok: false, val: "" },
-    utcp_bridge: { label: "UTCP-MCP Bridge", desc: "@utcp/mcp-bridge (мост трансляции UTCP в MCP)", ok: false, val: "" },
+    utcp_bridge: { label: "UTCP-MCP Bridge", desc: T("@utcp/mcp-bridge (мост трансляции UTCP в MCP)", "@utcp/mcp-bridge (UTCP to MCP translation bridge)"), ok: false, val: "" },
     utcp_sdk: { label: "UTCP Core SDK", desc: "@utcp/sdk (Universal Tool Calling Protocol)", ok: false, val: "" },
-    utcp_http: { label: "UTCP HTTP & OpenAPI", desc: "@utcp/http (HTTP клиент и парсер OpenAPI 3.0)", ok: false, val: "" },
-    utcp_file: { label: "UTCP Local Files", desc: "@utcp/file (драйвер локальных JSON/YAML мануалов)", ok: false, val: "" },
+    utcp_http: { label: "UTCP HTTP & OpenAPI", desc: T("@utcp/http (HTTP клиент и парсер OpenAPI 3.0)", "@utcp/http (HTTP client and OpenAPI 3.0 parser)"), ok: false, val: "" },
+    utcp_file: { label: "UTCP Local Files", desc: T("@utcp/file (драйвер локальных JSON/YAML мануалов)", "@utcp/file (driver for local JSON/YAML manuals)"), ok: false, val: "" },
   };
 
   // Ready-to-use UTCP Presets
@@ -406,7 +434,9 @@
                     s.name.toLowerCase().indexOf(q) >= 0 ||
                     s.desc.toLowerCase().indexOf(q) >= 0;
         if (!match && s.tags) {
-          match = s.tags.some(function (t) { return t.toLowerCase().indexOf(q) >= 0; });
+          match = s.tags.some(function (t) {
+            return t.toLowerCase().indexOf(q) >= 0 || tagText(t).toLowerCase().indexOf(q) >= 0;
+          });
         }
         if (!match) continue;
       }
@@ -517,7 +547,7 @@
           if (s.tags && s.tags.length > 0) {
             html += '  <div class="agy-mcp-tags">';
             s.tags.forEach(function (t) {
-              html += '  <span class="agy-mcp-tag-pill">' + esc(t) + '</span>';
+              html += '  <span class="agy-mcp-tag-pill">' + esc(tagText(t)) + '</span>';
             });
             html += '  </div>';
           }
@@ -603,7 +633,7 @@
       )) + '</div>';
       html += '  <div class="agy-mcp-utcp-hero-meta">';
       html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мост UTCP ↔ MCP: ", "UTCP ↔ MCP Bridge: ")) + (isUtcpActive && comps.utcp_bridge.ok ? '<b style="color:#10b981;">' + esc(T("Включён", "Enabled")) + '</b>' : '<b style="color:#f59e0b;">' + esc(comps.utcp_bridge.ok ? T("Установлен", "Installed") : T("Не установлен", "Not installed")) + '</b>') + '</span>';
-      html += '    <span class="agy-mcp-utcp-meta-item">Конфиг: ~/.gemini/config/utcp_config.json</span>';
+      html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Конфиг: ", "Config: ")) + '~/.gemini/config/utcp_config.json</span>';
       html += '    <span class="agy-mcp-utcp-meta-item">' + esc(T("Мануалов: ", "Manuals: ")) + Object.keys(utcpManuals).length + '</span>';
       html += '  </div>';
       html += '</div>';

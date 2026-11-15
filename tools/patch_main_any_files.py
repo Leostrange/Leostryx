@@ -7,8 +7,13 @@ Patches app/assets/web/generated/main.js in place:
   C. replaces the terminal `Unsupported file format` with a generic
      inline-data attach path (content sniffing for text vs. octet-stream)
   D. raises the text attachment cap 1MB -> 10MB
+  E. disables the `supportedMimeTypes` capability guard (both the
+     attach-time toast and the send-time throw) so that models whose
+     capability map only lists images still accept text/code files
 
 Идемпотентен: повторный запуск на уже пропатченном бандле ничего не делает.
+Блоки применяются независимо, поэтому скрипт можно докидывать к уже
+пропатченному бандлу после появления новых правок.
 Запускается один раз на каждой новой upstream-версии main.js:
     python3 tools/patch_main_any_files.py
 """
@@ -112,6 +117,31 @@ TEXT_NEW = (
     'g("validation_check_failed",Error("Text file size exceeds 10MB limit"));'
 )
 
+# --- E: capability guard -----------------------------------------------------
+# Upstream rejects any attachment whose mime is absent from the per-model
+# `supportedMimeTypes` map, even though most providers handle text fine.
+# Both call sites are wrapped in a flag that defaults to the permissive path;
+# `window.__agyBlockUnsupportedMedia = true` restores stock behaviour.
+GUARD_MARK = "__agyBlockUnsupportedMedia"
+GUARD_TOAST_OLD = (
+    'if(LNa(a,b.supportedMimeTypes))'
+    'return"Selected model does not support this media type"'
+)
+GUARD_TOAST_NEW = (
+    'if(window.__agyBlockUnsupportedMedia===!0&&LNa(a,b.supportedMimeTypes))'
+    'return"Selected model does not support this media type"'
+)
+GUARD_SEND_OLD = (
+    'if(LNa(l,r.supportedMimeTypes))throw Error('
+    '"Your model does not support this media.'
+)
+GUARD_SEND_NEW = (
+    'if(window.__agyBlockUnsupportedMedia===!0&&LNa(l,r.supportedMimeTypes))throw Error('
+    '"Your model does not support this media.'
+)
+
+UPSTREAM_MARK = 'var u5a=(a,b,c,e,f=10)=> {'
+
 s = open(PATH, encoding="utf-8").read()
 orig_len = len(s)
 
@@ -124,21 +154,31 @@ def sub_once(src, old, new, label):
 
 
 if "agyMimeForName" in s:
-    print("Already patched, aborting.")
+    print("Blocks A-D: already patched, skipping.")
+else:
+    s = sub_once(s, UPSTREAM_MARK, MIME_MAP + "\n" + UPSTREAM_MARK, "A mime resolver")
+    s = sub_once(s, DROP_OLD, DROP_NEW, "B dragover filter")
+    s = sub_once(s, FILTER_OLD, FILTER_NEW, "B drop filter")
+
+    assert s.count('else e?.("Unsupported file format")') == 1
+    s = sub_once(s, 'else e?.("Unsupported file format")', GENERIC, "C generic attach")
+
+    assert len(TEXT_RE.findall(s)) == 1, "text cap pattern mismatch"
+    s = TEXT_RE.sub(TEXT_NEW, s, count=1)
+    print("  [ok] D text cap 1MB->10MB")
+
+    assert "Unsupported file format" not in s
+
+if GUARD_MARK in s:
+    print("Block E: already patched, skipping.")
+else:
+    s = sub_once(s, GUARD_TOAST_OLD, GUARD_TOAST_NEW, "E attach-time guard")
+    s = sub_once(s, GUARD_SEND_OLD, GUARD_SEND_NEW, "E send-time guard")
+
+new_len = len(s)
+if new_len == orig_len:
+    print("Nothing to do.")
     sys.exit(0)
 
-s = sub_once(s, "var u5a=(a,b,c,e,f=10)=>{",
-             MIME_MAP + "\nvar u5a=(a,b,c,e,f=10)=>{", "A mime resolver")
-s = sub_once(s, DROP_OLD, DROP_NEW, "B dragover filter")
-s = sub_once(s, FILTER_OLD, FILTER_NEW, "B drop filter")
-
-assert s.count('else e?.("Unsupported file format")') == 1
-s = sub_once(s, 'else e?.("Unsupported file format")', GENERIC, "C generic attach")
-
-assert len(TEXT_RE.findall(s)) == 1, "text cap pattern mismatch"
-s = TEXT_RE.sub(TEXT_NEW, s, count=1)
-print("  [ok] D text cap 1MB->10MB")
-
-assert "Unsupported file format" not in s
 open(PATH, "w", encoding="utf-8", newline="").write(s)
-print(f"written: {orig_len} -> {len(s)} bytes (delta {len(s)-orig_len})")
+print(f"written: {orig_len} -> {new_len} bytes (delta {new_len - orig_len})")

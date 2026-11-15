@@ -1,26 +1,26 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.8-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.9-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.8).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.9).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 > [!NOTE]
-> **3.1.8 — актуальный релиз.** APK `Leostryx-3.1.8-standard.apk` и `Leostryx-3.1.8-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.8.txt` и архивом исходников `Leostryx-repo.zip`.
+> **3.1.9 — актуальный релиз.** APK `Leostryx-3.1.9-standard.apk` и `Leostryx-3.1.9-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.9.txt` и архивом исходников `Leostryx-repo.zip`.
 
 ---
 
-## Leostryx для Android 3.1.8
+## Leostryx для Android 3.1.9
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -50,8 +50,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.8-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.8-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.9-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.9-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -60,10 +60,22 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.8](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.8/SHA256SUMS-3.1.8.txt).
-2. Установите скачанный APK 3.1.8 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.9](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) и сверьте SHA-256 с файлом [`SHA256SUMS-3.1.9.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.9/SHA256SUMS-3.1.9.txt).
+2. Установите скачанный APK 3.1.9 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.8 (см. также [CHANGELOG.md](CHANGELOG.md))
+## Что нового в 3.1.9 (см. также [CHANGELOG.md](CHANGELOG.md))
+
+- **полная локализация на английский**: переведено всё, что видит пользователь — статусы и ошибки «Инструментов», единицы размера, описания всех девяти шрифтов и образец предпросмотра, 21 тег MCP-серверов и описания компонентов, 16 тегов правил/скиллов/плагинов и три шаблона правил, заголовки уведомлений в шторке и каталог субагентов, вся панель мем-гифок и звука, заголовки `transcript.md`, `MANIFEST.txt`, всплывающие сообщения и ошибки экспорта;
+- **язык передаётся в shell-бэкенд**: новая операция `setlang` пишет выбор в `$HOME/.agy_lang` (учитывается и `AGY_LANG`), в `agy_tools.sh` добавлен общий хелпер `L(ru, en)` — уведомления в шторке больше не приходят по-русски при английском интерфейсе;
+- **карточка «Обновления» переписана** («О приложении»): бейдж версии и мини-кнопка рядом с номером релиза открывают всплывающее окно с Changelog именно этого релиза;
+- **реальный прогресс загрузки обновления** вместо «5–7 %, потом резко 100 %»: процент и объём скачанных байт, отдельное уведомление с прогрессом в шторке Android и сообщение «Обновление скачано, откройте установщик» по завершении;
+- **установка через системный установщик**: по кнопке «Обновить» открывается `Intent.ACTION_VIEW` на скачанный APK, обновление встаёт штатно без ручного поиска файла;
+- **проверка обновлений через GitHub Releases API** с кэшем в `$HOME/.agy_changelog.json` и кнопкой обхода кэша;
+- **Changelog подтягивается с GitHub на языке интерфейса**: тела релизов содержат RU- и EN-блоки между маркерами `<!-- RU -->` / `<!-- EN -->`, `op_changelog` выбирает нужный, а при отсутствии английского блока в старом релизе аккуратно показывает русский. Маркеры распознаются только отдельной строкой, поэтому упоминание синтаксиса внутри текста релиза больше не ломает разбор;
+- **`CHANGELOG.md` стал двуязычным**: все 20 секций сохранены дословно под маркером RU и продублированы английским переводом под маркером EN — единый источник и для файла в репозитории, и для тел релизов на GitHub;
+- **версия 3.1.9** в манифесте (`versionCode` 34) и «О приложении»; cache-buster `?v=3.1.9` для `generated/main.js` и `agy_fun_notify.js`.
+
+### Что было в 3.1.8
 
 - **прикрепление файлов любых типов**: убрано тупиковое сообщение `Unsupported file format`. Файлы, которых нет в белом списке (`extensions.json`, `Dockerfile`, `Makefile`, `.env`, скрипты, конфиги, дампы, неизвестный бинарник), теперь прикрепляются к сообщению;
 - **перетаскивание больше не фильтруется**: раньше `drag&drop` молча отбрасывал файлы, чей MIME-тип не входил в белый список и чьё расширение не встречалось в наборе из 22 значений. Теперь принимается любой файл;

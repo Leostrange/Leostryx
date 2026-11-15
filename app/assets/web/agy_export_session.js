@@ -20,6 +20,18 @@
   "use strict";
   if (window.__agyExportSession) return;
 
+  /* Экспорт рисует собственные тосты и пишет MANIFEST/transcript, поэтому
+     нужен локальный выбор строки RU/EN по общему источнику языка. */
+  function ruT() {
+    try {
+      if (window.__agyI18n && typeof window.__agyI18n.getLanguage === "function") {
+        return window.__agyI18n.getLanguage() === "ru";
+      }
+    } catch (e) {}
+    return /^ru\b/i.test(navigator.language || "");
+  }
+  function T(r, e) { return ruT() ? r : e; }
+
   var MAX_BLOB = 64 * 1024 * 1024;
 
   function toast(msg) {
@@ -97,27 +109,27 @@
 
   /* Best-effort transcript.md from transcript_full.jsonl lines. */
   function transcriptMd(lines, sourceName) {
-    var md = ["# Сессия Leostryx", "", "Источник: " + sourceName, ""];
+    var md = [T("# Сессия Leostryx", "# Leostryx session"), "", T("Источник: ", "Source: ") + sourceName, ""];
     var filePaths = [], mediaUris = [];
     lines.forEach(function (line, idx) {
       if (!line.trim()) return;
       var rec;
-      try { rec = JSON.parse(line); } catch (e) { md.push("## Запись " + (idx + 1), "", "```", line, "```", ""); return; }
+      try { rec = JSON.parse(line); } catch (e) { md.push(T("## Запись ", "## Record ") + (idx + 1), "", "```", line, "```", ""); return; }
       var s = JSON.stringify(rec);
       // File paths mentioned in tool calls (for MANIFEST, not invented content).
       var pathMatch = s.match(/"[^"]*\.(?:py|js|ts|tsx|java|kt|go|rs|md|txt|json|xml|html|css|png|jpg)[^"]*"/g);
       if (pathMatch) pathMatch.forEach(function (p) { var v = p.slice(1, -1); if (filePaths.indexOf(v) < 0) filePaths.push(v); });
       var mediaMatch = s.match(/\.user_uploaded\/[^"'\s]+/g);
       if (mediaMatch) mediaMatch.forEach(function (u) { if (mediaUris.indexOf(u) < 0) mediaUris.push(u); });
-      var role = rec.role || rec.type || rec.kind || "запись";
+      var role = rec.role || rec.type || rec.kind || T("запись", "record");
       var text = rec.text || rec.content || rec.message || rec.delta || "";
       if (typeof text !== "string") text = JSON.stringify(text);
       var title = "## " + (idx + 1) + ". " + role;
       if (rec.timestamp || rec.time) title += " (" + (rec.timestamp || rec.time) + ")";
       md.push(title, "");
       if (text) md.push(text, "");
-      if (rec.tool_calls || rec.toolCalls) md.push("Инструменты: ```json", JSON.stringify(rec.tool_calls || rec.toolCalls, null, 2), "```", "");
-      if (rec.thinking) md.push("Размышления: ```", String(rec.thinking).slice(0, 4000), "```", "");
+      if (rec.tool_calls || rec.toolCalls) md.push(T("Инструменты: ```json", "Tools: ```json"), JSON.stringify(rec.tool_calls || rec.toolCalls, null, 2), "```", "");
+      if (rec.thinking) md.push(T("Размышления: ```", "Reasoning: ```"), String(rec.thinking).slice(0, 4000), "```", "");
       if (!text && !rec.tool_calls && !rec.toolCalls && !rec.thinking) md.push("```json", s.slice(0, 4000), "```", "");
     });
     return { md: md.join("\n"), filePaths: filePaths, mediaUris: mediaUris };
@@ -125,7 +137,7 @@
 
   window.__agyExportTest = { buildZip: buildZip, crc32: crc32, transcriptMd: transcriptMd };
   window.__agyExportSession = function (cascadeId) {
-    if (!cascadeId) { toast("Нет открытой сессии для сохранения."); return Promise.resolve(); }
+    if (!cascadeId) { toast(T("Нет открытой сессии для сохранения.", "No open session to save.")); return Promise.resolve(); }
     return (async function () {
       var errors = [];
       var transcriptText = "", sourceName = "", parsed = null;
@@ -148,7 +160,8 @@
         files.push({ name: "transcript.md", data: textToBytes(parsed.md) });
         files.push({ name: "transcript_full.jsonl", data: textToBytes(transcriptText) });
       } else {
-        errors.push("Транскрипт не получен: проверьте, что сессия сохранена на устройстве.");
+        errors.push(T("Транскрипт не получен: проверьте, что сессия сохранена на устройстве.",
+                        "Transcript not received: make sure the session is stored on the device."));
       }
       // Attachments (best effort, failures recorded, never fatal).
       for (var j = 0; j < mediaUris.length; j++) {
@@ -159,8 +172,8 @@
           if (r.ok) {
             var buf = new Uint8Array(await r.arrayBuffer());
             files.push({ name: "attachments/" + fname, data: buf });
-          } else errors.push("Вложение " + fname + ": HTTP " + r.status);
-        } catch (e) { errors.push("Вложение " + fname + ": " + e); }
+          } else errors.push(T("Вложение ", "Attachment ") + fname + ": HTTP " + r.status);
+        } catch (e) { errors.push(T("Вложение ", "Attachment ") + fname + ": " + e); }
       }
       var manifest = [
         "Antigravity session export (Drive 31.10.26, Task 1 v1)",
@@ -168,14 +181,17 @@
         "exported: " + new Date().toISOString(),
         "transcript source: " + (sourceName || "none (see errors)"),
         "",
-        "Файлы проекта НЕ включены: из скрипта страницы нет доступа к рабочей папке (нужен lsClient).",
-        "Пути файлов, упомянутые в транскрипте (для ручной проверки, не содержимое):",
-        filePaths.length ? filePaths.join("\n") : "(не найдено)",
+        T("Файлы проекта НЕ включены: из скрипта страницы нет доступа к рабочей папке (нужен lsClient).",
+          "Project files are NOT included: a page script has no access to the workspace folder (needs lsClient)."),
+        T("Пути файлов, упомянутые в транскрипте (для ручной проверки, не содержимое):",
+          "File paths mentioned in the transcript (for manual review, not content):"),
+        filePaths.length ? filePaths.join("\n") : T("(не найдено)", "(none found)"),
         "",
-        "Ошибки (если есть):",
-        errors.length ? errors.join("\n") : "(нет)",
+        T("Ошибки (если есть):", "Errors (if any):"),
+        errors.length ? errors.join("\n") : T("(нет)", "(none)"),
         "",
-        "ZIP: STORE (без сжатия), сохранён через загрузку blob. Лимит WebView: 64 МиБ."
+        T("ZIP: STORE (без сжатия), сохранён через загрузку blob. Лимит WebView: 64 МиБ.",
+          "ZIP: STORE (no compression), saved via blob download. WebView limit: 64 MiB.")
       ].join("\n");
       files.push({ name: "MANIFEST.txt", data: textToBytes(manifest) });
       // Meta: model / title are not available to a page script; do not invent them.
@@ -183,7 +199,8 @@
 
       var total = 0; files.forEach(function (f) { total += f.data.length + f.name.length + 100; });
       if (total > MAX_BLOB) {
-        toast("Сессия слишком большая (>" + Math.round(total / 1048576) + " МиБ): экспорт через blob ограничен 64 МиБ. Сохранение >64 МиБ в этой версии не реализовано.");
+        toast(T("Сессия слишком большая (>" + Math.round(total / 1048576) + " МиБ): экспорт через blob ограничен 64 МиБ. Сохранение >64 МиБ в этой версии не реализовано.",
+                "Session is too large (>" + Math.round(total / 1048576) + " MiB): blob export is limited to 64 MiB. Saving more than 64 MiB is not implemented in this version."));
         return;
       }
       var zip = buildZip(files);
@@ -203,7 +220,10 @@
         a.href = url; a.download = fname;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-        toast(transcriptText ? "Сессия сохранена в ZIP." : "ZIP сохранён, но транскрипт получить не удалось — см. MANIFEST.txt.");
+        toast(transcriptText
+          ? T("Сессия сохранена в ZIP.", "Session saved to a ZIP archive.")
+          : T("ZIP сохранён, но транскрипт получить не удалось — см. MANIFEST.txt.",
+              "ZIP saved, but the transcript could not be retrieved — see MANIFEST.txt."));
       }
       var agyA = (window.AndroidBridge && window.AndroidBridge.saveBlob) ? window.AndroidBridge : (window.Android && window.Android.saveBlob ? window.Android : null);
       var agyTok = window.__AG_NATIVE_BRIDGE_TOKEN__ || (function () { try { return localStorage.getItem("agy_bridge_token"); } catch (e) { return null; } })();
@@ -211,10 +231,11 @@
         agyB64(blob, function (b64) {
           try {
             agyA.saveBlob(agyTok, b64, fname, "application/zip");
-            toast("Сессия сохранена: " + fname + " (папка Загрузки).");
+            toast(T("Сессия сохранена: " + fname + " (папка Загрузки).",
+                    "Session saved: " + fname + " (Downloads folder)."));
           } catch (e) { agyAnchor(); }
         }, agyAnchor);
       } else { agyAnchor(); }
-    })().catch(function (e) { console.error("[agyExportSession]", e); toast("Не удалось сохранить сессию: " + e); });
+    })().catch(function (e) { console.error("[agyExportSession]", e); toast(T("Не удалось сохранить сессию: ", "Failed to save the session: ") + e); });
   };
 })();

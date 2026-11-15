@@ -5,6 +5,25 @@
   if (window.__agyRuFixes) return;
   window.__agyRuFixes = true;
 
+  /* Локализация: этот слой дописывает поверх бандла элементы интерфейса,
+     поэтому нужен собственный выбор строки RU/EN. Опираемся на тот же
+     источник истины, что и остальные модули (window.__agyI18n), с откатом
+     на AgyLang и язык системы. */
+  function ruLang() {
+    try {
+      if (window.__agyI18n && typeof window.__agyI18n.getLanguage === "function") {
+        return window.__agyI18n.getLanguage() === "ru";
+      }
+    } catch (e) {}
+    try {
+      var l = window.AgyLang && window.AgyLang.getLang && window.AgyLang.getLang();
+      if (l === "ru") return true;
+      if (l === "en") return false;
+    } catch (e) {}
+    return /^ru\b/i.test(navigator.language || "");
+  }
+  function T(r, e) { return ruLang() ? r : e; }
+
   /* ---- Dynamic Theme-Adaptive Glass Variables ----------------------------
    * Reads the active theme tokens (--background, --foreground) directly from
    * document.documentElement (which main.js updates on theme switch) and sets
@@ -1458,13 +1477,13 @@
       if (approveBtn) {
         var now = Date.now();
         var container = approveBtn.closest("[class*='step'],[class*='card'],[role='dialog']") || approveBtn.parentElement;
-        var textSnippet = container ? (container.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160) : "Требуется подтверждение действия агента";
+        var textSnippet = container ? (container.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160) : T("Требуется подтверждение действия агента", "The agent requires your confirmation");
         // Deduplicate by snippet: the same pending approval notifies ONCE.
         // Re-allow the same snippet only after 5 minutes (user dismissed it).
         if (textSnippet !== lastApprovalSnippet || (now - lastNotifiedApproval > 300000)) {
           lastApprovalSnippet = textSnippet;
           lastNotifiedApproval = now;
-          window.AgyShade.notify("agent_approval", "Leostryx — Требуется подтверждение", textSnippet, true);
+          window.AgyShade.notify("agent_approval", T("Leostryx — Требуется подтверждение", "Leostryx — Confirmation required"), textSnippet, true);
         }
       } else if (document.hidden) {
         // Approval resolved (or none pending): drop stale approval / progress notifications.
@@ -1486,7 +1505,7 @@
             if (!isStreaming) {
               lastNotifiedMessage = respText;
               var snippet = respText.slice(0, 150) + (respText.length > 150 ? "..." : "");
-              window.AgyShade.notify("agent_reply", "Leostryx — Ответ агента", snippet, false);
+              window.AgyShade.notify("agent_reply", T("Leostryx — Ответ агента", "Leostryx — Agent reply"), snippet, false);
             }
           }
         }
@@ -1507,14 +1526,14 @@
   };
 
   var CHAT_SUBAGENTS = [
-    { id: "self", name: "self", title: "Текущий агент", desc: "Копия контекста и инструментов", svg: SVG_ICONS.bot },
-    { id: "research", name: "research", title: "Исследователь", desc: "Поиск в кодовой базе и сети", svg: SVG_ICONS.search },
-    { id: "android-debugger", name: "android-debugger", title: "Android отладчик", desc: "Краши, logcat, JNI, jadx-agy", svg: SVG_ICONS.bug },
-    { id: "code-reviewer", name: "code-reviewer", title: "Код-ревью", desc: "Поиск багов и утечек памяти", svg: SVG_ICONS.code },
-    { id: "docs-architect", name: "docs-architect", title: "Архитектор доков", desc: "README, CHANGELOG, Mermaid", svg: SVG_ICONS.doc },
-    { id: "security-auditor", name: "security-auditor", title: "Аудитор безопасности", desc: "OWASP Top 10, уязвимости", svg: SVG_ICONS.shield },
-    { id: "test-engineer", name: "test-engineer", title: "Инженер тестов", desc: "Модульные и интеграционные тесты", svg: SVG_ICONS.test },
-    { id: "image-generator", name: "image-generator", title: "Генератор картинок", desc: "Создание и редактирование изображений", svg: SVG_ICONS.image }
+    { id: "self", name: "self", title: T("Текущий агент", "Current agent"), desc: T("Копия контекста и инструментов", "Copy of context and tools"), svg: SVG_ICONS.bot },
+    { id: "research", name: "research", title: T("Исследователь", "Researcher"), desc: T("Поиск в кодовой базе и сети", "Codebase and web search"), svg: SVG_ICONS.search },
+    { id: "android-debugger", name: "android-debugger", title: T("Android отладчик", "Android debugger"), desc: T("Краши, logcat, JNI, jadx-agy", "Crashes, logcat, JNI, jadx-agy"), svg: SVG_ICONS.bug },
+    { id: "code-reviewer", name: "code-reviewer", title: T("Код-ревью", "Code review"), desc: T("Поиск багов и утечек памяти", "Bug and memory-leak hunting"), svg: SVG_ICONS.code },
+    { id: "docs-architect", name: "docs-architect", title: T("Архитектор доков", "Docs architect"), desc: T("README, CHANGELOG, Mermaid", "README, CHANGELOG, Mermaid"), svg: SVG_ICONS.doc },
+    { id: "security-auditor", name: "security-auditor", title: T("Аудитор безопасности", "Security auditor"), desc: T("OWASP Top 10, уязвимости", "OWASP Top 10, vulnerabilities"), svg: SVG_ICONS.shield },
+    { id: "test-engineer", name: "test-engineer", title: T("Инженер тестов", "Test engineer"), desc: T("Модульные и интеграционные тесты", "Unit and integration tests"), svg: SVG_ICONS.test },
+    { id: "image-generator", name: "image-generator", title: T("Генератор картинок", "Image generator"), desc: T("Создание и редактирование изображений", "Image creation and editing"), svg: SVG_ICONS.image }
   ];
 
   function getSubagentsCatalog() {
@@ -1526,7 +1545,7 @@
         if (Array.isArray(extra)) {
           extra.forEach(function (x) {
             if (x && x.name && !list.some(function (i) { return i.name === x.name; })) {
-              list.push({ id: x.name, name: x.name, title: x.title || x.name, desc: x.desc || "Кастомный субагент", svg: SVG_ICONS.cpu });
+              list.push({ id: x.name, name: x.name, title: x.title || x.name, desc: x.desc || T("Кастомный субагент", "Custom subagent"), svg: SVG_ICONS.cpu });
             }
           });
         }
@@ -1573,8 +1592,9 @@
     var hdr = document.createElement("div");
     hdr.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px;" +
       "border-bottom:1px solid rgba(127,127,127,.18);margin-bottom:4px;font-size:13px;font-weight:600;color:var(--foreground,#eee)";
-    hdr.innerHTML = "<span style='display:inline-flex;align-items:center;gap:6px'>" + SVG_ICONS.bot + "<span>Субагенты</span></span>" +
-      "<span style='font-size:11px;font-weight:400;color:#888'>нажмите для вызова</span>";
+    hdr.innerHTML = "<span style='display:inline-flex;align-items:center;gap:6px'>" + SVG_ICONS.bot +
+      "<span>" + T("Субагенты", "Subagents") + "</span></span>" +
+      "<span style='font-size:11px;font-weight:400;color:#888'>" + T("нажмите для вызова", "tap to invoke") + "</span>";
     pop.appendChild(hdr);
 
     var list = getSubagentsCatalog();
@@ -1651,8 +1671,8 @@
     var btn = document.createElement("button");
     btn.type = "button";
     btn.id = "agy-subagent-btn";
-    btn.title = "Субагенты (вызов в чате)";
-    btn.setAttribute("aria-label", "Субагенты");
+    btn.title = T("Субагенты (вызов в чате)", "Subagents (invoke in chat)");
+    btn.setAttribute("aria-label", T("Субагенты", "Subagents"));
     btn.className = "agy-subagent-btn p-1.5 rounded-full text-secondary-foreground hover:bg-secondary cursor-pointer";
     btn.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;" +
       "padding:0;border:0;border-radius:9999px;background:transparent;cursor:pointer;line-height:1;" +

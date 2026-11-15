@@ -1,9 +1,64 @@
-# Список изменений — Leostryx (3.1.8)
+# Список изменений — Leostryx (3.1.9)
+# Changelog — Leostryx (3.1.9)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
+The complete list of every change and feature that was added.
+
+Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
+Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.9 — 2026-11-15 (Полная локализация RU/EN, просмотр Changelog, загрузка обновлений)
+
+<!-- RU -->
+- **Полная локализация интерфейса на английский язык.** Раньше английский интерфейс был наполовину русским: часть строк вообще не проходила через словарь. Теперь переведено всё, что видит пользователь:
+  - `agy_tools.js` — статусы «Инструментов», сообщения об ошибках (`Ошибка:` / `Error:`), единицы размера (`МиБ` / `MiB`, `МБ` / `MB`), сохранение selftest-лога;
+  - `agy_brand.js` — описания всех девяти шрифтов (`den:` у каждой записи `FONTS`) и предложение-образец в предпросмотре шрифта;
+  - `agy_mcp.js` — 21 тег MCP-серверов (`TAG_EN`) и описания четырёх компонентов;
+  - `agy_customizations.js` — 16 тегов правил, скиллов и плагинов, а также три шаблона правил (краткость, строгость, русский язык);
+  - `agy_ru.js` — заголовки уведомлений в шторке, каталог из 8 субагентов, «Кастомный субагент», подписи кнопок композера (добавлены хелперы `ruLang()` и `T(ru, en)`);
+  - `agy_fun_notify.js` — вся панель настроек мем-гифок: переключатель GIF, три поля ввода, раздел звука, пресеты, кнопка предпросмотра;
+  - `agy_export_session.js` — заголовки `transcript.md` (`User` / `Assistant` / `Tool` / `Thinking`), все всплывающие сообщения, шапка `MANIFEST.txt`, пути, ошибки, примечание к ZIP и сообщение о превышении размера.
+- **Язык интерфейса теперь передаётся в shell-бэкенд.** Добавлена операция `setlang`: она записывает выбранный язык в `$HOME/.agy_lang`, откуда его читают фоновые скрипты (`AGY_LANG` тоже учитывается). В `agy_tools.sh` появился общий хелпер `L(ru, en)`, поэтому уведомления в шторке больше не приходят по-русски при английском интерфейсе.
+- **Уведомления о загрузке обновления стали двуязычными** (`updatedownload`): заголовок, текст о ходе загрузки и сообщение об установке формируются через `L()`.
+- **Встроенная карточка «Обновления» переписана с нуля** («О приложении»):
+  - бейдж текущей версии и мини-кнопка рядом с номером релиза — по нажатию открывается всплывающее окно с Changelog именно этого релиза;
+  - проверка новой версии идёт через GitHub Releases API, кэш хранится в `$HOME/.agy_changelog.json`, кнопка «Проверить обновления» умеет обходить кэш;
+  - загрузка APK показывает реальный прогресс (процент и объём), а не прежние «5–7 %, потом резко 100 %»;
+  - загрузка видна и в шторке Android: отдельное уведомление с процветом, по завершении — уведомление «Обновление скачано, откройте установщик»;
+  - по нажатию «Обновить» запускается системный установщик Android (`Intent.ACTION_VIEW` на скачанный APK), приложение обновляется штатно, без ручного поиска файла;
+  - весь текст карточки проходит через `T(ru, en)` и меняется вместе с языком интерфейса.
+- **Changelog подтягивается с GitHub и показывается на языке интерфейса.** Тела релизов на GitHub теперь содержат обе версии текста, разделённые маркерами `<!-- RU --> … <!-- /RU -->` и `<!-- EN --> … <!-- /EN -->`; `op_changelog` выбирает нужную по языку, а если английского блока в старом релизе нет — аккуратно показывает русский.
+- **`CHANGELOG.md` стал двуязычным.** Каждая секция релиза сохранена дословно под маркером RU и продублирована английским переводом под маркером EN — это единый источник и для файла в репозитории, и для тел релизов на GitHub.
+- **Версия 3.1.9** (`versionCode` 34) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+- **Complete localisation of the interface into English.** Previously the English interface was half Russian: some strings never went through the dictionary at all. Now everything the user can see is translated:
+  - `agy_tools.js` — "Tools" statuses, error messages (`Ошибка:` / `Error:`), size units (`МиБ` / `MiB`, `МБ` / `MB`), saving the selftest log;
+  - `agy_brand.js` — the descriptions of all nine fonts (`den:` on every `FONTS` entry) and the sample sentence in the font preview;
+  - `agy_mcp.js` — 21 MCP-server tags (`TAG_EN`) and the descriptions of four components;
+  - `agy_customizations.js` — 16 rule/skill/plugin tags, plus three rule templates (concise, strict, Russian language);
+  - `agy_ru.js` — notification titles in the shade, the 8-entry subagent catalog, "Custom subagent", the composer button captions (the `ruLang()` and `T(ru, en)` helpers were added);
+  - `agy_fun_notify.js` — the whole meme-gif settings panel: the GIF toggle, three input fields, the sound section, the presets, the preview button;
+  - `agy_export_session.js` — `transcript.md` headings (`User` / `Assistant` / `Tool` / `Thinking`), all toasts, the `MANIFEST.txt` header, paths, errors, the ZIP note and the size-limit message.
+- **The interface language is now passed to the shell backend.** A `setlang` operation was added: it stores the selected language in `$HOME/.agy_lang`, which background scripts read (`AGY_LANG` is honoured too). `agy_tools.sh` gained a shared `L(ru, en)` helper, so notifications in the shade no longer arrive in Russian while the interface is in English.
+- **Update download notifications are now bilingual** (`updatedownload`): the title, the progress text and the install message are all produced through `L()`.
+- **The built-in "Updates" card was rewritten from scratch** ("About the app"):
+  - a badge with the current version and a mini-button next to the release number — tapping it opens a popup with the changelog of exactly that release;
+  - the new-version check goes through the GitHub Releases API, the cache lives in `$HOME/.agy_changelog.json`, and the "Check for updates" button can bypass the cache;
+  - the APK download shows real progress (percentage and size), instead of the previous "5–7 %, then a sudden 100 %";
+  - the download is also visible in the Android shade: a dedicated notification with a percentage, and on completion a "Update downloaded, open the installer" notification;
+  - pressing "Update" launches the system Android installer (`Intent.ACTION_VIEW` on the downloaded APK), so the app updates through the normal flow with no manual file search;
+  - every string on the card goes through `T(ru, en)` and follows the interface language.
+- **The changelog is pulled from GitHub and shown in the interface language.** GitHub release bodies now carry both versions of the text, separated by the `<!-- RU --> … <!-- /RU -->` and `<!-- EN --> … <!-- /EN -->` markers; `op_changelog` picks the right one for the language and, if an older release has no English block, gracefully falls back to Russian.
+- **`CHANGELOG.md` is bilingual.** Every release section is preserved verbatim under the RU marker and duplicated with an English translation under the EN marker — one source of truth for both the repository file and the GitHub release bodies.
+- **Version 3.1.9** (`versionCode` 34) in the manifest and in "About the app".
+<!-- /EN -->
+
 ## v3.1.8 — 2026-11-15 (Прикрепление файлов любых типов)
 
+<!-- RU -->
 Раньше композер принимал только изображения, PDF, офисные документы, zip, текст, аудио и видео. Любой другой файл — скрипт без известного расширения, `Dockerfile`, `Makefile`, `.env`, дамп, конфиг, неизвестный бинарник — упирался в тупиковое `Unsupported file format`. Причём до этой проверки дело часто даже не доходило: `drag&drop` отбрасывал файл раньше.
 
 - **Убрано сообщение `Unsupported file format`** (`app/assets/web/generated/main.js`, функция-валидатор `u5a`, терминальная ветка `else`). Вместо отказа работает общая ветка прикрепления: файл читается как `ArrayBuffer`, упаковывается в `I.MediaSchema` с блоком `inlineData` и добавляется к сообщению — тем же путём, что и уже поддерживаемые типы.
@@ -15,9 +70,27 @@
 - **Указатель файла для нативного пути сохранён**: после сборки `Media` вызывается `BB(m) && AB.set(B,m)` — если у файла есть реальный путь (`electronNative.getPathForFile` / `File.path`), он остаётся доступен модулю загрузки `v5a` и файл не дублируется в `inlineData` без необходимости.
 - **Синхронизация**: `app/assets/web/generated/main.js` (репозиторий) и `/data/user/0/com.agyru.t2/files/web/generated/main.js` (живая копия) совпадают побайтово; cache-buster `./generated/main.js` → `?v=3.1.8` в обоих `index.html`.
 - **Версия 3.1.8** (`versionCode` 33) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+**Attaching files of any type**
+
+Previously the composer accepted only images, PDFs, office documents, zip, text, audio and video. Every other file — a script with an unknown extension, `Dockerfile`, `Makefile`, `.env`, a dump, a config, an unknown binary — hit the dead-end `Unsupported file format`. And often it never even reached that check: `drag&drop` dropped the file earlier.
+
+- **Removed the `Unsupported file format` message** (`app/assets/web/generated/main.js`, the validator function `u5a`, terminal `else` branch). Instead of refusing, the generic attachment path runs: the file is read as an `ArrayBuffer`, packed into `I.MediaSchema` with an `inlineData` block and added to the message — the same path already supported types use.
+- **Extended MIME resolver `agyMimeForName()`** — a new function in front of `u5a`. A table of ~120 extensions: code (`py`, `js`, `ts`, `tsx`, `go`, `rs`, `java`, `c`, `cpp`, `cs`, `rb`, `php`, `lua`, `kt`, `swift`, `dart`, `sql`, `proto`, `graphql`), configs (`json`, `jsonl`, `yaml`, `toml`, `ini`, `cfg`, `conf`, `properties`, `env`, `gradle`, `mk`, `dockerfile`, `gitignore`), markup and text (`md`, `rst`, `txt`, `log`, `csv`, `tsv`, `html`, `css`, `scss`, `xml`, `svg`, `tex`, `vtt`), scripts (`sh`, `bash`, `zsh`, `fish`, `bat`, `cmd`, `ps1`), archives (`zip`, `gz`, `tgz`, `tar`, `7z`, `rar`, `apk`), fonts (`ttf`, `otf`, `woff`, `woff2`), plus images, audio, video and office formats — the latter are needed when the browser reports an empty `File.type`.
+- **Content-based detection**: if the type is still empty or equals `application/octet-stream`, the first 64 KB are inspected. The presence of zero bytes, `0x7F` or service control characters (more than 2 % of the sample) means a binary — it is sent as `application/octet-stream`, otherwise as `text/plain`. The check does not read the whole file and does not affect speed.
+- **`drag&drop` no longer filters by an allow-list.** In `m5a` (`dragover`) the condition `CB("",w.type) || image/ || video/ || audio/ || application/pdf || xNa() || pNa.includes()` was replaced with `w.kind==="file"`, and in the `drop` handler `CB(C.name,C.type)` before `B.items.add(C)` was removed. It was precisely that second filter that silently ate unsupported files: `CB` lets through only the MIME prefixes `image/`/`video/`/`audio/`, `application/pdf`, the `xNa`/`tB` resolvers and a set of 22 extensions `QNa`. A file without an extension and with an empty `type` never reached the validator at all.
+- **Guards instead of a silent failure**: an empty file is rejected with `File is empty`, a file larger than 20 MB with `File size exceeds 20MB limit` (the same ceiling as for zip and audio). Both branches record a `validation_check_failed` event in analytics, like all other rejections.
+- **Text attachment limit raised from 1 MB to 10 MB** (`Text file size exceeds 10MB limit`). A large log or a big source file no longer fails; the restriction is now aligned with PDFs and office documents.
+- **File handle for the native path preserved**: after building `Media`, `BB(m) && AB.set(B,m)` is called — if the file has a real path (`electronNative.getPathForFile` / `File.path`), it stays available to the upload module `v5a` and the file is not duplicated into `inlineData` needlessly.
+- **Synchronisation**: `app/assets/web/generated/main.js` (repository) and `/data/user/0/com.agyru.t2/files/web/generated/main.js` (live copy) are byte-for-byte identical; cache-buster `./generated/main.js` → `?v=3.1.8` in both `index.html` files.
+- **Version 3.1.8** (`versionCode` 33) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.7 — 2026-11-15 (Фикс работы сторонних провайдеров со вложенными файлами)
 
+<!-- RU -->
 - **Устранена критическая ошибка сторонних провайдеров (OpenAI / DeepSeek / Claude / локальные серверы)**:
   - **Причина бага**: при отправке сообщения со вложенными файлами (скрипты `.py`, документы `.md`, код `.ts`/`.js`, файлы `.json`, `.pdf`, `.txt`) фронтенд создаёт в истории переписки объект `Media` с MIME-типом (`text/x-python`, `text/markdown` и т. д.) и блоком `inlineData`. При переключении на **стороннего провайдера** (OpenAI-совместимый протокол шлюза `AGY_LLM_GATEWAY_WIRE_PROTOCOL=openai`) встроенный конвертер ядра `liblanguage_server.so` (`convertRequestToOpenAI` / `AgentExecutor.Run`) ожидал в `inlineData` **исключительно картинки** (`image/*` — `0x667dfa8–0x667dfdc`). При встрече любого другого MIME-типа конвертер немедленно завершал работу ошибкой:
     `failed to convert request to OpenAI format: unsupported inline data mime type: "text/x-python": invalid argument`
@@ -25,27 +98,61 @@
   - **Исправление ядра (`liblanguage_server.so`)**: в процедуре конвертации медиа-частей запроса (`0x667dfa8–0x667dfdc`) проверки длины MIME-типа (`b.lt`) и префикса `"image/"` (`tbz`) перенаправлены с блока генерации ошибки (`0x667e0b4`) на метку перехода к следующей части сообщения (`0x667ddbc`). Не-графические `inlineData` теперь безопасно пропускаются конвертером OpenAI-формата, запрос формируется корректно, а модель получает текстовый запрос и доступ к файлам на диске без сбоя.
   - Обновлены хеши SHA-256 в манифестах `app/assets/runtime/manifest.json` и `variants/bypass/assets/runtime/manifest.json`.
 - **Версия 3.1.7** (`versionCode` 32) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+- **Fixed a critical third-party provider bug (OpenAI / DeepSeek / Claude / local servers)**:
+  - **Root cause**: when a message with attached files is sent (`.py` scripts, `.md` documents, `.ts`/`.js` code, `.json`, `.pdf`, `.txt` files), the frontend creates a `Media` object in the conversation history with a MIME type (`text/x-python`, `text/markdown`, etc.) and an `inlineData` block. When switching to a **third-party provider** (OpenAI-compatible gateway protocol `AGY_LLM_GATEWAY_WIRE_PROTOCOL=openai`), the built-in converter in the core `liblanguage_server.so` (`convertRequestToOpenAI` / `AgentExecutor.Run`) expected **images only** in `inlineData` (`image/*` — `0x667dfa8–0x667dfdc`). On encountering any other MIME type the converter immediately aborted with an error:
+    `failed to convert request to OpenAI format: unsupported inline data mime type: "text/x-python": invalid argument`
+    As a result, a conversation with an attached script or document crashed permanently on every subsequent request to third-party models (including the `context summarization` stage).
+  - **Core fix (`liblanguage_server.so`)**: in the media-part conversion routine (`0x667dfa8–0x667dfdc`) the MIME-length check (`b.lt`) and the `"image/"` prefix check (`tbz`) were redirected from the error-generation block (`0x667e0b4`) to the label that jumps to the next message part (`0x667ddbc`). Non-image `inlineData` is now safely skipped by the OpenAI-format converter, the request is built correctly, and the model receives the text prompt plus access to the files on disk without failing.
+  - SHA-256 hashes updated in the manifests `app/assets/runtime/manifest.json` and `variants/bypass/assets/runtime/manifest.json`.
+- **Version 3.1.7** (`versionCode` 32) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.6 — 2026-11-15 (Собственные звуки завершения: Bell и Portal)
 
+<!-- RU -->
 - **Пресеты звука `Chime` и `Pop` больше не зависят от интернета**: раньше `SOUNDS` в `agy_fun_notify.js` указывал на `https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/{chime,pop}.mp3`. Без сети `new Audio(url).play()` молча падал (ошибка гасилась пустым `catch`), а при наличии сети каждый показ гифки тянул файл со стороннего CDN;
 - **в APK добавлены два собственных файла**: `app/assets/web/leostryx_bell.mp3` (31 808 Б) и `app/assets/web/leostryx_portal.mp3` (43 354 Б) — исходники `Bell.mp3` и `Portal.mp3` из каталога проекта. Они пакуются в APK штатным обходом `app/` в `rebuild.py`, отдельного кода сборки не потребовалось;
 - **`SOUNDS`**: `pop → /leostryx_bell.mp3`, `chime → /leostryx_portal.mp3`. Ключи `pop`/`chime` намеренно оставлены прежними — в `localStorage` у пользователя уже может быть сохранён `agy.funDoneSound`, и смена ключей сбросила бы выбор на «Стандартный»;
 - **подписи кнопок**: `🎵 Chime` → `🌀 Portal`, `💧 Pop` → `🛎 Bell` — теперь название пресета совпадает с именем файла;
 - cache-buster `agy_fun_notify.js` → `?v=3.1.8`;
 - **Версия 3.1.6** (`versionCode` 31) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+- **The `Chime` and `Pop` sound presets no longer depend on the internet**: previously `SOUNDS` in `agy_fun_notify.js` pointed at `https://cdn.jsdelivr.net/gh/hyprwm/hyprland-assets@main/sounds/{chime,pop}.mp3`. Offline, `new Audio(url).play()` failed silently (the error was swallowed by an empty `catch`), and online every gif display pulled the file from a third-party CDN;
+- **two of our own files added to the APK**: `app/assets/web/leostryx_bell.mp3` (31 808 B) and `app/assets/web/leostryx_portal.mp3` (43 354 B) — the sources `Bell.mp3` and `Portal.mp3` from the project directory. They are packed into the APK by the standard `app/` walk in `rebuild.py`, so no separate build code was needed;
+- **`SOUNDS`**: `pop → /leostryx_bell.mp3`, `chime → /leostryx_portal.mp3`. The `pop`/`chime` keys are deliberately kept as before — a user may already have `agy.funDoneSound` stored in `localStorage`, and renaming the keys would reset their choice to "Standard";
+- **button captions**: `🎵 Chime` → `🌀 Portal`, `💧 Pop` → `🛎 Bell` — the preset name now matches the file name;
+- cache-buster `agy_fun_notify.js` → `?v=3.1.8`;
+- **Version 3.1.6** (`versionCode` 31) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.5 — 2026-11-15 (Гифка встаёт вплотную под текстом ответа)
 
+<!-- RU -->
 - **Мем-гифка больше не «улетает» в низ экрана**: она вставлялась после всего списка сообщений (`div.mx-auto.w-full` → за `[ref=contentRef]`), а **внешний контейнер последнего хода** в бандле получает `min-height: calc(100cqh - 50px)` (у `autoscroll-viewport` стоит `container-type: size`). Из-за этого последний ход растянут почти на всю высоту ленты, и всё, что вставлено после него, оказывалось у нижней кромки вьюпорта — гифка отрывалась от текста примерно на пол-экрана, хотя в ленте между ними ничего нет;
 - **`agy_fun_notify.js`**: новый поиск `lastTurnContent()` — берётся `[data-turn-content="latest"]` (внутренний `flex flex-col gap-0.5 w-full`), и гифка добавляется **в конец последнего хода**, сразу под `[aria-label="Agent response"]`. Это flex-столбец по высоте содержимого, поэтому растянутость хода больше ни на что не влияет;
 - заодно: удаление старой гифки ищется по всему документу (`.agy-fun-chat`), а не только внутри контейнера; отступы карточки уменьшены (`margin: 8px auto 4px` вместо `14px auto`);
 - fallback-ветки (без `[data-turn-content]`) сохранены — вставка перед блоком ввода или в конец контейнера;
 - cache-buster `agy_fun_notify.js` → `?v=3.1.7`;
 - **Версия 3.1.5** (`versionCode` 30) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+- **The meme gif no longer "flies away" to the bottom of the screen**: it was inserted after the whole message list (`div.mx-auto.w-full` → behind `[ref=contentRef]`), while **the outer container of the last turn** gets `min-height: calc(100cqh - 50px)` in the bundle (`autoscroll-viewport` has `container-type: size`). Because of this the last turn is stretched to almost the full height of the feed, and anything inserted after it ended up at the bottom edge of the viewport — the gif was torn away from the text by about half a screen, even though nothing sits between them in the feed;
+- **`agy_fun_notify.js`**: new lookup `lastTurnContent()` — it takes `[data-turn-content="latest"]` (the inner `flex flex-col gap-0.5 w-full`) and the gif is appended **to the end of the last turn**, directly under `[aria-label="Agent response"]`. That is a flex column sized by its content, so the stretched turn no longer affects anything;
+- as a bonus: removal of the old gif now searches the whole document (`.agy-fun-chat`) instead of only inside the container; the card margins were reduced (`margin: 8px auto 4px` instead of `14px auto`);
+- the fallback branches (without `[data-turn-content]`) are preserved — insertion before the input block or at the end of the container;
+- cache-buster `agy_fun_notify.js` → `?v=3.1.7`;
+- **Version 3.1.5** (`versionCode` 30) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.4 — 2026-11-15 (Настоящая причина «отрыва» чата от клавиатуры)
 
+<!-- RU -->
 Диагностика 3.1.3 была неверной: правки `installScrollGuard()` и `html,body,#root{overflow:hidden}` лечили документ, который при открытии IME **вообще не скроллится**.
 
 - **Найден реальный виновник — `[data-testid="conversation-view"]`**:
@@ -56,9 +163,24 @@
 - **`index.html`**: в `<meta name="viewport">` добавлен `interactive-widget=resizes-content` — без него `100dvh` в WebView не уменьшается под IME и оболочка приложения остаётся высотой в полный экран (переменная `--agy-vvh` вычислялась в `installViewport()`, но нигде не использовалась);
 - **cache-buster'ы**: `agy_ru.css` → `?v=3.1.7`, `agy_ru.js` → `?v=3.1.7`;
 - **Версия 3.1.4** (`versionCode` 29) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body,#root{overflow:hidden}` treated a document that **does not scroll at all** when the IME opens.
+
+- **The real culprit found — `[data-testid="conversation-view"]`**:
+  - in the `generated/main.js` bundle this node renders as `flex h-full min-h-0 flex-col items-center relative overflow-y-auto` and contains **as siblings** both the message feed (`autoscroll-viewport` inside `div.relative.flex.flex-col.flex-1.grow.h-full.w-full.min-h-0`) and the input row (`agent-input-box`, `shrink-0`);
+  - that is, it is a **second, outer scroll container, and the caret's ancestor lives inside it**. When the keyboard appears, Chromium scrolls the nearest scrollable ancestor to reveal the caret — this very block was scrolled: the whole chat panel slid up together with the input field while the keyboard stayed in place. Hence the feeling that "the chat detached from its container";
+- **`agy_ru.css`**: `[data-testid="conversation-view"] { overflow: hidden !important; }` (a block with a detailed comment above the rule). Its `overscroll-behavior: contain` is preserved;
+- **`agy_ru.js`**: added the guard `pinConvoScroll()` — it zeroes `scrollTop` / `scrollLeft` on every `conversation-view`; it is called from the capture `scroll` handler and at the start of `nudge()`;
+- **`index.html`**: added `interactive-widget=resizes-content` to `<meta name="viewport">` — without it `100dvh` does not shrink under the IME inside WebView and the app shell stays a full screen tall (the `--agy-vvh` variable was computed in `installViewport()` but never used);
+- **cache-busters**: `agy_ru.css` → `?v=3.1.7`, `agy_ru.js` → `?v=3.1.7`;
+- **Version 3.1.4** (`versionCode` 29) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.3 — 2026-11-15 (Исправления: гифка в старых чатах, «отрыв» чата от клавиатуры)
 
+<!-- RU -->
 - **Мем-гифка завершения больше не появляется в старых переписках**:
   - Удалена отложенная очередь показа (`pendingChatGif` / `watchChatTimer`): раньше после завершения задачи вне чата гифка «ждала» до 30 секунд и затем вставлялась в любой открытый диалог — включая старую переписку, открытую позже.
   - Триггер переписан на конечный автомат: отправка запроса (`send-button` или Enter в поле ввода) → агент занят (`input-send-button-cancel-tooltip` / `agent-loading`) → пауза после последней активности (`GetTurnDiff`) 4,2 с.
@@ -72,9 +194,27 @@
   - Обновлены cache-buster'ы `agy_ru.css`, `web_optimizations.js`, `agy_fun_notify.js` (`?v=3.1.6`), чтобы WebView не держал старые файлы.
   - ⚠️ **Пометка из 3.1.4:** эти правки причину не устраняли — документ при открытии IME не скроллится вообще. Реальный виновник — `conversation-view` (см. раздел v3.1.4).
 - **Версия 3.1.3** (`versionCode` 28) в манифесте и «О приложении».
+<!-- /RU -->
+
+<!-- EN -->
+- **The completion meme gif no longer appears in old conversations**:
+  - Removed the deferred display queue (`pendingChatGif` / `watchChatTimer`): previously, after a task finished outside the chat, the gif "waited" up to 30 seconds and then was inserted into whatever dialog was open — including an old conversation opened later.
+  - The trigger was rewritten as a state machine: request sent (`send-button` or Enter in the input field) → agent busy (`input-send-button-cancel-tooltip` / `agent-loading`) → pause after the last activity (`GetTurnDiff`) of 4.2 s.
+  - The gif is shown only in the conversation where the request was sent: `data-cascade-id` of `conversation-view` is compared with the identifier captured at send time. On mismatch — `chatInsert:other-chat -> skip`, when no chat is open — `chatInsert:not-on-chat-screen -> skip` (no deferral).
+  - Enter is not treated as a send if text remained in the input field after the keypress (`skip:enter-not-sent`).
+  - The "Show a preview" button in "Appearance → Meme gifs" always shows the preview as an overlay and is not blocked by the 12-second cooldown.
+- **The chat no longer "detaches" from its container when the keyboard appears**:
+  - `agy_ru.css`: `html`, `body`, `#root` — `overflow: hidden`; `conversation-view`, `autoscroll-viewport` and `agent-input-box` — `overscroll-behavior: contain`; scrolling no longer "spills over" onto the document during the IME animation.
+  - `web_optimizations.js`: new patch `installScrollGuard()` — on any `scroll` event of the document and of `visualViewport` (`scroll` / `resize`) it resets `scrollTop` / `scrollLeft` to 0.
+  - Inserting the gif scrolls only the message list (`autoscroll-viewport`) and does it instantly (`scrollTop = scrollHeight`), without a `smooth` animation of the whole chat panel.
+  - Cache-busters updated for `agy_ru.css`, `web_optimizations.js`, `agy_fun_notify.js` (`?v=3.1.6`) so the WebView does not keep old files.
+  - ⚠️ **Note added in 3.1.4:** these changes did not remove the cause — the document does not scroll at all when the IME opens. The real culprit is `conversation-view` (see the v3.1.4 section).
+- **Version 3.1.3** (`versionCode` 28) in the manifest and in "About the app".
+<!-- /EN -->
 
 ## v3.1.2 — 2026-11-14 (Мем-гифки в чате при завершении задач, стабильность сборки)
 
+<!-- RU -->
 - **Мем-гифки при завершении задач агента (в переписке)**:
   - Добавлена функция показа мем-анимации прямо в ленте чата (`[data-testid="conversation-view"]`) над строкой ввода.
   - Настоящие анимированные GIF-пресеты: Nice (Майкл Розен), DiCaprio (аплодисменты), Bateman (улыбка), Deadpool (Very Nice), Jeremiah Johnson (одобрительный кивок).
@@ -86,18 +226,45 @@
 - **Оптимизация упаковки исходников в rebuild.py**:
   - Исключены директории `.git` и `dist` из архива исходников `Leostryx-repo.zip`, что уменьшило размер архива с 750 МБ до 275 МБ.
   - Ликвидированы зависания терминала и генерация мусорных временных файлов `zi*` на диске.
+<!-- /RU -->
+
+<!-- EN -->
+- **Meme gifs when an agent task finishes (inside the conversation)**:
+  - Added a function that shows the meme animation right in the chat feed (`[data-testid="conversation-view"]`) above the input row.
+  - Real animated GIF presets: Nice (Michael Rosen), DiCaprio (applause), Bateman (smile), Deadpool (Very Nice), Jeremiah Johnson (approving nod).
+  - Support for custom GIF/video via URL input with a preview in the "Appearance" settings.
+  - Conversion to a data URI via FileReader with preloading at startup — instant rendering without network delays and without WebView SSL restrictions.
+  - Smart completion trigger: fires strictly after the user has sent a request (`SendUserCascadeMessage` / Enter) and streaming has paused (`GetTurnDiff`).
+  - Complete elimination of false positives: the gif is not shown when scrolling through history or opening old dialogs.
+  - An emergency kill-switch (`agyFunSafeMode=1`) and full isolation of the triggers inside try/catch.
+- **Optimised source packing in rebuild.py**:
+  - The `.git` and `dist` directories are excluded from the `Leostryx-repo.zip` source archive, which shrank it from 750 MB to 275 MB.
+  - Terminal freezes and the generation of junk temporary `zi*` files on disk were eliminated.
+<!-- /EN -->
 
 ## v3.1.1 fix — 2026-11-14 (Исправления: плавный прогресс обновления, статус Gradle)
 
+<!-- RU -->
 - **Версия повышена до 3.1.1** (versionName/versionCode в манифесте, «О приложении»).
 - **Плавный прогресс загрузки в встроенном обновлении** («О приложении → Обновить»):
   - Процент больше не «прыгает» (0 → 7 → 100): добавлен интерполяционный тикер (lerp, шаг 100 мс), который плавно доводит отображаемое значение до реального прогресса загрузки.
   - Интервал опроса прогресса сокращён с 350 до 250 мс; по завершении загрузки прогресс гарантированно доводится до 100%.
 - **Статус Gradle: кнопка «Переключить» вместо «Установить» для скачанных версий**:
   - Подтверждена и зафиксирована передача `@@gradle-cached` в статусе «Инструментов»: скачанная в `$HOME/gradle-dist`, но неактивная версия Gradle всегда помечается бейджем «Скачана — переключение мгновенное» и кнопкой «Переключить» (мгновенное переключение симлинком, без повторного скачивания).
+<!-- /RU -->
+
+<!-- EN -->
+- **Version raised to 3.1.1** (versionName/versionCode in the manifest, "About the app").
+- **Smooth download progress in the built-in updater** ("About the app → Update"):
+  - The percentage no longer "jumps" (0 → 7 → 100): an interpolation ticker was added (lerp, 100 ms step) that smoothly brings the displayed value up to the real download progress.
+  - The progress polling interval was cut from 350 to 250 ms; when the download completes, the progress is guaranteed to reach 100%.
+- **Gradle status: a "Switch" button instead of "Install" for downloaded versions**:
+  - Passing `@@gradle-cached` in the "Tools" status is confirmed and locked in: a Gradle version downloaded into `$HOME/gradle-dist` but not active is always marked with the badge "Downloaded — switching is instant" and a "Switch" button (instant switch via a symlink, with no re-download).
+<!-- /EN -->
 
 ## v3.1.0 — 2026-11-12 (Стабильный базовый релиз: устранение фризов прикрепления файлов, шторка, стеклянные окна)
 
+<!-- RU -->
 - **Диагностика и починка битых build-tools (главный баг Leostryx)**:
   - `status` в «Инструментах» теперь определяет, где установлен SDK (`@@sdkhome`): общее хранилище (`/storage/...`, noexec — ELF-бинарники оттуда не запускаются, `aidl` падает с «Permission denied») или внутреннее (`$HOME/android-sdk`). При shared-пути показывается предупреждение с рекомендацией переустановить SDK во внутреннее хранилище и указать `sdk.dir` на внутренний путь.
   - Обнаружение битых заглушек (`@@stub`): `aidl`/`apksigner`/`d8` с чужим shebang (например `#!/data/user/0/com.agr/...` от другой песочницы) помечаются в статусе.
@@ -197,9 +364,115 @@
   уведомления больше не «прыгает» шторкой повторно.
 - **Полное руководство по исправленным багам** оформлено в отдельном документе:
   [`docs/BUGFIXES_3.1.0.md`](docs/BUGFIXES_3.1.0.md).
+<!-- /RU -->
+
+<!-- EN -->
+**Stable base release: file-attachment freezes fixed, notification shade, glass windows**
+
+- **Diagnosis and repair of broken build-tools (the main Leostryx bug)**:
+  - `status` in "Tools" now detects where the SDK is installed (`@@sdkhome`): shared storage (`/storage/...`, noexec — ELF binaries cannot be executed from there and `aidl` dies with "Permission denied") or internal storage (`$HOME/android-sdk`). With a shared path a warning is shown recommending reinstalling the SDK into internal storage and pointing `sdk.dir` at the internal path.
+  - Detection of broken stubs (`@@stub`): `aidl`/`apksigner`/`d8` with a foreign shebang (for example `#!/data/user/0/com.agr/...` from another sandbox) are flagged in the status.
+  - New operation `repairbt` (the "Repair" button): re-binds `aidl/aapt/aapt2/zipalign/d8/apksigner` in every `build-tools/*` to working binaries from `$PREFIX/bin` (a real aarch64 ELF `aidl`; `d8`/`apksigner` via `java` from PATH); the originals are kept as `.agy-original`.
+
+- **New "Gradle & AGP" block in "Settings → Tools"**:
+  - Gradle version selection (8.9 / 8.14.7 / 9.1.0 / 9.9.1) through a collapsible "Versions ▼" selector — mirroring Android platforms and Build-tools. The distribution is downloaded from `services.gradle.org` into `$HOME/gradle-dist`, the `$PREFIX/bin/gradle` symlink is switched to the selected version (the packaged Gradle is preserved as `.agy-original`, the `JAVA_TOOL_OPTIONS`/`GRADLE_OPTS` bridges are updated automatically). The "Delete" button restores the packaged Gradle.
+  - **Gradle multi-select**: several versions can be chosen at once — all selected ones are installed (each downloaded/cached in `$HOME/gradle-dist`) and the last selected one becomes active. Fixed a bug where only the last of the ticked versions was installed.
+  - **Version caching**: downloaded Gradle versions are kept in `$HOME/gradle-dist` and switch instantly (symlink) with no re-download. `@@gradle-cached` was added to the status; in the UI a downloaded but inactive version is marked with the badge "Downloaded — switching is instant".
+  - The duplicate Gradle entry was removed from the "Java and Kotlin" block — Gradle is installed only through the dedicated "Gradle & AGP" block; the "Android app (Gradle)" preset now installs Gradle 8.14.7.
+  - **Automatic Gradle version selection** ("Gradle (auto)"): the version is picked automatically from the project — 1) from `gradle/wrapper/gradle-wrapper.properties` (distributionUrl), 2) from the AGP note `# AGY-AGP:` in `AGENTS.md` (the minimum compatible one), 3) the latest stable from `services.gradle.org/versions/current` (fallback 9.9.1 when offline).
+  - Android Gradle Plugin version selection (8.7.3 / 9.0.0): writes the compatibility matrix (AGP 8.x → Gradle ≥ 8.9, JDK 17; AGP 9.x → Gradle ≥ 9.1, JDK 17+) into the project's `AGENTS.md` (idempotent update of the `# AGY-AGP:` block) so the agent uses the correct versions.
+  - `@@gradle-active` (active Gradle version) and `@@agp-active` (selected AGP) were added to the status.
+
+- **Instant opening of the media menu ("+") without shifting the container**:
+  - Removed the container shift to the left and the stripe appearing on the right: Base UI's scroll-lock helper (`GMa` in `main.js`) shrank `body` width by 15px (`calc(100vw - 15px)`). The width is pinned to `width: "100%"` and defensive rules were added to `agy_ru.css`.
+  - The popup opening delay is gone: the `pointerdown` event on the "+" button is handled instantly on frame 0 without waiting for a synthetic click, and the background loading of custom agent scripts is deferred by 60 ms via `setTimeout`.
+- **Stable chat and agent operation in the background (no drops when minimising)**:
+  - In `AppLifecycle.smali` the `onTrimMemory` threshold was raised from 10 (`0xa`) to 80 (`0x50`, `TRIM_MEMORY_COMPLETE`). Minimising the app (`TRIM_MEMORY_UI_HIDDEN = 20`) no longer triggers a WebView cache purge and aggressive GC.
+  - `setOffscreenPreRaster(true)` was enabled in `WebSettingsFactory.smali` to keep the WebView rendering pipeline alive in the background.
+  - A background keep-alive audio loop was added in `agy_ru.js` while generation is active: it signals Chromium that a priority media session exists, preventing the JS event loop from sleeping and the streaming fetch/SSE connections from dropping.
+- **Interface font selection in Settings › Appearance**:
+  - "Interface font" block: the dropdown is aligned to 100% of the preview block's width and name truncation is gone (`max-width: 140px`).
+  - A catalogue of 9 open fonts with no copyright issues (SIL OFL 1.1, Apache 2.0, Ubuntu Font Licence) and equally verified Cyrillic and Latin coverage:
+    1. *System (Default)* — Roboto / MiSans;
+    2. *Inter* — the reference modern UI grotesque (SIL OFL);
+    3. *JetBrains Mono* — a typeface purpose-built for code and editors (SIL OFL);
+    4. *Fira Code* — a monospaced font with ligatures (SIL OFL);
+    5. *Roboto* — the native Android grotesque (Apache 2.0);
+    6. *Geist* — a technical geometric grotesque (SIL OFL);
+    7. *Montserrat* — a geometric display grotesque (SIL OFL);
+    8. *Ubuntu* — a humanist grotesque with excellent legibility (Ubuntu Licence);
+    9. *PT Root UI* — a font created specifically for digital Cyrillic (SIL OFL).
+  - Instant application through the CSS tokens `--default-font-family`, `--font-sans`, `--font-mono` and synchronisation in `theme-bootstrap.js` before the first paint, with no flicker (FOUT).
+- **Instant file attachment ("Attach File" / "+") with no delays and no black screen**:
+  - The black screen when opening the file picker is completely gone: the native transition-animation reset `overridePendingTransition(0, 0)` was removed — it destroyed `MainActivity`'s window surface before DocumentsUI could render its first frame. The background activity now survives smoothly until the file chooser appears.
+  - The DocumentsUI opening delay is gone: the slow array of 50 MIME types (`accept={PYb}`) was replaced with a plain `*/*`, which avoided building heavy SQL filters in the system ContentProvider.
+  - **The "Media" button no longer lags**: `MainActivity.onShowFileChooser` was switched from `ACTION_GET_CONTENT` to `ACTION_OPEN_DOCUMENT`. `GET_CONTENT` first raises the system app-picker dialog and only then DocumentsUI — that was the several-second delay; `OPEN_DOCUMENT` opens the file manager immediately, exactly like the "Folder" button (`OPEN_DOCUMENT_TREE`).
+  - A side effect, but an important one: `takePersistableUriPermission()` in `onActivityResult` now works correctly — persistent permissions are only granted for URIs obtained through `OPEN_DOCUMENT`.
+  - Soft-keyboard desynchronisation eliminated: the synchronous `hideSoftInputFromWindow` before `startActivityForResult` was removed, preventing an extra window reflow.
+  - In `main.js` a click on a context-menu item now runs without extra synchronous work, letting the Radix UI menu close smoothly before the native file dialog appears.
+  - **The second cause of "Media" lag** — the list of ~50 MIME types in the shared input field's `accept`: the "Media" item reuses the composer input (`accept={PYb}`), whereas "Folder" uses a separate bare `webkitdirectory` input. Native `onShowFileChooser` opens `*/*` anyway and ignores `accept`, so the list was pure overhead and was removed from the bundle (`PYb` collapsed to a wildcard MIME). What remains in `agy_ru.js` is only regression protection: if the long list returns with a bundle update, it is collapsed on click. The click itself is **not intercepted** — `preventDefault`/`stopPropagation` are not called and React opens the dialog, so the "Media" button also works in cases where the synthetic path fails.
+  - The endless terminal spinner during xterm initialisation is fixed.
+  - Reflow in `agy_ru.js` optimised (`innerText` replaced with `textContent`).
+- **The `/browser` chip and mentions are deleted by tapping**:
+  - `/browser` is inserted not as text but as a Lexical inline node `beautifulMention`, so a native Backspace next to it did not delete it.
+  - A click interceptor on the chip was added in `agy_ru.js`: deletion goes through the editor's own API (`__lexicalEditor` → `editor.update()` → `node.remove()`), and if that API is unavailable a synthetic `Backspace` is sent right after the caret, repeated after 130 ms.
+- **The keyboard opens immediately after attaching a file or inserting a chip**:
+  - `focusEditor()` returns focus to `[contenteditable='true']` inside `[data-testid='agent-input-box']` 120 ms after `[data-testid='input-attachment']` appears and 140 ms after a click on the Mentions / Actions / Browser items.
+  - The `+` button, the model selector, the shield and the microphone still do not open the keyboard — the `guard` protection is unchanged.
+- **Expressive transparency of the glass windows and lists (Glass UI)**:
+  - Glass density: **0.88** in dark themes and **0.72** in light ones. 0.88 is historically the "ideal" density from the reference commit: cards and text read through the popup, yet the panel stays dense and does not "float".
+  - The glass surface is **exactly `--background` of the active theme**, with no `--primary` mixed in. The accent in the surface produced a dirty tint that clashed with the background (Monokai drifted olive, Dracula purple), so `--primary` now remains only in the border, hover, active state and shadow.
+  - In light themes the theme background is **darkened by 12 %** before the alpha is composited: white glass over a white page physically produces no visible transparency at any alpha (`C = α·255 + (1−α)·255 = 255`).
+  - The darkening is computed once in `updateGlassTheme()`, so light themes get exactly the same visible transparency as dark ones. The CSS fallbacks of `--agy-glass-surface` are synced to these numbers so the glass does not flash a different tint before the first JS frame.
+  - `backdrop-filter` is force-disabled (`none !important`) on every glass layer: the requirement is **clean transparency without blur**, not frosted glass.
+  - Opaque patches ("in places") eliminated: the `[class*="animate-slideIn"]` selector and the clearing of inner layers are applied universally to all popups regardless of the parent z-index, ruling out coverage by opaque white layers.
+  - The natural geometry of Base UI dropdowns in Settings is restored, with no overflow beyond the screen edges.
+- **The session no longer drops when the app goes to the background or the screen locks**:
+  - **Cause.** MIUI/HyperOS ships with `mDozeAfterScreenOff=true`: Doze starts as soon as the screen turns off and blocks the app's network. The foreground service and the `PARTIAL_WAKE_LOCK` keep the CPU alive but do not save the `core ↔ gateway` stream, so an active chat broke and stayed "dead" after unlocking. The package was not in the battery-saving allow-list (`dumpsys deviceidle whitelist`).
+  - **Recovery on return.** `agy_ru.js` subscribes to `agy:host-resume` (the event comes from `WebViewLifecycle.resume()`) and to `resume`: it restarts the silent-media keep-alive if a chat is running and dispatches a synthetic `online` so the stream helper `$i` in `main.js` retries immediately instead of waiting for the next tick.
+  - **Exemption from Doze.** A new `power` operation was added to `agy_tools.sh`: through Shizuku (`rish`) it checks `dumpsys deviceidle whitelist` and, if needed, runs `cmd deviceidle whitelist +com.agyru.t2`, then writes the state to the log (`@@power … whitelisted=yes|no|no-rish`). Without Shizuku the operation honestly reports `no-rish` and changes nothing.
+  - **Silent autostart.** `agy_ru.js` calls the operation no more than once every 6 hours (`localStorage["agyPowerExemptCheck"]`) and only writes `console.warn` if the exemption could not be obtained — no dialogs and no new screens.
+  - **Media session.** After the screen turns off the system usually tears down the silent-audio session, leaving the next background trip unprotected — it is now recreated on every return to the app.
+- **Confirmation notifications from the shade no longer spam**:
+  - While the app is **open**, shade notifications are not sent at all
+    (`nativeNotifications.send` skips sending when `!document.hidden`);
+  - The superfluous passive notification "Leostryx — Agent is working / A task is running in the background…" was removed entirely:
+    the shade already shows the persistent core status "Leostryx core running", so duplicate notifications are gone;
+  - The same pending confirmation notifies **once** (deduplication
+    by snippet text rather than by the DOM button React recreates);
+  - Once a confirmation is resolved, the shade notification is **cancelled
+    automatically**;
+  - The `agent-finished-*` completion events are now always passive — without
+    "Allow / Continue" buttons.
+- **Accent-coloured logo on the splash screen and at app launch**:
+  - `tools/brand.py` dynamically reads the user's active colour (`#ec4899`) and tints
+    `res/drawable-nodpi-v4/splash_logo.png`, the launcher icons and the notification icons to the selected accent;
+  - The native Android 12+ boot screen (SplashScreen) shows the lynx in pink;
+  - `theme-bootstrap.js` applies the accent variables (`--primary`, `--accent`)
+    from `localStorage["agyBrandConfig"]` instantly, before the first paint;
+  - `brand_logo.js` recognises `props.color: true` on the sign-in/launch screen and
+    reliably recolours the logo to the brand accent.
+- **Model selector — separators and provider names**:
+  - Custom models (`RXb`) received the selector attributes `data-testid="model-selector-item"`
+    and `data-model-label`;
+  - The `__agyProviderSpecs` and `cKa` metadata now carry `providerName` and `providerType`;
+  - Models in the Custom section are grouped by provider automatically;
+  - Before each provider's models, clear separators and names are displayed
+    (OpenAI, Claude, Gemini and others).
+- **Fixed the fake chat with a dot on the "Projects" screen** when switching provider:
+  - An empty `conversationId` leak in the model state `fKa` (`main.js`) is eliminated;
+  - Background sending of closing heads-up notifications while the app is open is forbidden.
+- **Java side (`AgyShade`)**: the boolean `needsAction` parameter now genuinely
+  controls whether buttons are added (previously it was ignored and buttons were added
+  always); `Notification.Builder.setOnlyAlertOnce(true)` was added — updating a
+  notification no longer re-raises the shade.
+- **The complete guide to the fixed bugs** is written up in a separate document:
+  [`docs/BUGFIXES_3.1.0.md`](docs/BUGFIXES_3.1.0.md).
+<!-- /EN -->
 
 ## v3.0.9 — 2026-11-11 (Comprehensive Fixes & System Integrations)
 
+<!-- RU -->
 - **Восстановление истинной прозрачности и матового стекла (Frosted Glass)**:
   - Исправлены CSS-переменные `--popover`, `--card` и `--background` для обеих тем (светлой и тёмной);
   - Добавлено принудительное размытие `backdrop-filter: blur(22px) saturate(180%) !important` на все шторки, меню, поповеры и диалоги без перекрытия фоновыми подложками.
@@ -221,9 +494,35 @@
   - Для preview/canary платформ (`android-37.0`, `android-37.1`) и `build-tools;37.0.0` в `op_sdk` автоматически подключается флаг `--channel=3` (canary) в `sdkmanager`.
 - **Кнопка вызова субагентов в чате**:
   - Полностью переработан механизм встраивания кнопки 🤖 в панель ввода чата: многоуровневый поиск панели инструментов с резервными селекторами и автоматическим восстановлением при переходах между чатами.
+<!-- /RU -->
+
+<!-- EN -->
+- **Restoring genuine transparency and frosted glass**:
+  - The CSS variables `--popover`, `--card` and `--background` are fixed for both themes (light and dark);
+  - `backdrop-filter: blur(22px) saturate(180%) !important` is force-applied to all sheets, menus, popovers and dialogs without being covered by background layers.
+- **Build number updated when installing over an existing version**:
+  - The `versionCode` (to 25) and `versionName` (to "3.0.9") attributes are updated in the binary `AndroidManifest.xml`;
+  - The version number now updates correctly in the app info screen and in the Android shortcut context menu.
+- **Dynamic switching of the desktop icon**:
+  - Instant switching of the active `activity-alias` (`LauncherOwl`, `LauncherLynx`, `LauncherLsx`, `LauncherAngularX`) through `pm` and Shizuku (`rish`) was added to `agy_tools.sh` (`op_brand`), letting the desktop icon change style immediately.
+- **Removal of the regional account lock**:
+  - The "This account cannot use Leostryx" problem is solved: the `liblanguage_server.so` binary with the regional restriction bypass is integrated directly into the app base `app/`;
+  - The built-in updater now downloads `-bypass.apk` first.
+- **Automatic dismissal of the outdated Claude models notification**:
+  - The notification-closing scanner in `agy_ru.js` was fully rewritten: the warning dialog about moving to version 5.5 dated 2 November is dismissed instantly along with its overlay and confirmed by the button.
+- **`zip` and `unzip` packages in the "Archives" category**:
+  - The `zip` and `unzip` packages were moved to the "Archives" section of the tools catalogue above the other formats.
+- **Full short descriptions for all packages**:
+  - Short descriptions in Russian and English were added for all packages (`make`, `cmake`, `ninja`, `pkg-config`, `pip`, `kotlin`, `maven`, `rust`, `go`, `git`, `gh`, `openssh`, `curl`, `wget`, `jq`, `ripgrep`, `fd`, `tree`, SDK platforms and build-tools).
+- **Fix for installing the Android SDK (37.x)**:
+  - For preview/canary platforms (`android-37.0`, `android-37.1`) and `build-tools;37.0.0`, the `--channel=3` (canary) flag is now passed to `sdkmanager` automatically in `op_sdk`.
+- **Subagent invocation button in the chat**:
+  - The mechanism for embedding the 🤖 button into the chat input panel was fully reworked: a multi-level toolbar search with fallback selectors and automatic recovery when switching between chats.
+<!-- /EN -->
 
 ## v3.0.8 — 2026-11-11 (Leostryx In-App Updater & UI Polish)
 
+<!-- RU -->
 - **Переключатель акцентного цвета логотипов и значков**:
   - В раздел «Настройки › Оформление» добавлен переключатель «Перекрашивать логотипы и значки»;
   - В выключенном состоянии (по умолчанию) все 4 логотипа (Owl, Lynx, LSX, Angular X) и системные иконки сохраняют свои оригинальные дизайнерские цвета, полностью соответствующие иконке приложения на рабочем столе Android;
@@ -246,9 +545,36 @@
   - По завершении скачивания автоматически запускается системный установщик пакетов, а повторное нажатие кнопки повторно вызывает установку;
   - Добавлен fallback через elevated Shizuku (`rish`) и `pm install -r`.
 - Пересборка и подпись релизных APK `Leostryx-3.0.8-standard.apk` и `Leostryx-3.0.8-bypass.apk`.
+<!-- /RU -->
+
+<!-- EN -->
+- **Accent colour toggle for logos and icons**:
+  - A "Recolour logos and icons" toggle was added to "Settings › Appearance";
+  - When off (the default), all 4 logos (Owl, Lynx, LSX, Angular X) and the system icons keep their original designer colours, fully matching the app icon on the Android home screen;
+  - Turning the toggle on tints the logos and icons with the accent colour chosen by the user.
+- **Frosted glass in the light theme**:
+  - Opacity in the light theme is fixed: the system variable `--popover` is set to `rgba(255, 255, 255, 0.88)` with the blur effect `backdrop-filter: blur(22px) saturate(180%)`;
+  - All popup menus, lists and cards now have an authentic translucent look in both dark and light themes.
+- **Restoring the original model selector and fixing the sheets**:
+  - The model selector is back to the original full-height bottom sheet (as in builds before 3.0.6);
+  - The top-right button in the chat (the workspace sheet: files, terminal, history, artifacts) now opens as a proper side/bottom sheet instead of being wrongly collapsed into a compact popup;
+  - Fixed the freeze and the collapse into a narrow strip of the settings window opened from the main menu.
+- **Quick subagent invocation right in the chat**:
+  - A subagent button (🤖) with a quick-selection popup menu was added to the chat input toolbar;
+  - Tapping a subagent inserts the prefix `@<subagent_name> ` into the input field automatically;
+  - When a subagent is invoked from "Settings › Customizations › Subagents", the settings sheet now closes correctly before focus moves to the input field.
+- **Built-in update system and automatic installation (In-App Updater)**:
+  - The system permission `android.permission.REQUEST_INSTALL_PACKAGES` was added to `AndroidManifest.xml` to allow installing updates from inside the app;
+  - A method `installApk(path)` calling the system `PackageInstaller` through `AppFileProvider` was added to the native `AgyTools` bridge;
+  - Duplicate update buttons removed: there is now one button whose state changes smoothly: "Check for updates" → "Download update (vX.X.X)" → download progress as a percentage (`Downloading… X%`) → "Update and install";
+  - When the download completes the system package installer launches automatically, and pressing the button again re-triggers the installation;
+  - A fallback through elevated Shizuku (`rish`) and `pm install -r` was added.
+- Rebuild and signing of the release APKs `Leostryx-3.0.8-standard.apk` and `Leostryx-3.0.8-bypass.apk`.
+<!-- /EN -->
 
 ## v3.0.7 — 2026-11-10 (Leostryx UI & Fluidity Polish)
 
+<!-- RU -->
 - **Адаптация селектора выбора моделей к темам и прозрачности** — панель выбора модели (`[data-testid="model-selector-panel"]`, `.agy-model-menu`) теперь полностью интегрирована в дизайн-систему тем:
   - Поддержка матового стекла (frosted glass) с фоном `var(--agy-glass-surface)`, эффектом `backdrop-filter: blur(22px) saturate(190%)` и тонкой границей `var(--agy-glass-border)`;
   - Гармоничный вид как в тёмной (`rgba(26, 26, 30, 0.84)`), так и в светлой (`rgba(255, 255, 255, 0.82)`) теме;
@@ -265,9 +591,30 @@
   - Синхронизировано обновление переменной `--agy-vvh` при изменении `visualViewport`;
   - В обработчике закрытия клавиатуры отключены искусственные задержки и рывки прокрутки (`nudgeSeries`), благодаря чему чат опускается мгновенно и без артефактов.
 - Пересборка и подпись релизных APK `Leostryx-3.0.7-standard.apk` и `Leostryx-3.0.7-bypass.apk`.
+<!-- /RU -->
+
+<!-- EN -->
+- **Model selector adapted to themes and transparency** — the model selection panel (`[data-testid="model-selector-panel"]`, `.agy-model-menu`) is now fully integrated into the theme design system:
+  - Frosted glass support with the `var(--agy-glass-surface)` background, the `backdrop-filter: blur(22px) saturate(190%)` effect and the thin `var(--agy-glass-border)` border;
+  - A harmonious look in both the dark (`rgba(26, 26, 30, 0.84)`) and the light (`rgba(255, 255, 255, 0.82)`) theme;
+  - Correct styling of the model and effort items with rounded corners and a hover highlight.
+- **Genuine transparency of dropdowns and popups in the light theme** — opaque solid white layers are eliminated in all dropdown menus, Radix Popper containers, context lists and popups:
+  - The child `div`, `ul`, `section` containers inside popups are cleared of the covering opaque background (`background-color: transparent !important`);
+  - The frosted glass effect (blur + saturation) now shows through unimpeded in all popup elements of the light theme.
+- **Instant and smooth opening of the file picker (+ / Media)** — jerks, the black screen, the side stripe and the delays when picking files are gone:
+  - The slow system mediator `Intent.createChooser` was removed from the native `MainActivity` layer when opening media/files;
+  - The on-screen keyboard is now force-hidden before the file dialog starts;
+  - The jerky Android window animation is disabled (`overridePendingTransition(0, 0)`), so the picker opens instantly and perfectly smoothly.
+- **Smooth chat lowering when the keyboard is hidden** — the visual delay and the empty coloured filler where the closing keyboard was are gone:
+  - The root WebView height is hard-bound to the window size (`height: 100% !important`), bypassing the delayed recomputation of Chromium's dynamic viewport units (`dvh`);
+  - Updating the `--agy-vvh` variable is synchronised with `visualViewport` changes;
+  - The artificial delays and scroll jerks (`nudgeSeries`) are disabled in the keyboard-close handler, so the chat lowers instantly and without artefacts.
+- Rebuild and signing of the release APKs `Leostryx-3.0.7-standard.apk` and `Leostryx-3.0.7-bypass.apk`.
+<!-- /EN -->
 
 ## v3.0.6 — 2026-11-10 (Leostryx Major Update)
 
+<!-- RU -->
 - **Субагенты (Subagents) и каталог агентов в 1 клик** — в «Настройки › Кастомизация» добавлена новая вкладка «Субагенты»:
   - Просмотр списка встроенных (`self`, `research`, `image-generator`) и пользовательских субагентов с бейджами прав (`write`, `mcp`, `subagents`) и модели (`inherit`, `pro`, `flash`, `flash_lite`);
   - Создание, редактирование и удаление субагентов с автоматической синхронизацией в правила агента (`~/.gemini/config/rules/custom_subagents.md`);
@@ -289,26 +636,73 @@
 - **Динамическая перекраска иконок и логотипа** — выбор акцентного цвета в оформлении теперь перекрашивает не только кнопки, но и логотип рыси, шапку и ключевые иконки через `brand_logo.js` и динамические стили;
 - **Расширение лимитов нативного моста AgyTools** — лимит длины аргументов увеличен с 600 до 65536 символов, разрешены спецсимволы `|` и `#` (устранена ошибка `ERR:arg` при сохранении больших навыков и субагентов);
 - Пересборка и подпись релизных APK `Leostryx-3.0.6-standard.apk` и `Leostryx-3.0.6-bypass.apk`.
+<!-- /RU -->
+
+<!-- EN -->
+- **Subagents and a one-click agent catalogue** — a new "Subagents" tab was added to "Settings › Customizations":
+  - Viewing the list of built-in (`self`, `research`, `image-generator`) and user-defined subagents with permission badges (`write`, `mcp`, `subagents`) and model badges (`inherit`, `pro`, `flash`, `flash_lite`);
+  - Creating, editing and deleting subagents with automatic synchronisation into the agent rules (`~/.gemini/config/rules/custom_subagents.md`);
+  - A built-in catalogue of ready-made subagents (Code Reviewer, Android Debugger, Security Auditor, Test Engineer, Docs Architect) with one-click installation;
+  - An "Invoke in chat" button that instantly inserts the subagent command into the input field;
+  - Fallback routing in `AgyGateway`: abstract subagent models (`inherit`, `flash`, `pro`) are automatically redirected to the configured provider model instead of failing with 404.
+- **Agent notifications in the Android shade with direct reply and confirmation** — the native `AgyShade` bridge and the high-importance `agy_agent_chat` channel were implemented:
+  - Expandable notifications (`BigTextStyle`) with the agent's questions and work status;
+  - A direct-input field (`RemoteInput`) behind the "Reply" button in the shade — the reply is typed and sent to the chat immediately;
+  - An "Allow / Continue" button for instant confirmation of action requests without opening the app;
+  - Dual delivery: an instant JS bridge through a `BroadcastReceiver` plus a `pollReplies` queue when the WebView is backgrounded.
+- **Power, speed and memory optimisation** — a deep optimisation of the runtime and components:
+  - `WebSettings`: the redundant offscreen pre-rasterisation is disabled (`setOffscreenPreRaster(false)`), saving 30–50% GPU and RAM on long conversations;
+  - Go core (`CoreEnvironment`): the `madvdontneed=1` flag in `GODEBUG` for immediate return of RAM pages to the Android kernel, plus the `GOMEMLIMIT=384MiB` and `GOGC=50` limits;
+  - Memory cleanup in `AppLifecycle.trimMemory` and `WebViewLifecycle.freeMemory` (Chromium cache purge and GC at `onTrimMemory >= 10`);
+  - `AgyVosk`: automatic release of the 50+ MB speech model from RAM when voice recognition stops.
+- **Branded lynx banner** — the repository banner (`assets/leostryx-banner.svg`) was replaced with a neon-style one using the accent palette `#0b84ff` and the lynx mascot.
+- **Removal of the automatic reset to the Gemini 4 Argon model** — the background model-check logic in `main.js` that reset the user's chosen model (Gemini 3.8 Flash and others) to the default Argon is fixed.
+- **Dynamic recolouring of icons and the logo** — choosing an accent colour in the appearance settings now recolours not only the buttons but also the lynx logo, the header and the key icons, through `brand_logo.js` and dynamic styles;
+- **Extended limits of the native AgyTools bridge** — the argument length limit was raised from 600 to 65536 characters, and the special characters `|` and `#` are allowed (fixing the `ERR:arg` error when saving large skills and subagents);
+- Rebuild and signing of the release APKs `Leostryx-3.0.6-standard.apk` and `Leostryx-3.0.6-bypass.apk`.
+<!-- /EN -->
 
 ## v3.0.5 — 2026-11-10 (Leostryx Release)
 
+<!-- RU -->
 - **Нативное переключение иконки рабочего стола без пересборки APK** — в манифест добавлены 4 `activity-alias` (`IconPack1Activity`..`IconPack4Activity`) и нативный мост `Android.setIconPack(token, packId)` (`IconPackSwitcher`), меняющий иконку лончера на лету из раздела «Настройки › Оформление»;
 - **Живой векторный логотип и динамический акцентный цвет** — выбор логотипа (Сова, Рысь, LSX, Angular X) и акцентного цвета в «Оформлении» мгновенно перекрашивает SVG-логотипы на экране входа, в верхней панели, в превью настроек и все акцентные кнопки интерфейса (`--primary` с приоритетом над пресетами тем);
 - **Полный брендинг экрана входа и локализации («Добро пожаловать в Leostryx»)** — обновлены идентификаторы продукта в React-бандле (`main.js`), словаре `agy_i18n.js` (включая полный перевод раздела резервного копирования «Бэкап»), `agy_tools.js`, `agy_mcp.js`, `agy_export_session.js` и заголовке диагностики (`=== Leostryx Diagnostics ===`);
 - **Стабильная работа в фоне и устранение обрыва долгих задач** — отключён агрессивный 120-секундный сторож `AGY-P2-16` в `bridge.core.js` (который ошибочно разрывал реактивный канал `StreamCascadeReactiveUpdates` по совпадению `/cascade/i`), а в нативном слое (`WebViewLifecycle`, `AppLifecycle`, `LauncherIconSwitcher`) отключена заморозка таймеров `pauseTimers()`, сброс памяти `freeMemory()` и переключение компонентов при сворачивании приложения;
 - **Чистый старт без мелькания экрана ошибки диагностики** — в `startup_ready.js` убран немедленный вызов `Android.onUiError` на некритичных стартовых промисах, а в `agy_tools.sh` добавлена автоочистка поля `skills` в `plugin.json` (устранён спам `customization.go` в `core.log`);
 - Пересборка и подпись `Leostryx-3.0.5-standard.apk` и `Leostryx-3.0.5-bypass.apk` (`versionCode 22`).
+<!-- /RU -->
+
+<!-- EN -->
+- **Native desktop icon switching without rebuilding the APK** — 4 `activity-alias` entries (`IconPack1Activity`..`IconPack4Activity`) were added to the manifest, plus the native bridge `Android.setIconPack(token, packId)` (`IconPackSwitcher`), which changes the launcher icon on the fly from "Settings › Appearance";
+- **Live vector logo and dynamic accent colour** — choosing a logo (Owl, Lynx, LSX, Angular X) and an accent colour in "Appearance" instantly recolours the SVG logos on the sign-in screen, in the top bar, in the settings preview, and all accent buttons of the interface (`--primary` takes priority over the theme presets);
+- **Full branding of the sign-in screen and localisation ("Welcome to Leostryx")** — product identifiers were updated in the React bundle (`main.js`), the `agy_i18n.js` dictionary (including the full translation of the "Backup" section), `agy_tools.js`, `agy_mcp.js`, `agy_export_session.js` and the diagnostics header (`=== Leostryx Diagnostics ===`);
+- **Stable background operation and no dropping of long tasks** — the aggressive 120-second watchdog `AGY-P2-16` in `bridge.core.js` is disabled (it wrongly tore down the reactive channel `StreamCascadeReactiveUpdates` on a `/cascade/i` match), and on the native side (`WebViewLifecycle`, `AppLifecycle`, `LauncherIconSwitcher`) the timer freeze `pauseTimers()`, the memory reset `freeMemory()` and the component switching on app minimisation are turned off;
+- **Clean start without the diagnostics error screen flashing** — the immediate `Android.onUiError` call on non-critical startup promises was removed from `startup_ready.js`, and automatic cleanup of the `skills` field in `plugin.json` was added to `agy_tools.sh` (removing the `customization.go` spam in `core.log`);
+- Rebuild and signing of `Leostryx-3.0.5-standard.apk` and `Leostryx-3.0.5-bypass.apk` (`versionCode 22`).
+<!-- /EN -->
 
 ## v3.0.4 — 2026-11-10 (Leostryx Patch Release)
 
+<!-- RU -->
 - **Разделители провайдеров в селекторе моделей** — модели из разных провайдеров (OpenAI-совместимые, Claude/Anthropic, Gemini-совместимые) теперь сгруппированы с заголовками провайдера;
 - **Проверка отображения всех выбранных моделей** — все модели из настроек провайдеров корректно появляются в селекторе чата в разделе «Пользовательский»;
 - **Папка бэкапа: Leostryx Backup**, рабочая папка: **Leostryx Projects** (в интерфейсе, путях по умолчанию и i18n);
 - Пересборка standard и bypass APK (`rebuild.py both`) с новыми изменениями;
 - Обновлён README.md и CHANGELOG.md под версию 3.0.4.
+<!-- /RU -->
+
+<!-- EN -->
+- **Provider separators in the model selector** — models from different providers (OpenAI-compatible, Claude/Anthropic, Gemini-compatible) are now grouped under provider headings;
+- **Verification that all selected models are displayed** — every model from the provider settings appears correctly in the chat selector under the "Custom" section;
+- Backup folder: **Leostryx Backup**, working folder: **Leostryx Projects** (in the interface, in the default paths and in i18n);
+- Rebuild of the standard and bypass APKs (`rebuild.py both`) with the new changes;
+- README.md and CHANGELOG.md updated for version 3.0.4.
+<!-- /EN -->
 
 ## v3.0.3 — 2026-11-10 (Leostryx Release)
 
+<!-- RU -->
 - **Проект переименован в Leostryx** (репозиторий: `Leostrange/Leostryx`);
 - **Новый баннер и брендинг** в стиле Leostryx (цвет `#0b84ff`, маскот — рысь);
 - **По умолчанию стоит значок и лого в виде рыси** (pack `02_lynx`);
@@ -317,9 +711,22 @@
 - **Иконки в SVG** загружены в архиве `Leostryx-4-SVG-logos.7z`;
 - Версия bumped до **3.0.3** (versionCode 19);
 - Оба APK (standard + bypass) подписаны с Leostryx брендингом: application-label, иконки, dex strings.
+<!-- /RU -->
+
+<!-- EN -->
+- **The project was renamed to Leostryx** (repository: `Leostrange/Leostryx`);
+- **New banner and branding** in the Leostryx style (colour `#0b84ff`, mascot — a lynx);
+- **The lynx icon and logo are now the default** (pack `02_lynx`);
+- **Icon and splash screen customisation** added to the appearance settings: 4 sets (Owl, Lynx, LSX, Angular X), switchable in settings;
+- **Pillow (PIL) is integrated into the app** — available in the build after compilation;
+- **SVG icons** uploaded in the archive `Leostryx-4-SVG-logos.7z`;
+- Version bumped to **3.0.3** (versionCode 19);
+- Both APKs (standard + bypass) are signed with Leostryx branding: application-label, icons, dex strings.
+<!-- /EN -->
 
 ## Изменения
 
+<!-- RU -->
 1. **Полная русификация.**
    - Словарь `agy_i18n.js` (EN → RU) для всего интерфейса приложения.
    - +64 ключа в словаре: статусы действий агента в чате («Распаковка», «Загрузка», «Сборка», «Клонирование», «Анализ», «Тестирование»… и варианты с «…» для прогрессивных статусов), строки карточки и диалога.
@@ -635,9 +1042,327 @@
     - Сгенерированы контрольные суммы SHA-256 в `SHA256SUMS.txt`.
 
 ---
+<!-- /RU -->
+
+<!-- EN -->
+1. **Full Russian localisation.**
+   - The `agy_i18n.js` dictionary (EN → RU) for the whole app interface.
+   - +64 dictionary keys: the agent's action statuses in the chat ("Unpacking", "Downloading", "Building", "Cloning", "Analysing", "Testing"… and the "…" variants for progressive statuses), the card and dialog strings.
+   - A live reasoning indicator in Russian: "Thinking — N s".
+   - Russian pluralisation of the question counter: "N вопрос / вопроса / вопросов".
+   - The confirmation dialog: Russian variants "outside the project" and "globally" — the English duplicates that made the variants look identical were removed.
+   - The strings of the agent question card and of the answer are translated.
+
+2. **Attaching up to 10 files.**
+   - The limit was raised from 5 to 10.
+
+3. **Correct display of attached files.**
+
+4. **Ability to view and delete files attached to the chat.**
+
+5. **Shield mode in the chat — chat behaviour settings (security and JavaScript), "does not ask" mode.**
+   - Shield sections: security profile, access to files outside folders, **internet access** ("Always ask" / "Allow" / "Deny"), automatic execution of terminal commands, sandbox, JavaScript in the browser.
+   - Autonomous agent operation: "Do not ask" (EAGER) is set and the sandbox is off — Android has no bwrap, so previously the "Run in sandbox" combination required confirmation for every command. Now the agent works autonomously and does not ask for confirmation again.
+   - **Shield choices are actually persisted**: writing through the `AgyTools` native bridge into `config.json` (new `policy` operation), enum value normalisation (numbers and strings like `AGENT_SETTING_POLICY_ALLOW`), a sticky overlay for instant display, and synchronisation with the config when the shield opens. Previously the write was rolled back (the JS bundle schema dropped the `userSettings` fields) and the settings "did not stick".
+   - The shield popup is strictly the width of the context window (the 360px limit is gone).
+
+6. **Initial onboarding for choosing the language.**
+
+7. **Compact and tidy menus, dropdowns and windows.**
+   - Compact menu sheets and anchored popups (menu/select) in the Out27 style: 14/12px radii, compact items, shadows; the menu backing layer is fully transparent.
+   - Width limits removed, centring and correct positioning in wide windows.
+
+8. **Applying theme styles to the menus, dropdowns and windows.**
+   - Background/border come from the theme tokens (`--popover` / `--card` / `--border` / `--foreground`) — identically in the light and dark theme.
+   - The plugin warning banner is switched to theme tokens (no yellow `--color-warning`), the text is centred.
+
+9. **Developer tools built into the settings** — installing components from the settings so the agent does not download them in the chat.
+   - Full NDK: accepts `.tar.xz` / `.tar.gz` / `.zip` archives, unpacked with `tar`, with a fallback that avoids the GitHub API (rate-limit protection).
+   - TypeScript pinned to `typescript@5` — TS 7+ (the native `tsgo`) does not build on Android.
+   - zipalign removed from the tool list and from the "Android app (Gradle)" preset — it is absent from the pkg repository and `apksigner` does the signing.
+   - Tool bridges through `exec $(readlink -f …)` — shell scripts such as `ndk-build` no longer break on symlinks.
+   - Fixes for batch preset installation and for the package status parser.
+
+10. **A "Language" row added to the "General" settings module.**
+
+11. **Light transparency and darkening implemented.**
+    - Compact sheets, anchored popups and the shield popup — 90% opacity (10% of "glass"; previously 4%).
+    - Menu backings fully transparent; `box-shadow` shadows only in the light theme (disabled in the dark one); `backdrop-filter` is not used.
+
+12. **Background operation fixed** — it no longer hangs on the logo when minimised; an app kept in memory keeps working.
+
+13. **Gestures fixed.**
+    - Back from a submenu returns to the previous menu instead of jumping straight to the projects window.
+    - Settings collapse downwards like a sheet.
+
+14. **Microphone — text transcription** for custom providers (added by the user manually) using Android Speech Cognition.
+
+15. **Custom models can see images.**
+
+16. **Dictation settings.**
+
+17. **Thinking modes.**
+
+18. **The "Open provider settings" navigation.**
+    - The path and the query are passed to the TanStack router separately (`navigate({to, search})`) — previously a URL with `?` turned into a garbage pathname and the transition did not work.
+    - This also fixes "Provide Feedback" and navigation between settings sections.
+    - Instead of the "Plugins not supported for this auth method" error — a button that goes to the provider settings (in the final version — no button, only a theme-aware text banner).
+
+19. **Agent question card — duplicate strings removed.**
+    - The crossfade of text transitions is disabled (the old and the new text are no longer rendered at the same time, "lines 3 and 4" are no longer duplicated).
+
+20. **The "Keyboard shortcuts" tab is removed from the settings** — via the stock `hideShortcuts` flag; desktop layouts are not needed on Android.
+
+21. **Full width for reasoning and the terminal** — the side paddings `pl-2` / `ml-4` are gone, tool steps start from the left edge.
+
+22. **Shield test harness** — 47 automatic checks of the shield logic against the real `config.json` (enum normalisation, writing through the bridge, synchronisation, protection of fresh choices).
+
+23. **Fixing and adapting MCP servers for Android**:
+    - A Node.js environment was deployed (`nodejs-lts` 24.22.2) with the `npm` 12.2.1 and `npx` gateways.
+    - Native MCP servers were installed and adapted: `sequential-thinking` (v2.0.0), `exa-search-server` (v3.4.2), `github-mcp-server` (v0.6.2, the unavailable Docker container replaced with a native JS package), `mcp-remote` (StitchMCP).
+    - Shebang paths fixed through `agy-fix-paths` for the Android userspace prefix.
+    - Clean startup configured directly through the binaries, without delays and without network dependencies (`mcp_config.json`).
+    - The incompatible `android-management-api` removed (it required Google Cloud Application Default Credentials).
+
+24. **For MCP servers to work they must be added from the standard Antigravity provider, and the core must be switched.**
+
+25. **Install Node.js**:
+    - Running and operating most MCP servers and their dependencies requires Node.js installed on the system (`pkg install nodejs-lts`).
+
+26. **Fixing MCP server operation with custom providers**:
+    - Cyclic recursion of the shell bridges eliminated (when creating symlinks in `runtime/bin` overwrote the original binaries in `$PREFIX/bin` with bridge scripts and caused `context deadline exceeded` / signal 36 failures).
+    - `LD_LIBRARY_PATH: $PREFIX/lib` added to the environment of every MCP server (`mcp_config.json`), which solves the Bionic dynamic linking problem (`libz.so.1 not found: needed by main executable`) when the `language_server` core spawns processes.
+    - The direct JS entry points corrected: `stdio.cjs` for `exa-mcp-server` and `proxy.js` for `mcp-remote` (StitchMCP).
+    - All 4 MCP servers (`sequential-thinking`, `exa`, `github-mcp-server`, `StitchMCP` — 45 tools in total) successfully reach `MCP_SERVER_STATUS_READY` and expose their function-calling schemas without needing to switch the core, and `AgyGateway` transparently forwards tool calls to custom models over the OpenAI protocol.
+
+27. **Rebuild of standard and bypass**:
+    - Both builds were rebuilt from the current source tree (`rebuild.py both`), now including the MCP server fixes (item 26) and the updated documentation.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-9-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-9-bypass.apk` — located in the root of the `Antigravity Projects/` folder next to the repository.
+    - The `Antigravity Projects` folder was tidied up: only the current source code (the repository with README and CHANGELOG) and the two APKs were kept; old builds (ui-8, the base fixed-ui-9), intermediate projects, archives and duplicate working copies were deleted.
+
+28. **Eliminating core and command crashes with exit code 164 (signal 36 / SIGRTMIN+2)**:
+    - The source of signal 36 was identified: the Android 16 system background profiler (`traced_perf` / ART), which broadcasts signals to app processes. Because no handler for signal 36 was installed in glibc / bionic, the processes terminated immediately with code `164 = 128 + 36`.
+    - A low-level `SIG_IGN` installation for signals 36 and 37 through `raw_rt_sigaction` was added to the `liblse_compat.c` core in the library constructor, together with a `sigaction()` interceptor that prevents the ignore flag from being reset by runtime components. Since POSIX guarantees `SIG_IGN` survives `execve()`, all child processes inherit the protection. `app/assets/runtime/lib/liblse_compat.so` was recompiled and the runtime manifests for standard and bypass were updated.
+    - A preventive `trap '' 36 37 2>/dev/null || true` was added to all startup shells (`00-env.sh`, `pkg`, `agy_tools.sh`, the `bash` wrapper).
+
+29. **Preserving the selected custom model when the app is minimised**:
+    - In `app/assets/web/generated/main.js` (`fKa`) the custom-model state is initialised and synchronised with `localStorage` (`agyLastCustomModel`).
+    - Previously, when the app was minimised and the component re-rendered, the state was reset to `null`, which rolled the selection back to the standard Google models. The choice is now reliably preserved across sessions and returns from the background.
+
+30. **Fixing the tool installation hang (Settings › Tools) and the reset button**:
+    - The cause of the hang was diagnosed: when the background script terminated abnormally, the `rc` exit-code file was never created, so the web UI polled a non-existent process forever.
+    - A forced cancel/reset `[✕]` button was added to the task panel UI in `agy_tools.js`.
+    - Automatic timeout and hang detection were added: if a process does not update its journal for more than 45 seconds while having run for more than 90 seconds in total (or exceeds 10 minutes), the job is automatically marked as failed and the journal is opened for analysis.
+    - Signals 36/37 are intercepted inside the `pkg` and `agy_tools.sh` scripts, preventing packages from dying in the middle of an installation.
+
+31. **Fixing terminal startup (`libandroid-support.so not found`) and the Bionic bash bridge**:
+    - A system wrapper for `$PREFIX/bin/bash` was added to `overlay/bin/bash`; it reliably exports `LD_LIBRARY_PATH="$PREFIX/lib"`, sets `PREFIX` and the Termux variables, and launches the real `bash.bin` binary.
+    - This completely removes the Bionic dynamic linker failure when the terminal starts from `CoreEnvironment` (where `LD_LIBRARY_PATH` is deliberately cleared to isolate the glibc core).
+    - The `overlaySha256`, `pkgSha256` and `bundleId` hashes in `app/assets/env/manifest.json` were updated so the overlay is rolled onto existing installations automatically.
+
+32. **Synchronising the repository with the "tools-log-fix" branch (previously the changes only lived in the built APK)**:
+    - The updates to `agy_tools.js` (refined check ids for `node-lts`/`java17`, SDK API 36/37 and build-tools 36/37 components, `aidl`, "aapt + zipalign"), `agy_shield.js` (initial policy write into `config.json` through the bridge and ignoring outdated enums) and `agy_ru.js` were moved into `app/assets/web/`, and `agy_resolver.sh` was added.
+    - Improved dependency-alternative selection was moved into `app/assets/env/pkg/lib/resolver.sh`: an already installed alternative is chosen only if its version satisfies the dependencies (protecting `nodejs-lts` from being overwritten by `nodejs`).
+    - The updated `overlay/bin/bash`, the rebuilt `liblse_compat.so` and the current runtime manifests (standard and bypass) were moved over from the `*-tools-log-fix` build.
+
+33. **Reliability of tool installation (Settings › Tools) on an unstable network**:
+    - The root cause of the earlier installation failures: connection resets (curl error 35 "Recv failure: Connection reset by peer") — the standard `curl --retry` does not retry them, so `pkg install` failed on the first attempt and needed 3–4 tries.
+    - In `pkg` (`lib/fetch.sh`, index download) curl was switched to `--retry 5 --retry-all-errors` with backoff.
+    - `pkg_retry` (up to 3 attempts with pauses) was added to `agy_tools.sh` around all `pkg update/install/upgrade` and `npm install` calls (plus `--fetch-retries=5`); the SDK download is hardened with retries; the NDK download (~1 GB) resumes with `-C -` and falls back to a full re-download.
+    - The `npm: command not found` error during self-test was a consequence of the same problem (an interruption during `pkg install npm`).
+
+34. **Providers: "Load models" for Claude-compatible APIs without a model catalogue**:
+    - For providers such as MiMo the Anthropic endpoint works (`POST /v1/messages` → 200) but does not expose a model list (`GET /v1/models` → 404) — the button failed with an error.
+    - A fallback was added: if the catalogue for the API type is unavailable, the OpenAI-compatible catalogue of the same server (`<origin>/v1/models`) is requested and the source is noted in the message.
+    - Manual model addition (a "Model ID" field + "Add") and model deletion (✕) were added — for providers with no catalogue at all.
+    - Base URL normalisation: trailing `/` and a redundant `/v1` for the Anthropic type are stripped automatically; errors are shown as clean text without HTML noise.
+
+35. **Rebuild of standard and bypass (fixed-ui-10)**:
+    - Both builds were compiled from the current tree (`rebuild.py both`) with the fixes from items 32–34; the `env/pkg` layers received new `pkgSha256`/`bundleId` detectors in `app/assets/env/manifest.json` so updates roll onto existing installations automatically.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-10-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-10-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+36. **Automatic package check and removal of the false red banner when opening "Tools"**:
+    - The false red banner ("The package list is not loaded yet — the state is incomplete") when opening "Settings → Tools" is eliminated.
+    - A ready package index (`repo.1.tsv`, `repo.1.Packages`, `repo.1.url`) is now shipped in `app/assets/env/overlay/var/lib/pkg/index/` — the index is available immediately after installation without waiting for a network download.
+    - Automatic on-the-fly `.tsv` generation from `.Packages` through `index.awk` was added to `agy_tools.sh` (`op_status`) for the case when the file is missing; polling of installed packages was optimised into a single `awk` (~120 ms instead of 3+ seconds).
+    - In `agy_tools.js` the `hasIndex` caching was fixed, the banner is hidden when packages are installed, and opening "Tools" (`__agyToolsMount`) now triggers the component check automatically (`refresh(true)`), making all indicators green without having to press the "Check" button manually.
+
+37. **A dedicated "MCP Servers" settings submenu (spec 14)**:
+    - A separate "MCP Servers" section (`agy_mcp.js`) was added to the "Settings" menu, registered in the `main.js` router and in the Russian localisation dictionaries of `agy_i18n.js`.
+    - **Components submenu**: diagnostics and centralised one-click installation of all required MCP packages (`Node.js LTS`, `@modelcontextprotocol/server-sequential-thinking`, `exa-mcp-server`, `mcp-remote`, `@modelcontextprotocol/server-github`, `gopls`) with automatic invocation of `agy-fix-paths` and a live terminal log.
+    - **Integration with custom providers**: a toggle for MCP tool support in third-party APIs (OpenAI, Claude, DeepSeek) that automatically sets the `tools: true` flag in the model configuration.
+    - **Server cards and authorisation**: key entry (`EXA_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `X-Goog-Api-Key` for StitchMCP) and on/off switches for each server.
+    - **Direct native startup**: automatic normalisation of `mcp_config.json` to call `/runtime/bin/node` with correct `LD_LIBRARY_PATH`, `PATH` and `NODE_PATH`, ruling out `npx` failures and the Android-incompatible `docker`. A quick core-restart button through the `AgyProviders.restartCore()` bridge.
+
+38. **A full catalogue and marketplace of MCP servers**:
+    - The "MCP Servers" submenu was expanded into a full server marketplace.
+    - The catalogue includes vetted MCP ecosystem servers:
+      - `Sequential Thinking` — step-by-step logical reasoning and planning;
+      - `Memory Graph` — a long-term graph of knowledge, entities and relations;
+      - `Filesystem Access` — safe access to the device storage files (`/storage/emulated/0`);
+      - `Everything Reference` — the reference MCP server for testing prompts, resources and tools;
+      - `Exa AI Search` — intelligent neural web search in real time;
+      - `Context7 Docs` — instant lookup of official documentation for libraries, frameworks and APIs;
+      - `Brave Search` — search through the official Brave Search API;
+      - `Google Stitch MCP` — remote access to the cloud Stitch API tools;
+      - `GitHub MCP` — the full GitHub workflow (repositories, PRs, issues, commits);
+      - `Go Language Server (gopls)` — autocompletion, navigation and diagnostics for Go;
+      - `Notion MCP` and `Sentry MCP` — workspace integrations and error monitoring.
+    - **Filtering and search**: quick search by name, tags and descriptions; filtering by category ("All", "Reasoning", "Search & web", "Development", "Files", "Cloud").
+    - **Adding your own servers**: an interactive "+ Add your own MCP server" modal for configuring the id, launch command, arguments and environment variables, plus the ability to delete servers.
+    - **End-to-end synchronisation with custom providers**: a button that instantly syncs the `tools: true` flag to all models of third-party providers.
+    - **One-click stack installation**: simultaneous installation of all required npm packages and binaries with a live terminal log.
+
+39. **Rebuild of standard and bypass (fixed-ui-11)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with all the MCP catalogue work.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-11-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-11-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+40. **User settings: Skills, Instructions (AGENTS.md) and Plugins**:
+    - The built-in "User settings" (`Customizations`) section was reworked; it previously hung on the Google Internal Language Server that is unavailable to standalone installations.
+    - **The "Skills" tab**:
+      - Display of all 36+ procedural skills (built-in ones, skills from the Android CLI, Flutter and Modern Web plugins, and user-defined ones).
+      - Filtering by category ("All", "My skills", "From plugins", "Built-in") and live search by name/description.
+      - **Creating your own skills**: an interactive "+ Create your own skill" modal that generates a valid YAML manifest in `~/.gemini/config/skills/<id>/SKILL.md` (picked up by the core in all conversations automatically).
+      - Toggles to enable/disable skills and deletion of custom skills.
+    - **The "Instructions" (AGENTS.md) tab**:
+      - A built-in full-screen editor for the global agent instructions and behaviour rules (`~/.gemini/config/AGENTS.md`).
+      - Presets for quick insertion of rules (concise answers, strict typing, Russian language).
+      - A button to restore the reference Android instructions.
+    - **The "Plugins" tab**:
+      - An overview of the installed plugins (`android-cli-plugin`, `flutter`, `modern-web-guidance-plugin`) with statistics on the skills, rules and MCP servers they contain.
+      - Plugin activation switches synchronised into `~/.gemini/config/config.json`.
+    - **End-to-end integration with custom providers**:
+      - Guaranteed delivery of rules, instructions and tools to third-party models (OpenAI, Claude, DeepSeek) with an instant `tools: true` sync button.
+
+41. **Rebuild of standard and bypass (fixed-ui-12)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with all the "User settings" submenu work.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-12-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-12-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+42. **Implementing UTCP server and OpenAPI 3.0 specification support**:
+    - Integration of the **Universal Tool Calling Protocol (UTCP)** standard (utcp.io) for directly connecting external REST APIs, Swagger/OpenAPI specifications and custom JSON manuals without writing intermediate MCP proxy servers.
+    - The `@utcp/mcp-bridge`, `@utcp/sdk`, `@utcp/http`, `@utcp/file`, `@utcp/cli`, `@utcp/dotenv-loader` stack was installed and optimised.
+    - A dedicated **"🌐 UTCP & OpenAPI"** tab in the MCP server settings:
+      - An overview of the UTCP ↔ MCP bridge state, the active config (`~/.gemini/config/utcp_config.json`) and a manual counter.
+      - Cards of connected services with type badges (`OPENAPI`, `REST`, `FILE`), activity toggles, a list of discovered tools, a live test button (`🔍 Check tools`) and deletion.
+      - **A catalogue of ready-made free UTCP APIs (one-click connection)**:
+        - *Open-Meteo Weather API*: weather forecast and current temperature by coordinates worldwide, with no API key.
+        - *IP Geolocation API*: country, city, provider and coordinates for any IP address.
+        - *REST Countries Global API*: an encyclopaedia of the world's countries (capitals, currencies, population, languages).
+        - *CoinGecko Crypto API*: real-time cryptocurrency rates (BTC, ETH, TON, SOL).
+      - An interactive **"+ Add UTCP manual / OpenAPI service"** modal supporting remote OpenAPI 3.0 specifications, REST endpoints and local JSON files, plus optional Bearer/API Key authorisation.
+    - Automatic translation of all registered UTCP tools through the bridge into the Antigravity core and into custom providers (OpenAI, Claude, DeepSeek).
+
+43. **Rebuild of standard and bypass (fixed-ui-13)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with full UTCP and OpenAPI support.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-13-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-13-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+44. **Redesigning the MCP, UTCP and customisation settings in the native Antigravity IDE style**:
+    - A complete rework of the visual styling of the "MCP Servers", "UTCP and OpenAPI" and "User settings" screens:
+      - Strict adherence to the Antigravity IDE component architecture (`u3` / `v3` / `w3`): settings grouped into monolithic cards with horizontal dividers (`rounded-xl border border-border divide-y divide-border bg-card/40`).
+      - Segmented tab-switching controls (`inline-flex p-1 rounded-lg bg-secondary/50 border border-border/40 gap-1`, active tab `bg-background text-foreground shadow-sm`).
+      - Complete removal of coloured emoji from tabs, filters, headings and buttons in favour of the authentic IDE aesthetic: minimalist SVG icons, strict typefaces and native badges (`text-[10px] font-semibold bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full border border-border`).
+      - Use of the Antigravity system theme tokens (`--background`, `--foreground`, `--muted-foreground`, `--card`, `--border`, `--secondary`, `--secondary-foreground`, `--primary`, `--destructive`).
+
+45. **Rebuild of standard and bypass (fixed-ui-14)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with the authentic Antigravity IDE styling.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-14-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-14-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+46. **Updating the "User settings" section and direct links for obtaining API tokens in MCP**:
+    - **Skills**:
+      - The ability to **view** the contents of any skill (`SKILL.md`) in a modal with syntax highlighting and an agent-trigger description was added.
+      - A function to **copy built-in skills and plugin skills** into user skills (`~/.gemini/config/skills/<name>/SKILL.md`) was implemented. The user can clone any system skill under their own name to customise its instructions.
+      - **Editing** of the instructions and triggers of user skills directly from the interface was implemented.
+      - The **"+ Create your own skill"** modal for quickly adding procedural instructions was kept and improved.
+    - **Plugins**:
+      - The **catalogue of ready-made plugins with one-click installation** was restored and extended:
+        - *Google Workspace & Cloud* (integration with Docs, Sheets, Drive and the Cloud API).
+        - *Python Data Science & ML* (a skill pack for EDA, data visualisation and machine learning).
+        - *Docker & Container DevOps* (Dockerfile and docker-compose optimisation).
+        - *Database Engineering & SQL* (schema design and SQL query optimisation).
+        - *Security Audit & Hardening* (finding OWASP Top 10 vulnerabilities and auditing secrets).
+        - *Git Automation & Conventional Flow* (Conventional Commits standards and PR review).
+      - Management of installed plugins: enable/disable toggles, badges with the number of skills, rules and MCP servers, and a delete button for user plugins.
+      - A "+ Create your own plugin" function for quickly scaffolding a plugin structure in `~/.gemini/config/plugins/`.
+    - **Links for obtaining API tokens for MCP servers**:
+      - Compact direct links to the official API-token portals (`dashboard.exa.ai`, `github.com/settings/tokens`, `aistudio.google.com`, `api.search.brave.com`, `notion.so/my-integrations`, `sentry.io/settings` and others) were added next to the key input fields in the MCP server cards.
+      - The links open in the browser while preserving context and allow the token to be copied to the clipboard quickly.
+
+47. **Rebuild of standard and bypass (fixed-ui-15)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`).
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-15-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-15-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+48. **Curating the catalogues for Android: everything that does not work on the device is removed**:
+    - An analysis of the stock "User settings" implementation (the *Customizations* screen of upstream Antigravity from the GitHub repository): Skills / Agents / MCP servers / Rules / Hooks / UI extensions, plus the remote *Build With Google Plugins* catalogue and the MCP template store ("Add MCP", search by name, one-click installation). The local implementation was brought to the same logic: Installed + Marketplace, nothing extra.
+    - **MCP servers**: the `notion` and `sentry` entries were removed from the catalogue — they had no installation path on Android (an npx proxy without the component) and only cluttered the list. 10 servers that genuinely work on ARM64 remain: sequential-thinking, memory, filesystem, everything, exa, brave-search, context7, github-mcp-server, gopls (via pkg), StitchMCP (mcp-remote).
+    - **Plugins**: `docker-devops` was removed from the one-click installation catalogue (Docker is unavailable on Android) and `database-tools` was retargeted from Postgres/MySQL to **SQLite — the native Android database** (`sqlite-optimizer` + `schema-design`). The final catalogue: Google Workspace & Cloud, Python Data Science & ML, SQLite & Mobile Databases, Security Audit & Hardening, Git Automation & Conventional Flow — all of them run on the device's stock runtimes (python3, git, sqlite, HTTP APIs).
+    - The plugin catalogue tags were translated into Russian for interface consistency.
+    - **Order in the "Skills" section**: the list (40+ entries from builtin/plugins) is now grouped into sections — "User-defined", "From plugins", "Built-in" — with headings and counters; the duplicate path lines in the card footers and the redundant type badges were removed (the group now conveys the type).
+
+49. **Rebuild of standard and bypass (fixed-ui-16)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with the cleaned MCP and plugin catalogues.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-16-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-16-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+50. **Fixed the critical "Skills (0) / Plugins (0)" bug in the user settings**:
+    - Cause: when the screen opened, two bridge polls started in parallel (`status` and `read-instructions`), and the global `pollTimer` of the first poll was cancelled by the second — the result of the skills and plugins scan **was never parsed**, and the list was always empty (the instructions did load, because they went through the second poll).
+    - Fix: polling was switched to **independent timers per job** (`pollTimers[id]`), each poll parses **its own log** (`r.log`), the `activeJobs` counter replaces the single `job`; the eager instruction load on mount was removed (the tab picks it up when opened).
+    - Result: opening the section now shows all **36 skills** (8 built-in + 28 from the flutter/android-cli/modern-web plugins) and **3 installed plugins**.
+
+51. **Analysis and cleanup of the working MCP servers, catalogue extended with plugins from Build With Google**:
+    - A full smoke test of all servers through a JSON-RPC `initialize`: **OK** — sequential-thinking, memory, filesystem, everything, exa, context7, github, StitchMCP (mcp-remote), the UTCP bridge (loads 4 manuals), gopls; the components node v24.22.2 / npm 12.2.2 / python 3.14.10 / git 2.56.0 are installed.
+    - `brave-search` is left **disabled** — the config holds the `YOUR_BRAVE_KEY` placeholder; it will enable once a real key is inserted (the link for issuing a key is in the server card).
+    - The config was cleaned: the dead stock `android-management-api` was removed (disabled, empty args); `MEMORY_FILE_PATH` for `memory` was set outside `node_modules` (protecting the knowledge graph from being wiped when the npm package updates).
+    - The plugin catalogue gained three entries from the Build With Google store (photo 4): **Google Antigravity SDK** (a Python SDK for agents), **Science** (scientific tasks) and **Firebase** (Auth/Firestore/Functions) — all built on text skills and working on Android without extra runtimes.
+
+52. **Rebuild of standard and bypass (fixed-ui-17)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with the fixed skills/plugins scan and the updated catalogue.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-17-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-17-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+53. **Toolchain fixes: Termux-JDK JVM paths and Flutter/Dart on Android (automation)**:
+    - **Root cause of the JVM errors** (jadx/apktool/d8/apksigner/Gradle: `AccessDeniedException` in `/data/data/com.termux/...`): the Termux OpenJDK hard-codes `user.home` and `java.io.tmpdir` to inaccessible paths; the JVM ignores `TMPDIR` for `java.io.tmpdir`.
+    - A new profile **`$PREFIX/etc/profile.d/65-agy-jvm.sh`** (part of the overlay): it sets `JAVA_TOOL_OPTIONS="-Duser.home=$HOME -Djava.io.tmpdir=…"` for **all** Java tools at once; the tmp directory is chosen after checking that `TMPDIR` is writable. `agy-fix-paths` gained step 3 — the profile restores itself when missing.
+    - A new wrapper **`jadx-agy`**: sandbox JVM flags + `-Xmx1500m` (protection against OOM-kill/137 on ~2 GB of RAM), with `-j 2 --no-res` recommended; `--single-class-thread` does not exist in jadx 1.5.x.
+    - A new idempotent script **`agy-fix-flutter`** (all 7 sections of the fixes document): swaps the glibc `cache/dart-sdk` for the bionic build from `pkg install dart` (with version comparison, the original kept as `dart-sdk.glibc`), patches `os.dart` / `platform.dart` / the pub-cache `local_platform.dart` (every `platform-*`), invalidates `flutter_tools.snapshot` only when real edits happen, fixes `gradle.properties` (`-Duser.home`/`-Djava.io.tmpdir`) and purges a broken `~/.gradle/native` (ELF magic check). Verified on the device: a second run reports "everything [ok], 0 fix(es)".
+    - **Delivery mechanism**: `overlaySha256` in `app/assets/env/manifest.json` is a version token (decompiling `EnvInstaller` confirmed it: a mismatch with the `$PREFIX/.installed` marker triggers a merge copy of the overlay without erasing). The token is recomputed by the `tools/gen_env_overlay_sha.py` generator (scheme: sha256 over sorted "sha256 relpath" lines) → the new files land in `$PREFIX` on the next app start.
+    - Documentation: `docs/jadx-fixes.md` and `docs/flutter-toolchain.md` (the complete fix documents), and section 8 "Toolchain Fixes" was added to the seed `AGENTS.md` and the environment `AGENTS.md` — the agent knows about `agy-fix-flutter` and `jadx-agy`.
+
+54. **Rebuild of standard and bypass (fixed-ui-18)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with the JVM/Flutter/jadx toolchain fixes in the overlay.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-18-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-18-bypass.apk` in the root of `Antigravity Projects/` (checksums — `SHA256SUMS.txt`).
+
+55. **Integrating the Flutter SDK into the tools, fixing the MCP configuration failure and the Stitch links (fixed-ui-19)**:
+    - **Flutter SDK integration into "Settings → Tools" (`agy_tools.js`, `agy_tools.sh`)**:
+      - A "Flutter & Dart" component group was added (component `flutter-sdk`, check `flutter,dart`) along with a ready "Flutter development" preset for one-click installation.
+      - An automatic installation script `op_flutter()`: downloads the system packages (`dart`, `git`, `curl`, `tar`, `xz-utils`, `python`) automatically, clones the official `stable` SDK branch into `$HOME/flutter_sdk`, exports `FLUTTER_ROOT` and `$HOME/flutter_sdk/bin` into the environment (`write_env()`) and runs the bionic patcher `agy-fix-flutter` (replacing the glibc Dart SDK with the native Dart from `pkg`, adapting `os.dart`, `platform.dart` and `local_platform.dart` in the pub-cache).
+      - Viability checks for the `flutter` and `dart` tools were added to the general verification (`op_verify`).
+      - A function for a complete and clean removal of the Flutter SDK (`op_flutterremove`) was implemented, including clearing the exported paths.
+      - Flutter installation progress tracking was added to the UI (`agy_tools.js`).
+    - **Fixing the failure and persistence of MCP servers (`mcp_config.json`)**:
+      - The `json.decoder.JSONDecodeError` that occurred when saving API keys (`set-key`) and toggling servers (`toggle`) with an empty (0-byte) `~/.gemini/config/mcp_config.json` file is eliminated.
+      - An automatic fallback that initialises the `{"mcpServers": {}}` structure was added to all read/write operations of `op_mcp`.
+    - **Masking API keys with asterisks (`***`)**:
+      - Private-field detection in `agy_mcp.js` was fixed: the case-sensitive `indexOf("KEY")` check was replaced with the regular expression `/key|token|secret|auth|password/i`. The `X-Goog-Api-Key` (Stitch), `api_token` and `access_token` keys are now reliably masked as `type="password"`.
+    - **Fixing StitchMCP**:
+      - The official key-obtaining/authorisation URL was corrected: the link now points to `https://stitch.withgoogle.com/` instead of `aistudio.google.com`.
+      - Automatic generation of a valid StitchMCP configuration in `mcp_config.json` was added, invoking it through `node`, the `mcp-remote` proxy, the arguments and a correct `LD_LIBRARY_PATH` environment.
+
+56. **Rebuild of standard and bypass (fixed-ui-19)**:
+    - Standard and bypass APKs built from the current repository tree (`rebuild.py both`) with all the tool, Flutter SDK and MCP server fixes.
+    - Ready APKs: `Antigravity-BP-2.4.1-ru.fixed-ui-19-standard.apk` and `Antigravity-BP-2.4.1-ru.fixed-ui-19-bypass.apk`.
+
+57. **Moving to the major version 3.0 (v3.0)**:
+    - The project numbering was updated to its own major version **3.0**:
+      - The manifest `app/AndroidManifest.xml` now declares version `3.0.0-ru.s7p1` (`versionName`).
+      - The build configuration in `rebuild.py` was updated for the 3.0 release.
+      - All 29 major blocks of improvements and fixes (items 28–56) developed after the public v2.4.1 audit on GitHub were consolidated into a single stable 3.0 branch.
+    - The official release packages were built:
+      - `Antigravity-BP-3.0-standard.apk` (base build)
+      - `Antigravity-BP-3.0-bypass.apk` (region-bypass build)
+    - SHA-256 checksums were generated in `SHA256SUMS.txt`.
+<!-- /EN -->
 
 ## Что нового в 3.0.1
 
+<!-- RU -->
 Изменения, внесённые после релиза 3.0 на GitHub.
 
 58. **Консоль приложения (Tools → Консоль приложения)**:
@@ -671,9 +1396,47 @@
 
 65. **Экспорт сессий — текст и изображения**:
     - Markdown-файл и изображения сохраняются в исходном формате (`agy_export_session.js`).
+<!-- /RU -->
+
+<!-- EN -->
+Changes made after the 3.0 release on GitHub.
+
+58. **Application console (Tools → Application console)**:
+    - Commands run as a separate invocation (`op_termrun`) in the app's environment, without a PTY session of the project — the `Terminal input failed: ENXIO/ENOENT` errors on `.agy-tools-terminal.fifo` are gone.
+    - A toolbar with the "Copy output" and "Clear screen" buttons.
+    - A `logcat` button for quickly capturing logs (`logcat -d -t 80 *:W`).
+    - Every command is a separate job with a return code; timeout 25 s.
+
+59. **Error history — a filter for genuine failures**:
+    - Only real errors reach the log (non-zero return code or the `@@fail` marker).
+    - Successful installations where the word "error" appears in licence text or progress output no longer clutter the window.
+    - "Copy all" (clipboard API + fallback) and "Clear" (`op_histclear`) buttons in the toolbar.
+
+60. **Scrolling of the error and terminal windows**:
+    - Our own visible scrollbar (`attachScroll21`) — the Android WebView does not draw `::-webkit-scrollbar`.
+    - The scroll position is preserved when more text loads; auto-scroll downwards only if the user is already at the bottom edge.
+    - Background scrolling of the chat is blocked while the modal window is open (P2-22).
+
+61. **PDF export of sessions**:
+    - PDF assembly through `pymupdf` (`op_pdfin` + `op_pdf`), without the empty system printer.
+    - Streaming of large files through `@@PDFB64` chunks.
+
+62. **Chat stream protection (P2-16/P2-22)**:
+    - The hung-stream watchdog is narrowed to the generation URL — background requests are not interrupted.
+
+63. **Package upgrade confirmation (P2-11)**:
+    - Before `pkg upgrade` the number of packages and the download size are shown; it does not start without confirmation.
+
+64. **Conversation sorting — a narrow menu**:
+    - The sorting popup ("By update date" / "Custom order") no longer stretches to the full width of the panel: width by content, at most 210px on top of the built-in `w-56` class.
+
+65. **Session export — text and images**:
+    - The Markdown file and the images are saved in their original format (`agy_export_session.js`).
+<!-- /EN -->
 
 ## 3.1.0 — Динамический сплэш-скрин (Android 12+)
 
+<!-- RU -->
 - **Сплэш-скрин больше не захардкожен в розовый**: из `SplashTheme` (все конфигурации v31)
   удалён статический `windowSplashScreenAnimatedIcon` (`0x0101062d`).
   Android 12+ автоматически подставляет иконку **активного** `activity-alias`,
@@ -685,3 +1448,18 @@
 - Патч автоматизирован в `tools/brand.py` (`build_overlay`): ретаргет и инвалидация
   выполняются на этапе сборки, попадание проверяется выводом
   `brand: dynamic splash: removed ... retargeted ...`.
+<!-- /RU -->
+
+<!-- EN -->
+- **The splash screen is no longer hard-coded to pink**: the static `windowSplashScreenAnimatedIcon`
+  (`0x0101062d`) was removed from `SplashTheme` (all v31 configurations).
+  Android 12+ substitutes the icon of the **active** `activity-alias` automatically,
+  so when the colour/icon set is changed in the settings the splash screen changes
+  together with the launcher, with no APK rebuild.
+- `windowSplashScreenIconBackgroundColor` (`0x0101062e`) now points at
+  `@color/ic_launcher_background` (instead of an invalid reference to `@drawable/splash_icon`),
+  so the splash icon background stays in sync with the active set.
+- The patch is automated in `tools/brand.py` (`build_overlay`): the retargeting and invalidation
+  run at build time, and the result is verified by the output
+  `brand: dynamic splash: removed ... retargeted ...`.
+<!-- /EN -->

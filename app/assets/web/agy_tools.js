@@ -133,6 +133,19 @@
 
   function bridge() { return window.AgyTools && typeof window.AgyTools.start === "function" ? window.AgyTools : null; }
 
+  /* Язык интерфейса сообщаем shell-бэкенду: фоновые операции (уведомления
+     обновления в шторке, сообщения об ошибках) обязаны говорить на том же
+     языке, что и экран. Пишем только при смене значения. */
+  var shellLangSent = "";
+  function syncShellLang() {
+    var b = bridge();
+    if (!b) return;
+    var lang = ru() ? "ru" : "en";
+    if (lang === shellLangSent) return;
+    shellLangSent = lang;
+    try { b.start("setlang", lang); } catch (e) {}
+  }
+
   function installed(it) {
     if (it.kind === "pkg") { var s = status[it.id]; return !!(s && s.inst && s.inst !== "-"); }
     if (it.kind === "sdk") { var p = it.id.split(";"); return (p[0] === "platforms" ? special.platforms[p[1]] : special.buildtools[p[1]]) === true; }
@@ -443,7 +456,7 @@
   // Log text: drop machine lines and curl "####" bars; keep the last state of \r-lines.
   function cleanLog(raw) {
     return (raw || "").split("\n").map(function (l) { var p = l.split("\r"); while (p.length && !p[p.length - 1].trim()) p.pop(); return p.pop() || ""; })
-      .map(function (l) { return l.replace(/^@@fail\s+/, "Ошибка: ").replace(/^@@error\s+/, "Ошибка: "); })
+      .map(function (l) { return l.replace(/^@@fail\s+/, T("Ошибка: ", "Error: ")).replace(/^@@error\s+/, T("Ошибка: ", "Error: ")); })
       .filter(function (l) { return !/^@@/.test(l) && !/^[#\s]*(\d{1,3}(?:[.,]\d+)?%?)?\s*$/.test(l) && !/^#{3,}/.test(l); }).join("\n");
   }
   // Progress model from pkg / curl / sdkmanager output.
@@ -544,7 +557,9 @@
   function agyToast11(msg){ try { var d=document.createElement("div"); d.textContent=msg; d.style.cssText="position:fixed;left:12px;right:12px;bottom:24px;z-index:999999;background:#222;color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.4;"; document.body.appendChild(d); setTimeout(function(){ try{d.remove();}catch(e){} },6000); } catch(e){ try{alert(msg);}catch(e2){} } }
   /* AGY-P1-5-SELFTEST: диагностика нативного сохранения файлов */
   function selftestSave15() {
-    var txt = "AGY selftest " + new Date().toISOString() + "\nЕсли вы видите этот файл в Загрузках — нативный экспорт работает.\n";
+    var txt = "AGY selftest " + new Date().toISOString() + "\n" +
+      T("Если вы видите этот файл в Загрузках — нативный экспорт работает.",
+        "If you can see this file in Downloads — native export works.") + "\n";
     var blob = new Blob([txt], { type: "text/plain" });
     var fr = new FileReader();
     fr.onload = function () {
@@ -552,11 +567,12 @@
       var b64 = i >= 0 ? s.slice(i + 1) : s;
       var a = (window.AndroidBridge && window.AndroidBridge.saveBlob) ? window.AndroidBridge : (window.Android && window.Android.saveBlob ? window.Android : null);
       var tok = window.__AG_NATIVE_BRIDGE_TOKEN__ || (function () { try { return localStorage.getItem("agy_bridge_token") || null; } catch (e) { return null; } })();
-      if (!a || !tok) { alert("Мост недоступен: saveBlob=" + (!!a) + ", токен=" + (!!tok)); return; }
+      if (!a || !tok) { alert(T("Мост недоступен: saveBlob=", "Bridge unavailable: saveBlob=") + (!!a) + T(", токен=", ", token=") + (!!tok)); return; }
       try {
         a.saveBlob(tok, b64, "agy-selftest.txt", "text/plain");
-        alert("saveBlob вызван. Файл agy-selftest.txt должен появиться в Загрузках.");
-      } catch (e) { alert("Ошибка saveBlob: " + e); }
+        alert(T("saveBlob вызван. Файл agy-selftest.txt должен появиться в Загрузках.",
+                "saveBlob called. The file agy-selftest.txt should appear in Downloads."));
+      } catch (e) { alert(T("Ошибка saveBlob: ", "saveBlob error: ") + e); }
     };
     fr.onerror = function () { alert("FileReader failed"); };
     fr.readAsDataURL(blob);
@@ -604,7 +620,7 @@
           agyToast11(T("Обновления не требуются: все пакеты актуальны.", "Nothing to upgrade: all packages are up to date."));
           return;
         } else {
-          msg = T("Будет обновлено пакетов: ", "Packages to upgrade: ") + n + (mb > 0 ? ("\n" + T("Объём загрузки: ~", "Download size: ~") + mb + " МиБ") : "") + "\n\n" + T("Это может занять 10+ минут. Продолжить?", "This may take 10+ minutes. Continue?");
+          msg = T("Будет обновлено пакетов: ", "Packages to upgrade: ") + n + (mb > 0 ? ("\n" + T("Объём загрузки: ~", "Download size: ~") + mb + T(" МиБ", " MiB")) : "") + "\n\n" + T("Это может занять 10+ минут. Продолжить?", "This may take 10+ minutes. Continue?");
         }
         if (confirm(msg)) doUpgrade();
       };
@@ -1139,7 +1155,7 @@
           meta.style.cssText = "font-size:11px;color:#888;margin-top:2px;display:flex;gap:8px;align-items:center";
           var dateIcon = '<svg width="12" height="12" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
           var sizeIcon = '<svg width="12" height="12" fill="none" stroke="#888" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
-          meta.innerHTML = dateIcon + ' ' + ts + ' <span style="opacity:.5">·</span> ' + sizeIcon + ' ' + mb + ' МБ';
+          meta.innerHTML = dateIcon + ' ' + ts + ' <span style="opacity:.5">·</span> ' + sizeIcon + ' ' + mb + ' ' + esc(T("МБ", "MB"));
           info.appendChild(nameEl);
           info.appendChild(meta);
           row.appendChild(info);
@@ -1171,6 +1187,7 @@
 
   /* AGY-ABOUT: О приложении — три карточки: приложение, разработчик, обновления */
   function openAboutSection(hostEl) {
+    syncShellLang();
     if (!hostEl) return;
     if (hostEl.querySelector("[data-about-section]") && hostEl.children.length === 1) return;
     hostEl.innerHTML = "";
@@ -1212,7 +1229,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.1.1 fix";
+    appVer.textContent = "3.1.9";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1305,6 +1322,171 @@
     });
     wrap.appendChild(c2);
 
+    /* ── Card 3: Обновления + Changelog ── */
+    var CURRENT_VERSION = "3.1.9";
+    /* ── Changelog: окно тянет текст живьём с GitHub Releases ── */
+    var clOverlay = null;
+    function closeChangelog() {
+      if (clOverlay && clOverlay.parentNode) clOverlay.parentNode.removeChild(clOverlay);
+      clOverlay = null;
+    }
+    function b64utf8(b64) {
+      try {
+        var bin = atob(String(b64 || "").replace(/-/g, "+").replace(/_/g, "/"));
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        try { return new TextDecoder("utf-8").decode(bytes); } catch (e) { return bin; }
+      } catch (e) { return ""; }
+    }
+    function clLang() { return ru() ? "ru" : "en"; }
+    /* Парсит поток @@CLMETA / @@CLL / @@CLEND, который печатает op_changelog. */
+    function fetchChangelog(tag, cb) {
+      var b = bridge();
+      if (!b) { cb(null, "bridge"); return; }
+      var arg = clLang() + (tag ? "-" + String(tag).replace(/^v/i, "") : "");
+      var id = b.start("changelog", arg);
+      if (!id || /^ERR/.test(id)) { cb(null, "start"); return; }
+      pollStandalone(id, function (r) {
+        var log = String(r.log || "");
+        var em = /@@CLERR ([^\n]*)/.exec(log);
+        if (em) { cb(null, em[1].trim()); return; }
+        var out = [], cur = null;
+        var lines = log.split("\n");
+        for (var i = 0; i < lines.length; i++) {
+          var ln = lines[i];
+          if (ln.indexOf("@@CLMETA ") === 0) {
+            var p = ln.slice(9).trim().split(" ");
+            cur = { tag: b64utf8(p[0]), name: b64utf8(p[1]), date: b64utf8(p[2]), items: [] };
+            out.push(cur);
+          } else if (ln.indexOf("@@CLL ") === 0 && cur) {
+            var raw = b64utf8(ln.slice(6).trim());
+            if (raw.length >= 2) cur.items.push({ k: raw.charAt(0), v: raw.slice(2) });
+          } else if (ln.indexOf("@@CLEND") === 0) {
+            cur = null;
+          }
+        }
+        cb(out.length ? out : null, out.length ? null : "empty");
+      }, 0);
+    }
+
+    function openChangelog(tag) {
+      closeChangelog();
+      var ov = document.createElement("div");
+      ov.setAttribute("data-changelog-modal", "");
+      ov.setAttribute("data-agy-no-translate", "");
+      ov.style.cssText = "position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box";
+      ov.onclick = function (e) { if (e.target === ov) closeChangelog(); };
+
+      var sheet = document.createElement("div");
+      sheet.style.cssText = "width:100%;max-width:560px;max-height:84vh;background:var(--background,#141414);border:1px solid " + BORDER + ";border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.55)";
+
+      var head = document.createElement("div");
+      head.style.cssText = "display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid " + BORDER + ";flex-shrink:0";
+      var htxt = document.createElement("div");
+      htxt.style.cssText = "flex:1;min-width:0";
+      var h1 = document.createElement("div");
+      h1.style.cssText = "font-size:16px;font-weight:600;color:var(--foreground,#eee)";
+      h1.textContent = tag ? T("Что нового в " + tag, "What's new in " + tag) : T("История изменений", "Changelog");
+      var h2 = document.createElement("div");
+      h2.style.cssText = "font-size:11px;color:#777;margin-top:2px";
+      h2.textContent = T("Загружается с GitHub", "Fetched from GitHub");
+      htxt.appendChild(h1);
+      htxt.appendChild(h2);
+      head.appendChild(htxt);
+      var btnX = document.createElement("button");
+      btnX.style.cssText = "width:32px;height:32px;border:0;border-radius:10px;background:rgba(127,127,127,.14);color:#aaa;font-size:18px;line-height:1;cursor:pointer;flex-shrink:0";
+      btnX.textContent = "\u00d7";
+      btnX.onclick = closeChangelog;
+      head.appendChild(btnX);
+      sheet.appendChild(head);
+
+      var body = document.createElement("div");
+      body.style.cssText = "flex:1;overflow-y:auto;padding:14px 16px 20px;-webkit-overflow-scrolling:touch";
+      sheet.appendChild(body);
+
+      var loading = document.createElement("div");
+      loading.style.cssText = "display:flex;align-items:center;gap:10px;padding:24px 4px;color:#888;font-size:13px";
+      var spin0 = document.createElement("div");
+      spin0.style.cssText = "width:16px;height:16px;border:2px solid rgba(127,127,127,.3);border-top-color:" + ACCENT + ";border-radius:50%;animation:agy-usage-spin .7s linear infinite";
+      loading.appendChild(spin0);
+      var ltxt = document.createElement("span");
+      ltxt.textContent = T("Загрузка с GitHub…", "Loading from GitHub…");
+      loading.appendChild(ltxt);
+      body.appendChild(loading);
+
+      ov.appendChild(sheet);
+      document.body.appendChild(ov);
+      clOverlay = ov;
+
+      fetchChangelog(tag, function (releases, err) {
+        if (!clOverlay) return;
+        body.innerHTML = "";
+        if (!releases) {
+          var er = document.createElement("div");
+          er.style.cssText = "font-size:13px;color:#d64545;line-height:1.5;padding:12px 0";
+          er.textContent = T("Не удалось загрузить историю изменений. Проверьте подключение к сети.", "Could not load the changelog. Check your network connection.");
+          body.appendChild(er);
+          var hint = document.createElement("div");
+          hint.style.cssText = "font-size:12px;color:#777";
+          hint.textContent = err ? String(err) : "";
+          body.appendChild(hint);
+          return;
+        }
+        releases.forEach(function (rel) {
+          var card = document.createElement("div");
+          card.style.cssText = "padding:12px 0;border-bottom:1px solid " + BORDER;
+          var top = document.createElement("div");
+          top.style.cssText = "display:flex;align-items:baseline;gap:8px;margin-bottom:8px";
+          var tg = document.createElement("div");
+          tg.style.cssText = "font-size:15px;font-weight:600;color:" + ACCENT;
+          tg.textContent = rel.tag;
+          top.appendChild(tg);
+          var dt = document.createElement("div");
+          dt.style.cssText = "font-size:11px;color:#777";
+          dt.textContent = rel.date || "";
+          top.appendChild(dt);
+          card.appendChild(top);
+          rel.items.forEach(function (it) {
+            var el = document.createElement("div");
+            if (it.k === "H") {
+              el.style.cssText = "font-size:13px;font-weight:600;color:var(--foreground,#eee);margin:10px 0 4px";
+              el.textContent = it.v;
+            } else if (it.k === "B") {
+              el.style.cssText = "font-size:13px;line-height:1.5;color:var(--foreground,#ccc);padding-left:16px;position:relative;margin:3px 0";
+              var dot = document.createElement("span");
+              dot.style.cssText = "position:absolute;left:4px;top:7px;width:4px;height:4px;border-radius:50%;background:" + ACCENT + ";opacity:.8";
+              el.appendChild(dot);
+              el.appendChild(document.createTextNode(it.v));
+            } else if (it.k === "E") {
+              el.style.cssText = "height:6px";
+            } else {
+              el.style.cssText = "font-size:13px;line-height:1.55;color:var(--foreground,#bbb);margin:4px 0";
+              el.textContent = it.v;
+            }
+            card.appendChild(el);
+          });
+          if (!tag) {
+            var more = document.createElement("button");
+            more.style.cssText = "margin-top:10px;padding:7px 12px;border:1px solid " + BORDER + ";border-radius:10px;background:transparent;color:" + ACCENT + ";font-size:12px;cursor:pointer";
+            more.textContent = T("Читать полностью", "Read in full");
+            more.onclick = function () { openChangelog(rel.tag); };
+            card.appendChild(more);
+          }
+          body.appendChild(card);
+        });
+        var foot = document.createElement("div");
+        foot.style.cssText = "margin-top:14px";
+        var gh = document.createElement("a");
+        gh.href = "https://github.com/Leostrange/Leostryx/releases";
+        gh.target = "_blank";
+        gh.style.cssText = "font-size:12px;color:#777;text-decoration:underline";
+        gh.textContent = T("Все релизы на GitHub", "All releases on GitHub");
+        foot.appendChild(gh);
+        body.appendChild(foot);
+      });
+    }
+    window.__agyOpenChangelog = openChangelog;
+
     /* ── Card 3: Обновления ── */
     var c3 = makeCard();
     var updTitle = document.createElement("div");
@@ -1313,8 +1495,8 @@
     c3.appendChild(updTitle);
 
     var updStatus = document.createElement("div");
-    updStatus.style.cssText = "font-size:13px;color:#888;margin-bottom:12px;min-height:20px";
-    updStatus.textContent = T("Нажмите для проверки наличия обновлений.", "Tap to check for updates.");
+    updStatus.style.cssText = "font-size:13px;color:#888;margin-bottom:12px;min-height:20px;line-height:1.45";
+    updStatus.textContent = T("Версия " + CURRENT_VERSION + ". Нажмите для проверки обновлений.", "Version " + CURRENT_VERSION + ". Tap to check for updates.");
     c3.appendChild(updStatus);
 
     var btnUpd = document.createElement("button");
@@ -1324,10 +1506,38 @@
     btnUpd.textContent = T("Проверить обновления", "Check for updates");
     c3.appendChild(btnUpd);
 
-    var CURRENT_VERSION = "3.1.1 fix";
+    var btnHistory = document.createElement("button");
+    btnHistory.style.cssText = "width:100%;margin-top:8px;padding:11px;border:1px solid " + BORDER + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:13px;font-weight:500;cursor:pointer";
+    btnHistory.textContent = T("История изменений", "Changelog");
+    btnHistory.onclick = function () { openChangelog(null); };
+    c3.appendChild(btnHistory);
+
     var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
     var pendingApkUrl = null;
     var updState = "check"; // "check" | "available" | "downloading" | "ready"
+
+    /* Рядом с номером релиза — мини-кнопка, открывающая Changelog этого релиза. */
+    function showAvailable(tag, apkUrl) {
+      pendingApkUrl = apkUrl;
+      updState = "available";
+      updStatus.innerHTML = "";
+      var line = document.createElement("span");
+      line.textContent = T("Доступна новая версия: ", "Update available: ");
+      updStatus.appendChild(line);
+      var tg = document.createElement("span");
+      tg.style.cssText = "color:" + ACCENT + ";font-weight:600";
+      tg.textContent = tag;
+      updStatus.appendChild(tg);
+      var info = document.createElement("button");
+      info.style.cssText = "margin-left:6px;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;border:1px solid " + BORDER + ";background:rgba(11,132,255,.12);color:" + ACCENT + ";font-size:11px;font-weight:700;cursor:pointer;vertical-align:middle;padding:0;line-height:1";
+      info.textContent = "i";
+      info.title = T("Что нового", "What's new");
+      info.onclick = function (e) { e.stopPropagation(); openChangelog(tag); };
+      updStatus.appendChild(info);
+      btnUpd.textContent = T("Скачать обновление (" + tag + ")", "Download update (" + tag + ")");
+      btnUpd.style.background = ACCENT;
+      btnUpd.disabled = false;
+    }
 
     function triggerInstall(apkPath) {
       var p = apkPath || downloadedApkPath;
@@ -1350,8 +1560,10 @@
       }
 
       if (updState === "ready") {
-        updStatus.textContent = T("Запуск установщика пакетов…", "Launching package installer…");
-        triggerInstall(downloadedApkPath);
+        updStatus.textContent = T("Запуск системного установщика…", "Launching the system installer…");
+        if (!triggerInstall(downloadedApkPath)) {
+          updStatus.textContent = T("Не удалось открыть установщик. APK лежит в Download/update-temp.apk.", "Could not open the installer. The APK is at Download/update-temp.apk.");
+        }
         return;
       }
 
@@ -1364,7 +1576,7 @@
         var stx = document.createElement("span");
         stx.textContent = T(" Проверяем…", " Checking…");
         btnUpd.appendChild(stx);
-        updStatus.textContent = "";
+        updStatus.textContent = T("Проверка обновлений на GitHub…", "Checking GitHub for updates…");
 
         var id = b.start("updatecheck", "");
         if (!id || /^ERR/.test(id)) {
@@ -1381,14 +1593,11 @@
             var tag = m[1], apkUrl = m[3];
             var cleanTag = tag.replace(/^v/, "");
             if (cleanTag === CURRENT_VERSION) {
-              updStatus.textContent = T("Установлена актуальная версия (" + CURRENT_VERSION + ").", "Latest version is installed (" + CURRENT_VERSION + ").");
+              updStatus.textContent = T("Установлена актуальная версия (" + CURRENT_VERSION + ").", "The latest version is installed (" + CURRENT_VERSION + ").");
               btnUpd.textContent = T("Проверить обновления", "Check for updates");
               updState = "check";
             } else {
-              pendingApkUrl = apkUrl;
-              updState = "available";
-              updStatus.textContent = T("Доступна новая версия: ", "Update available: ") + tag;
-              btnUpd.textContent = T("Скачать обновление (" + tag + ")", "Download update (" + tag + ")");
+              showAvailable(tag, apkUrl);
             }
           } else {
             updStatus.textContent = T("Не удалось проверить обновления.", "Could not check for updates.");
@@ -1403,7 +1612,7 @@
         if (!pendingApkUrl) return;
         btnUpd.disabled = true;
         btnUpd.textContent = T("Скачивание… 0%", "Downloading… 0%");
-        updStatus.textContent = T("Загрузка APK…", "Downloading APK…");
+        updStatus.textContent = T("Загрузка APK… Прогресс также виден в шторке уведомлений.", "Downloading APK… Progress is also shown in the notification shade.");
         updState = "downloading";
 
         var dlId = b.start("updatedownload", pendingApkUrl);
@@ -1415,52 +1624,53 @@
           return;
         }
 
-        /* Continuous progress polling with smooth interpolation */
+        /* b.read() возвращает JSON {"log": "...", "rc": ...} — разбираем его,
+           иначе экранированные \n не находятся и берётся самое первое значение
+           прогресса (отсюда прежние «5–7%, а потом сразу готово»). */
         var dlTarget = 0, dlShown = 0;
         var dlSmoothTimer = setInterval(function () {
           if (dlShown < dlTarget) {
-            dlShown = Math.min(dlTarget, dlShown + Math.max(1, Math.ceil((dlTarget - dlShown) / 4)));
+            dlShown = Math.min(dlTarget, dlShown + Math.max(1, Math.ceil((dlTarget - dlShown) / 5)));
             btnUpd.textContent = T("Скачивание… " + dlShown + "%", "Downloading… " + dlShown + "%");
+            updStatus.textContent = T("Загрузка APK: " + dlShown + "% (прогресс виден в шторке)", "Downloading APK: " + dlShown + "% (progress is in the notification shade)");
           }
-        }, 100);
+        }, 120);
         var dlPollTimer = setInterval(function () {
-          var chunk = b.read(dlId);
-          if (chunk) {
-            var lines = chunk.split("\n");
-            for (var i = lines.length - 1; i >= 0; i--) {
-              var pm = /@@UPDPROGRESS (\d+) (\d+)/.exec(lines[i]);
-              if (pm) {
-                var done = parseInt(pm[1], 10);
-                var total = parseInt(pm[2], 10);
-                if (total > 0) {
-                  dlTarget = Math.min(100, Math.round((done * 100) / total));
-                }
-                break;
-              }
-            }
+          var parsed = null;
+          try { parsed = JSON.parse(b.read(dlId) || "{}"); } catch (_) {}
+          var log = (parsed && parsed.log) ? String(parsed.log) : "";
+          if (!log) return;
+          var found = null, re = /@@UPDPROGRESS (\d+) (\d+)/g, mm;
+          while ((mm = re.exec(log)) !== null) { found = mm; }   /* берём ПОСЛЕДНЕЕ значение */
+          if (!found) return;
+          var done = parseInt(found[1], 10), total = parseInt(found[2], 10);
+          if (total > 0) {
+            dlTarget = Math.min(99, Math.round((done * 100) / total));
+          } else if (done > 0) {
+            dlTarget = Math.min(95, dlTarget + 1);
           }
-        }, 250);
+        }, 300);
 
         pollStandalone(dlId, function (r2) {
           clearInterval(dlPollTimer);
           clearInterval(dlSmoothTimer);
           dlShown = dlTarget = 100;
-          var log = r2.log || "";
+          var log = String(r2.log || "");
           if (log.indexOf("@@UPDOK installed") >= 0) {
             btnUpd.disabled = false;
+            btnUpd.style.background = "#30d158";
             btnUpd.textContent = T("Обновлено! Перезапустить", "Updated! Restart");
             btnUpd.onclick = function() { location.reload(); };
             updStatus.textContent = T("Обновление успешно установлено!", "Update successfully installed!");
             updState = "done";
-          } else if (log.indexOf("@@UPDREADY") >= 0 || log.indexOf("@@UPD manual") >= 0 || log.indexOf("@@UPDOK") >= 0) {
+          } else if (log.indexOf("@@UPDREADY") >= 0) {
             var rm = /@@UPDREADY (\S+)/.exec(log);
             if (rm && rm[1]) downloadedApkPath = rm[1];
             btnUpd.disabled = false;
             btnUpd.style.background = "#30d158";
             btnUpd.textContent = T("Обновить и установить", "Update & install");
-            updStatus.textContent = T("Загрузка завершена! Запуск установщика…", "Download complete! Launching installer…");
+            updStatus.textContent = T("Загрузка завершена. Запускаю системный установщик…", "Download complete. Launching the system installer…");
             updState = "ready";
-            /* Automatically launch the system package installer! */
             triggerInstall(downloadedApkPath);
           } else {
             updStatus.textContent = T("Ошибка загрузки.", "Download error.");
@@ -1624,6 +1834,7 @@
   window.__agyFeedbackMount = openFeedbackSection;
 
   window.__agyToolsMount = function (el) {
+    syncShellLang();
     if (!el) return;
     host = el;
     if (root && root.parentElement === el && el.children.length === 1) return;

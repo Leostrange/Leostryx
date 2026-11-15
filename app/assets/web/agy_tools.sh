@@ -10,6 +10,37 @@ OP="${1:-}"
 shift 1 2>/dev/null || true
 ARG="$*"
 
+# Язык интерфейса. Приложение пишет его в "$HOME/.agy_lang" (op setlang) при
+# каждом монтировании настроек, поэтому фоновые операции (уведомления в шторке,
+# сообщения об ошибках) говорят на том же языке, что и остальной UI.
+AGY_LANG="${AGY_LANG:-}"
+if [ -z "$AGY_LANG" ]; then
+    AGY_LANG="$(head -c 8 "$HOME/.agy_lang" 2>/dev/null || true)"
+fi
+case "$AGY_LANG" in
+    ru|en) ;;
+    *)
+        case "${LANG:-}" in
+            ru*|*_RU*) AGY_LANG="ru" ;;
+            *)         AGY_LANG="ru" ;;
+        esac
+        ;;
+esac
+export AGY_LANG
+
+# L "русский" "english" — выбрать строку под текущий язык интерфейса.
+L() {
+    if [ "$AGY_LANG" = "en" ]; then printf '%s' "$2"; else printf '%s' "$1"; fi
+}
+
+op_setlang() {
+    case "${ARG:-}" in
+        ru|en) printf '%s' "$ARG" > "$HOME/.agy_lang" 2>/dev/null || true ;;
+        *) : ;;
+    esac
+    say "@@LANG $AGY_LANG"
+}
+
 SDK="$HOME/android-sdk"
 CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
 NDK_REPO="lzhiyong/termux-ndk"
@@ -3160,57 +3191,275 @@ PYUC
 }
 
 # AGY-UPDATE: скачивание и установка APK
+#
+# Уведомления в шторке: само приложение постить их не может
+# (`cmd notification post` -> permission denied, callingUid=app), поэтому всё
+# идёт через Shizuku (`rish -c`, uid=2000). Прогресс дополнительно пишется в
+# файл `<apk>.progress`, чтобы UI мог читать его независимо от лога задачи
+# (лог обрезается до 24 КБ хвоста в AgyTools.read()).
 op_updatedownload() {
-    AGY_APKURL="$ARG" python3 - << 'PYUD'
-import os, sys, subprocess, urllib.request, ssl
+    AGY_LANG="$AGY_LANG" AGY_APKURL="$ARG" python3 - <<'PYUD'
+import os, re, sys, subprocess, urllib.request, ssl
 url = os.environ.get("AGY_APKURL", "").strip()
+EN = (os.environ.get("AGY_LANG") or "ru").strip() == "en"
+def L(ru, en):
+    return en if EN else ru
 if not url.startswith("https://"):
     print("@@UPD ERR:bad url", flush=True); sys.exit(1)
 dst = "/storage/emulated/0/Download/update-temp.apk"
+prog = dst + ".progress"
+pkg = (os.environ.get("AGY_APPLICATION_ID") or "com.agyru.t2").strip()
+
+NOTIF_TITLE = "Leostryx \u2014 " + L("\u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "update")
+NOTIF_INSTALL = "Leostryx \u2014 " + L("\u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430", "installation")
+
+def _rish(cmd, timeout=15):
+    try:
+        subprocess.run(["rish", "-c", cmd], capture_output=True, text=True, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+def _safe(s):
+    s = re.sub(r'[^0-9A-Za-z\u0410-\u044f\u0401\u0451 .,:;!?%()\-/+_=#]', ' ', str(s))
+    return " ".join(s.split())[:140]
+
+def notify(tag, title, text):
+    _rish('cmd notification post -S bigtext -t "%s" %s "%s"' % (_safe(title)[:60], tag, _safe(text)))
+
+def notify_cancel(tag):
+    _rish("cmd notification cancel " + tag, timeout=10)
+
+# Без этого appop системный установщик молча игнорирует ACTION_VIEW на .apk.
+_rish("appops set %s REQUEST_INSTALL_PACKAGES allow" % pkg, timeout=20)
+
+pf = None
+try:
+    with open(prog, "w") as pf:
+        pf.write("0 0")
+        pf.flush()
+except Exception:
+    pf = None
+
 print("@@UPD downloading...", flush=True)
+notify("leostryx_update", NOTIF_TITLE, L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430: 0%", "Downloading: 0%"))
 ctx = ssl._create_unverified_context()
 try:
     req = urllib.request.Request(url, headers={"User-Agent": "Antigravity-App"})
     with urllib.request.urlopen(req, timeout=180, context=ctx) as r, open(dst, "wb") as f:
-        total = int(r.headers.get("Content-Length", 0))
+        total = int(r.headers.get("Content-Length", 0) or 0)
         done = 0
+        last_pct = -10
+        milestone = 0
         while True:
-            chunk = r.read(262144)
+            chunk = r.read(131072)
             if not chunk: break
             f.write(chunk)
             done += len(chunk)
             if total > 0:
                 print("@@UPDPROGRESS %d %d" % (done, total), flush=True)
+                pct = int(done * 100 / total)
+                if pct >= last_pct + 5:
+                    last_pct = pct
+                    notify("leostryx_update", NOTIF_TITLE,
+                           L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 %d%%  (%d / %d \u041c\u0411)",
+                             "Downloading %d%%  (%d / %d MB)")
+                           % (pct, done // 1048576, total // 1048576))
+            else:
+                # Content-Length не пришёл (chunked): отчитываемся по 10 МБ
+                mb = done // (10 * 1048576)
+                if mb > milestone:
+                    milestone = mb
+                    print("@@UPDPROGRESS %d 0" % done, flush=True)
+                    notify("leostryx_update", NOTIF_TITLE,
+                           L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 %d \u041c\u0411", "Downloading %d MB")
+                           % (done // 1048576))
+            if pf:
+                try:
+                    pf.seek(0); pf.truncate()
+                    pf.write("%d %d" % (done, total)); pf.flush()
+                except Exception:
+                    pass
+    if pf:
+        try: pf.close()
+        except Exception: pass
     sz = os.path.getsize(dst)
     print("@@UPD downloaded %d" % sz, flush=True)
-    installed = False
-    try:
-        r = subprocess.run(["rish", "-c", "pm install -r " + dst], capture_output=True, text=True, timeout=60)
-        out = (r.stdout + r.stderr).strip()
-        if r.returncode == 0 or "Success" in out:
-            installed = True
-    except Exception:
-        pass
-    if not installed:
-        try:
-            r = subprocess.run(["pm", "install", "-r", dst], capture_output=True, text=True, timeout=60)
-            out = (r.stdout + r.stderr).strip()
-            if r.returncode == 0 or "Success" in out:
-                installed = True
-        except Exception:
-            pass
-    if installed:
-        print("@@UPDOK installed", flush=True)
-    else:
-        # Fallback intent via rish
-        try:
-            subprocess.run(["rish", "-c", "am start -a android.intent.action.VIEW -d file://" + dst + " -t application/vnd.android.package-archive --grant-read-uri-permission"], capture_output=True, text=True, timeout=10)
-        except Exception:
-            pass
-        print("@@UPDREADY " + dst, flush=True)
+    notify_cancel("leostryx_update")
+    # Установку делает системный установщик Android: JS-сторона сразу после
+    # @@UPDREADY вызывает AgyTools.installApk() -> ACTION_VIEW с FileProvider.
+    # Тихая установка через `rish pm install` намеренно не используется.
+    notify("leostryx_ready", NOTIF_TITLE, L("\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0435", "Ready to install"))
+    print("@@UPDREADY " + dst, flush=True)
 except Exception as e:
+    notify_cancel("leostryx_update")
+    if pf:
+        try: pf.close()
+        except Exception: pass
     print("@@UPD ERR", e, flush=True)
 PYUD
+}
+
+# AGY-UPDATE: чтение прогресса загрузки из файла-маркера (страховка для UI,
+# если лог задачи уже обрезан по 24 КБ хвосту)
+op_updprogress() {
+    local f="/storage/emulated/0/Download/update-temp.apk.progress"
+    if [ -f "$f" ]; then
+        echo "@@P $(tr -s ' \n' '  ' < "$f" 2>/dev/null)"
+    else
+        echo "@@P 0 0"
+    fi
+}
+
+# AGY-CHANGELOG: история изменений подтягивается живьём с GitHub Releases.
+# Тело релиза хранит оба языка в маркерах:
+#     <!-- RU --> ...русский текст... <!-- /RU -->
+#     <!-- EN --> ...english text... <!-- /EN -->
+# Если маркеров нет, тело считается русским (совместимость со старыми релизами).
+# ARG: "ru" | "en"  — список последних релизов (короткие тела);
+#      "ru-3.1.8" | "en-3.1.8" — один релиз целиком;
+#      суффикс/слово "fresh" — игнорировать локальный кеш.
+op_changelog() {
+    AGY_CL_ARG="${ARG:-ru}" python3 - <<'PYCL'
+import os, sys, re, ssl, json, base64, urllib.request
+
+arg = (os.environ.get("AGY_CL_ARG") or "ru").strip().lower()
+home = os.environ.get("HOME") or "/data/user/0/com.agyru.t2/files"
+cache = os.path.join(home, ".agy_changelog.json")
+api = "https://api.github.com/repos/Leostrange/Leostryx/releases?per_page=30"
+
+force = "fresh" in arg
+arg = arg.replace("fresh", "").strip("-") or "ru"
+parts = arg.split("-", 1)
+lang = "en" if parts[0].startswith("en") else "ru"
+want = parts[1] if len(parts) > 1 else ""
+
+def load_remote():
+    ctx = ssl._create_unverified_context()
+    req = urllib.request.Request(api, headers={
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "Leostryx-App",
+    })
+    raw = urllib.request.urlopen(req, timeout=15, context=ctx).read()
+    data = json.loads(raw)
+    out = []
+    for r in data:
+        if r.get("draft"):
+            continue
+        out.append({
+            "tag": str(r.get("tag_name") or "").strip(),
+            "name": str(r.get("name") or r.get("tag_name") or "").strip(),
+            "date": str(r.get("published_at") or "")[:10],
+            "body": str(r.get("body") or ""),
+            "url": str(r.get("html_url") or ""),
+        })
+    return [x for x in out if x["tag"]]
+
+def load_cache():
+    try:
+        with open(cache, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        if isinstance(d, list) and d:
+            return d
+    except Exception:
+        pass
+    return []
+
+rels = [] if force else load_cache()
+if not rels:
+    try:
+        rels = load_remote()
+        try:
+            with open(cache, "w", encoding="utf-8") as f:
+                json.dump(rels, f, ensure_ascii=False)
+        except Exception:
+            pass
+    except Exception as e:
+        rels = load_cache()
+        if not rels:
+            print("@@CLERR " + str(e).replace("\n", " ")[:110])
+            sys.exit(0)
+
+MARK = re.compile(r"^[ \t]*<!--\s*(RU|EN)\s*-->[ \t]*$(.*?)^[ \t]*<!--\s*/\1\s*-->[ \t]*$",
+                  re.S | re.M | re.I)
+
+def split_lang(body):
+    got = {}
+    for m in MARK.finditer(body):
+        got.setdefault(m.group(1).upper(), m.group(2))
+    if got:
+        return (got.get("RU") or got.get("EN") or ""), (got.get("EN") or "")
+    return body, ""
+
+def plain(md):
+    t = md.replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"<!--.*?-->", "", t, flags=re.S)
+    t = re.sub(r"^```[A-Za-z0-9_+-]*\s*$", "", t, flags=re.M)
+    t = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"<br\s*/?>", "\n", t, flags=re.I)
+    t = re.sub(r"</?[A-Za-z][^>]*>", "", t)
+    for a, b in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'")):
+        t = t.replace(a, b)
+    t = t.replace("**", "").replace("__", "").replace("\u2192", "->")
+    out = []
+    for line in t.split("\n"):
+        st = line.strip()
+        if not st:
+            if out and out[-1][0] != "E":
+                out.append(("E", ""))
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*)$", st)
+        if m:
+            out.append(("H", m.group(2).strip().rstrip(":")))
+            continue
+        m = re.match(r"^[-*+\u2022]\s+(.*)$", st)
+        if m:
+            out.append(("B", m.group(1).strip()))
+            continue
+        m = re.match(r"^\d+[.)]\s+(.*)$", st)
+        if m:
+            out.append(("B", m.group(1).strip()))
+            continue
+        out.append(("P", st))
+    while out and out[-1][0] == "E":
+        out.pop()
+    return out
+
+def b64(s):
+    return base64.b64encode(s.encode("utf-8")).decode("ascii")
+
+def emit(items, cap):
+    for r in items:
+        ru, en = split_lang(r["body"])
+        txt = (en if (lang == "en" and en) else ru) or ""
+        if lang == "en" and not en:
+            txt = ru  # английского ещё нет в этом релизе — показываем что есть
+        lines = plain(txt)
+        used, kept = 0, []
+        for kind, val in lines:
+            if used + len(val) > cap:
+                kept.append(("E", ""))
+                kept.append(("P", "\u2026"))
+                break
+            kept.append((kind, val))
+            used += len(val)
+        print("@@CLMETA %s %s %s" % (b64(r["tag"]), b64(r["name"]), b64(r["date"] or "-")))
+        for kind, val in kept:
+            print("@@CLL " + b64(kind + "\t" + val))
+        print("@@CLEND")
+    print("@@CLDONE")
+
+if want:
+    sel = [r for r in rels if r["tag"].lstrip("vV").lower() == want.lstrip("vV").lower()
+           or r["tag"].lower() == want.lower()]
+    if not sel:
+        print("@@CLERR not found: " + want[:40])
+        sys.exit(0)
+    emit(sel[:1], 14000)
+else:
+    emit(rels[:12], 700)
+PYCL
 }
 
 # ------------------------------------------------------------ power / doze
@@ -3292,6 +3541,9 @@ case "$OP" in
     bkdelete)       op_bkdelete ;;  # AGY-BACKUP
     updatecheck)    op_updatecheck ;; # AGY-UPDATE
     updatedownload) op_updatedownload ;; # AGY-UPDATE
+    updprogress)    op_updprogress ;;    # AGY-UPDATE
+    changelog)      op_changelog ;;      # AGY-CHANGELOG
+    setlang)        op_setlang ;;        # язык интерфейса для фоновых операций
     pdfin)          op_pdfin ;;  # AGY-P2-19
     pdf)            op_pdf ;;    # AGY-P2-19
     status)         op_status ;;
