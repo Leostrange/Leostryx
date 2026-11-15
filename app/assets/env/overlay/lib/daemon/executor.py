@@ -44,13 +44,20 @@ RUNNING_LOCK = threading.Lock()
 def log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{ts}] {msg}"
-    print(formatted, flush=True)
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(formatted + "\n")
     except Exception:
         pass
+    # daemonize() dup2()s stdout onto LOG_FILE. Printing as well would append
+    # every line a second time, which made a single loop look like two.
+    try:
+        redirected = os.path.realpath("/proc/self/fd/1") == os.path.realpath(LOG_FILE)
+    except OSError:
+        redirected = False
+    if not redirected:
+        print(formatted, flush=True)
 
 
 def notify(title, message, tag=None):

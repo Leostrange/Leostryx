@@ -185,5 +185,28 @@ Termux-built components hardcode `/data/data/com.termux/...` paths or ship glibc
 
 - **`agy-fix-flutter`** — run after `flutter upgrade`, `flutter pub get` (a new `platform-x.y.z` lands in pub-cache) or a Gradle reset, and whenever Flutter reports `Unsupported host platform` / `Unsupported operating system`. It swaps `flutter_sdk/bin/cache/dart-sdk` to the bionic `pkg install dart` build (original kept as `dart-sdk.glibc`, only when versions match), patches `os.dart` / `platform.dart` / pub-cache `local_platform.dart`, invalidates `flutter_tools.snapshot`, fixes `~/.gradle/gradle.properties` JVM paths and removes a broken `~/.gradle/native`.
 - **`jadx-agy`** — use INSTEAD of plain `jadx` when decompiling: injects `-Duser.home` / `-Djava.io.tmpdir` (the Termux-JDK defaults are inaccessible from this sandbox) and `-Xmx1500m` so large APKs are not OOM-killed (exit 137). Recommended flags: `-j 2 --no-res`; note `--single-class-thread` does not exist in jadx 1.5.x. Harmless `res/*.9.png` decode warnings from obfuscated APKs do not affect smali/manifest.
-- Every other Java tool (apktool, d8, apksigner, jadx-gui, Gradle client/daemon) receives the same sandbox paths automatically through `$PREFIX/etc/profile.d/65-agy-jvm.sh` (`JAVA_TOOL_OPTIONS`); `agy-fix-paths` re-creates that file if missing.
-- Full reference documents: `docs/flutter-toolchain.md` and `docs/jadx-fixes.md` in the repository.
+- Every other Java tool (apktool, d8, apksigner, jadx-gui, Gradle client/daemon) receives the same sandbox paths automatically through `$PREFIX/etc/profile.d/65-agy-jvm.sh` (`JAVA_TOOL_OPTIONS`), which also exports `-Djavax.net.ssl.trustStore` together with `-Djavax.net.ssl.trustStorePassword=changeit`. Without that password the PKCS12 store loads with zero trust anchors and every Gradle/Maven HTTPS request fails with `the trustAnchors parameter must be non-empty`. `agy-fix-paths` rewrites the profile whenever its `JVM-TRUSTSTORE-FIX-v2` marker is missing.
+- Full reference documents: `docs/flutter-toolchain.md`, `docs/jadx-fixes.md` and `docs/gradle-agp-toolchain.md` in the repository.
+
+---
+
+## 9. Gradle & AGP (multi-version toolchain)
+
+Several Gradle distributions and several Android Gradle Plugin versions coexist on the device; the project decides which one is used.
+
+- **Never run `./gradlew`.** `/bin/sh` does not exist on Android and the wrapper download fails. Use `gradle -p <project> <task> --no-daemon`.
+- **Gradle:** distributions live in `$HOME/gradle-dist/gradle-<ver>` and `$PREFIX/bin/gradle` is a symlink to the active one. Check `gradle --version` instead of assuming a version. Switching between already-downloaded versions is instant — never re-download to "fix" one.
+- **AGP:** artifacts live in `$HOME/.gradle/caches/modules-2/files-2.1/com.android.tools.build/gradle/<ver>`. Once fetched, builds resolve them from the cache, `--offline` included. The selected version is stored in `~/.gemini/config/agy-agp.state` and mirrored as a `# AGY-AGP:` note in `AGENTS.md`.
+- **Per-project pinning:** put `.agy-toolchain` in the project root:
+
+  ```
+  gradle=8.14.7
+  agp=8.7.3
+  ```
+
+  Resolution order: `.agy-toolchain` → `gradle/wrapper/gradle-wrapper.properties` → `# AGY-AGP:` note → latest stable. Never silently rewrite a project's `build.gradle`.
+- **Compatibility:** AGP 8.x → Gradle ≥ 8.9, JDK 17. AGP 9.x → Gradle ≥ 9.1, JDK 17+.
+- **Install / switch** from `Settings › Tools › Gradle & AGP` or headlessly:
+  `bash $HOME/web/agy_tools.sh agp "8.7.3 9.0.0 9.1.1"` and `bash $HOME/web/agy_tools.sh gradle "8.14.7 auto"`.
+- **Verify** with `bash $HOME/web/agy_tools.sh verify jvm,agp,gradle` — `jvm` probes that the truststore really has trust anchors, `agp` that at least one AGP version is cached.
+- **`agy-selfheal`** repairs the whole toolchain (environment profile, bridges, Gradle symlink, AGP state/note pair, `AGENTS.md` blocks) and runs hourly through `agy-daemon`. Run it manually after an app update, or when `gradle`/AGP suddenly break — do not reinstall packages to fix a symlink.

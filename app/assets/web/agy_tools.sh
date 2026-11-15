@@ -51,6 +51,51 @@ say()  { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
 fail() { printf '@@error %s\n' "$*"; exit 1; }
 
+# jvm_env_ensure — guarantee the JVM sandbox flags even in a stale shell.
+# $PREFIX/etc/profile.d/65-agy-jvm.sh only runs for fresh login shells. The
+# AgyTools bridge and the background daemon inherit whatever environment the
+# app had at launch, and before this fix that environment carried
+# -Duser.home but NOT -Djavax.net.ssl.trustStore. The JVM then falls back to a
+# bundled cacerts it cannot open (PKCS12 protected by "changeit", default
+# password is empty) -> ZERO trust anchors -> every Gradle/Maven HTTPS call
+# dies with "the trustAnchors parameter must be non-empty".
+# Repair it in-process so downloads work no matter how we were started.
+jvm_env_ensure() {
+    local c store="" pass="" magic add=""
+    for c in "${JAVA_HOME:-}/lib/security/cacerts" \
+             "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
+             "$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts" \
+             "$PREFIX/etc/tls/certs/java/cacerts"
+    do
+        [ -f "$c" ] || continue
+        store="$c"
+        magic="$(od -An -tx1 -N4 "$c" 2>/dev/null | tr -d ' \n')"
+        case "$magic" in
+            feedfeed) pass="" ;;        # JKS keeps the default (empty) password
+            *)        pass="changeit" ;; # Termux PKCS12 stores
+        esac
+        break
+    done
+    case "${JAVA_TOOL_OPTIONS:-}" in
+        *-Duser.home=*) : ;;
+        *) add="$add -Duser.home=$HOME" ;;
+    esac
+    case "${JAVA_TOOL_OPTIONS:-}" in
+        *-Djava.io.tmpdir=*) : ;;
+        *) add="$add -Djava.io.tmpdir=$PREFIX/tmp" ;;
+    esac
+    if [ -n "$store" ]; then
+        case "${JAVA_TOOL_OPTIONS:-}" in
+            *-Djavax.net.ssl.trustStore=*) : ;;
+            *) add="$add -Djavax.net.ssl.trustStore=$store -Djavax.net.ssl.trustStorePassword=$pass" ;;
+        esac
+    fi
+    if [ -n "$add" ]; then
+        export JAVA_TOOL_OPTIONS="${add# }${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"
+    fi
+}
+jvm_env_ensure
+
 # pkg_retry <cmd...> — retry a pkg/network command on transient failures.
 # Mobile/VPN links routinely reset connections (curl error 35 "Recv failure"),
 # which pkg surfaces as "download failed"; most installs succeed on a retry.
@@ -164,8 +209,9 @@ ensure_index() {
 }
 
 write_env() {
-    mkdir -p "$(dirname "$ENVF")"
-    cat > "$ENVF" <<EOF
+    mkdir -p "$(dirname "$ENVF")" "$PREFIX/tmp"
+    local env_tmp="$PREFIX/tmp/.agy-envf-$$-$RANDOM" changed=0
+    cat > "$env_tmp" <<EOF
 # Written by Settings › Tools. Android SDK / NDK / Java for shells and Gradle.
 export ANDROID_HOME="$SDK"
 export ANDROID_SDK_ROOT="$SDK"
@@ -178,9 +224,18 @@ for _d in "$SDK"/ndk/*/; do [ -d "\$_d" ] && export ANDROID_NDK_HOME="\${_d%/}" 
 [ -d "$HOME/flutter_sdk/bin" ] && export PATH="$HOME/flutter_sdk/bin:\$PATH" && export FLUTTER_ROOT="$HOME/flutter_sdk"
 export GRADLE_USER_HOME="\$HOME/.gradle"
 EOF
+    # Only touch the file when the content really differs: selfheal counts a
+    # repair by exit status, and an unconditional rewrite never reaches fixed=0.
+    if cmp -s "$env_tmp" "$ENVF"; then
+        rm -f "$env_tmp"
+    else
+        mv -f "$env_tmp" "$ENVF" 2>/dev/null || { rm -f "$env_tmp"; fail "write $ENVF"; }
+        changed=1
+    fi
     mkdir -p "$HOME/.gradle" "$PREFIX/tmp"
-    local gp="$HOME/.gradle/gradle.properties"
+    local gp="$HOME/.gradle/gradle.properties" gp_before="$PREFIX/tmp/.agy-gp-$$-$RANDOM"
     touch "$gp"
+    cp -f "$gp" "$gp_before" 2>/dev/null || : > "$gp_before"
     if [ -x "$PREFIX/bin/aapt2" ]; then
         grep -q '^android.aapt2FromMavenOverride=' "$gp" \
             && sed -i "s#^android.aapt2FromMavenOverride=.*#android.aapt2FromMavenOverride=$PREFIX/bin/aapt2#" "$gp" \
@@ -209,6 +264,7 @@ EOF
 - Build with \`gradle assembleDebug --no-daemon\` or \`bash ./gradlew assembleDebug --no-daemon\` (never \`./gradlew\`: /bin/sh does not exist on Android).
 - node, npm, java, gradle, sdkmanager, ndk-build, npm global CLIs have bridges in runtime/bin that load this environment automatically.
 EOF
+        changed=1
     fi
     if [ -f "$AGENTS" ] && ! grep -q 'AGY-KMP-COMPAT' "$AGENTS"; then
         cat >> "$AGENTS" <<'EOF'
@@ -219,7 +275,12 @@ EOF
 - When an older KMP androidTarget() project encounters AGP 9 new-DSL or built-in Kotlin conflicts, consult project compatibility and consider android.newDsl=false and android.builtInKotlin=false in that project's gradle.properties. Do not set them globally.
 - For Gradle launcher issues on Android, check JAVA_TOOL_OPTIONS for user.home and java.io.tmpdir and use the configured Gradle bridge; keep project JVM options and build logs for diagnosis.
 EOF
+        changed=1
     fi
+    # gradle.properties may have gained keys or JVM paths above.
+    cmp -s "$gp_before" "$gp" || changed=1
+    rm -f "$gp_before"
+    [ "$changed" -eq 1 ]
 }
 
 # ------------------------------------------------------------ agent bridges
@@ -376,6 +437,10 @@ op_status() {
         ;; esac
     fi
     [ -n "$ga" ] && say "@@agp-active $ga"
+    local ac
+    for ac in $(agp_cached_versions); do
+        say "@@agp-cached $ac"
+    done
     local IDX="$PREFIX/var/lib/pkg/index" DB="$PREFIX/var/lib/pkg/installed"
     # Ensure TSV index exists if Packages file is available; fetch index if missing
     if [ -z "$(ls "$IDX"/repo.*.tsv 2>/dev/null)" ]; then
@@ -795,6 +860,9 @@ op_repairbt() {
 # ------------------------------------------------------------ gradle/agp
 GRDIST="$HOME/gradle-dist"
 AGP_STATE="$HOME/.gemini/config/agy-agp.state" # selected AGP version; survives AGENTS.md rewrites
+AGP_CACHE="$HOME/.gradle/caches/modules-2/files-2.1/com.android.tools.build/gradle"
+AGENTS_TEMPLATE="$AGENTS"                       # shipped rules, re-copied on reset
+AGENTS_LIVE="$HOME/.gemini/config/AGENTS.md"    # rules the agent reads right now
 agp_read_state() { # -> prints selected AGP version or ""
     local v=""
     [ -r "$AGP_STATE" ] && v="$(tr -d '[:space:]' < "$AGP_STATE" 2>/dev/null)"
@@ -803,31 +871,161 @@ agp_read_state() { # -> prints selected AGP version or ""
 GRADLE_URL_VER() { # version -> distribution URL
     printf 'https://services.gradle.org/distributions/gradle-%s-bin.zip' "$1"
 }
-gradle_write_agents_note() { # agp-version, gradle-min, jdk
-    local agp="$1" gmin="$2" jdk="$3"
-    local note="# AGY-AGP: $agp"
-    local block
-    block="$(printf '## Android Gradle Plugin (выбрано в Инструментах)\n- AGP: %s (минимальный Gradle: %s, JDK: %s)\n- В проекте: plugins { id '"'"'com.android.application'"'"' version '"'"'%s'"'"' }\n- %s ставится через Инструменты › Gradle & AGP › Gradle (симлинк $PREFIX/bin/gradle переключается на выбранную версию).\n' "$agp" "$gmin" "$jdk" "$agp" "$gmin")"
-    local f="$HOME/AGENTS.md" tmp
-    if [ -f "$f" ] && grep -q '^# AGY-AGP:' "$f"; then
-        tmp="$PREFIX/tmp/agy-agp-$$"
-        awk -v n="$note" -v b="$block" '
-            !done && /^# AGY-AGP:/ {
-                print n; print ""; print b; skip=1; done=1; next
-            }
-            skip && $0 == "" { skip=0; next }
-            skip { next }
-            { print }
-        ' "$f" > "$tmp" && mv -f "$tmp" "$f" || { rm -f "$tmp"; fail "update AGP note"; }
-    else
-        printf '\n%s\n%s\n' "$note" "$block" >> "$f"
+
+# Rules block every agent must see: several Gradle/AGP versions coexist, the
+# project decides which one is used, and the toolchain is repaired by selfheal.
+GRADLE_AGP_DOC='## Gradle & AGP (multi-version toolchain)
+- Several Gradle distributions coexist in `$HOME/gradle-dist/gradle-<ver>`; `$PREFIX/bin/gradle` is a symlink to the active one. Check `gradle --version` before building instead of assuming a version. Switching between downloaded versions is instant — never re-download to "fix" a version.
+- Never run `./gradlew`: `/bin/sh` does not exist on Android and the wrapper download fails with `SSLException: the trustAnchors parameter must be non-empty`. Use `gradle -p <project> <task> --no-daemon` or `bash ./gradlew ...`.
+- Version priority for a project: `.agy-toolchain` in the project root (`gradle=8.14.7`, `agp=8.7.3`, one per line) -> `gradle/wrapper/gradle-wrapper.properties` -> `# AGY-AGP:` note -> latest stable. Never silently rewrite the project build files.
+- AGP matrix: 8.7.3 -> Gradle >= 8.9, JDK 17; 9.0.0 / 9.1.1 -> Gradle >= 9.1, JDK 17+. The active AGP is stored in `~/.gemini/config/agy-agp.state`; other versions stay in the cache and can be switched instantly.
+- AGP artifacts are fetched by `Settings > Tools > Gradle & AGP` into `~/.gradle/caches/modules-2/files-2.1/com.android.tools.build/gradle/<ver>`. Once fetched, builds resolve them without network (`--offline`).
+- Headless equivalents: `bash $HOME/web/agy_tools.sh gradle "8.14.7 auto"` and `bash $HOME/web/agy_tools.sh agp "8.7.3 9.0.0 9.1.1"`.
+- `~/.gradle/gradle.properties` already sets `android.aapt2FromMavenOverride`, `org.gradle.daemon=false`, `org.gradle.native=false` and the JVM temp paths. Do not override them per project without a real reason.
+- JVM truststore: the bundled cacerts is PKCS12 protected by `changeit` while the JVM default password is empty, so HTTPS silently gets zero trust anchors and every Gradle/Maven download fails with `the trustAnchors parameter must be non-empty`. `65-agy-jvm.sh` exports the store AND the password; confirm with `bash $HOME/web/agy_tools.sh verify jvm`.
+- A broken toolchain is repaired by `agy-selfheal` (or `bash agy_tools.sh selfheal`, UI: Settings > Tools > "Repair environment"): it re-creates bridges, relinks Gradle, reconciles the AGP note and rewrites this block. It runs hourly from `agy-daemon`. Do not reinstall packages to fix a symlink.'
+
+# agents_block_put <file> <tag> <body> — writes one <!-- tag --> … <!-- /tag -->
+# block and removes every previous copy, so repeated runs never duplicate text.
+# The block is replaced WHERE IT ALREADY IS (or appended once). Rewriting it at
+# EOF instead would make two coexisting blocks swap places on every call, so the
+# file would differ every run and selfheal could never settle at fixed=0.
+# Returns 0 only when the file actually changed.
+agents_block_put() {
+    local f="$1" tag="$2" body="$3"
+    local tmp out bodyf
+    tmp="$PREFIX/tmp/.agy-agents-$$-$RANDOM"
+    out="${tmp}.out"
+    bodyf="${tmp}.body"
+    [ -n "$f" ] && [ -n "$tag" ] || return 1
+    mkdir -p "$(dirname "$f")" 2>/dev/null
+    [ -f "$f" ] || : > "$f" 2>/dev/null || return 1
+    printf '%s\n' "$body" > "$bodyf" 2>/dev/null || return 1
+    awk -v t="<!-- $tag -->" -v e="<!-- /$tag -->" -v bf="$bodyf" '
+        function emit(   l) { while ((getline l < bf) > 0) print l; close(bf) }
+        $0 == t {
+            if (!ins) { print t; emit(); print e; ins = 1; skip = 1 }
+            next
+        }
+        skip && $0 == e { skip = 0; next }
+        skip { next }
+        { print }
+        END { if (!ins) { print ""; print t; emit(); print e } }
+    ' "$f" > "$out" 2>/dev/null || { rm -f "$tmp" "$out" "$bodyf"; return 1; }
+    rm -f "$tmp" "$bodyf"
+    if cmp -s "$out" "$f"; then
+        rm -f "$out"
+        return 1
     fi
+    mv -f "$out" "$f" 2>/dev/null || { rm -f "$out"; return 1; }
+}
+
+gradle_write_agents_note() { # agp-version, gradle-min, jdk
+    local agp="$1" gmin="$2" jdk="$3" body
+    mkdir -p "$(dirname "$AGP_STATE")" 2>/dev/null
+    printf '%s\n' "$agp" > "$AGP_STATE" 2>/dev/null || true
+    body="# AGY-AGP: $agp
+## $(L "Android Gradle Plugin — активная версия" "Android Gradle Plugin — active version")
+- AGP: $agp · Gradle ≥ $gmin · JDK $jdk
+- $(L "В проекте" "In the project"): plugins { id 'com.android.application' version '$agp' }
+- $(L "Артефакты AGP уже в кэше Gradle" "AGP artifacts are in the Gradle cache"): ~/.gradle/caches/modules-2/files-2.1/com.android.tools.build/gradle
+- $(L "Другие версии ставятся и переключаются" "Other versions install and switch") : $(L "Инструменты › Gradle & AGP" "Tools › Gradle & AGP")
+- $(L "Свои версии для проекта" "Project-specific versions"): .agy-toolchain (gradle=<ver>, agp=<ver>)"
+    agents_block_put "$AGENTS_TEMPLATE" "AGY-AGP-ACTIVE" "$body" || true
+    [ -L "$AGENTS_LIVE" ] || agents_block_put "$AGENTS_LIVE" "AGY-AGP-ACTIVE" "$body" || true
     say "@@agp $agp"
 }
+
+# ------------------------------------------------------------ gradle versions
+gradle_have() { [ -x "$GRDIST/gradle-$1/bin/gradle" ]; }
+gradle_cached_versions() { # -> installed distributions, one per line
+    local d v
+    for d in "$GRDIST"/gradle-*/bin/gradle; do
+        [ -x "$d" ] || continue
+        v="${d#"$GRDIST/gradle-"}"; printf '%s\n' "${v%/bin/gradle}"
+    done
+}
+gradle_pick_for_agp() { # agp-version -> compatible cached Gradle, rc!=0 if none
+    local v
+    case "$1" in
+        9.*) for v in 9.9.1 9.3.1 9.2.0 9.1.0; do gradle_have "$v" && { printf '%s' "$v"; return 0; }; done
+             for v in $(gradle_cached_versions); do case "$v" in 9.*) printf '%s' "$v"; return 0 ;; esac; done ;;
+        8.*) for v in 8.14.7 8.14 8.10.2 8.9; do gradle_have "$v" && { printf '%s' "$v"; return 0; }; done
+             for v in $(gradle_cached_versions); do case "$v" in 8.*) printf '%s' "$v"; return 0 ;; esac; done ;;
+    esac
+    return 1
+}
+gradle_ensure() { # version — download and unpack into $GRDIST unless already there
+    local ver="$1" url name z dir
+    case "$ver" in ''|*[!0-9.]*) fail "bad gradle version: $ver" ;; esac
+    dir="$GRDIST/gradle-$ver"
+    if [ -x "$dir/bin/gradle" ]; then
+        step "Gradle $ver already cached"
+        say "@@gradle-cached $ver"
+        return 0
+    fi
+    command -v unzip >/dev/null 2>&1 || pkg install unzip || fail "unzip"
+    url="$(GRADLE_URL_VER "$ver")"; name="gradle-$ver-bin.zip"
+    mkdir -p "$GRDIST"
+    step "Download Gradle $ver"
+    z="$PREFIX/tmp/$name"
+    curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -C - -o "$z" "$url" \
+        || curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -o "$z" "$url" \
+        || fail "download $name"
+    step "Unpack"
+    rm -rf "$dir"; mkdir -p "$GRDIST/.agy-unpack-$$"
+    unzip -q "$z" -d "$GRDIST/.agy-unpack-$$" || fail "unpack $name"
+    mv "$GRDIST/.agy-unpack-$$/gradle-$ver" "$dir" || fail "move gradle-$ver"
+    rm -rf "$GRDIST/.agy-unpack-$$" "$z"
+    say "@@gradle-cached $ver"
+}
+gradle_activate() { # version — point $PREFIX/bin/gradle at it
+    local dir="$GRDIST/gradle-$1"
+    [ -x "$dir/bin/gradle" ] || fail "gradle $1 is not installed"
+    if [ -e "$PREFIX/bin/gradle" ] && [ ! -L "$PREFIX/bin/gradle" ] && [ ! -e "$PREFIX/bin/gradle.agy-original" ]; then
+        cp -p "$PREFIX/bin/gradle" "$PREFIX/bin/gradle.agy-original" || fail "backup pkg gradle"
+    fi
+    ln -sf "$dir/bin/gradle" "$PREFIX/bin/gradle.agy-new" && mv -f "$PREFIX/bin/gradle.agy-new" "$PREFIX/bin/gradle" || fail "switch gradle"
+    refresh_bridges
+    say "@@gradle-active $1"
+}
+
+# ------------------------------------------------------------ project pinning
+agy_project_dir() { printf '%s' "${AGY_PROJECT_DIR:-$PWD}"; }
+toolchain_pin() { # key -> value from <project>/.agy-toolchain (may be empty)
+    local f v
+    for f in "$PWD/.agy-toolchain" "$(agy_project_dir)/.agy-toolchain"; do
+        [ -r "$f" ] || continue
+        v="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\([^[:space:]#]*\).*/\1/p" "$f" 2>/dev/null | head -n1)"
+        [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    done
+    printf ''
+}
+agp_pick_auto() { # -> AGP version requested by the current project
+    local v f
+    v="$(toolchain_pin agp)"; [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    for f in "$(agy_project_dir)/build.gradle" "$(agy_project_dir)/build.gradle.kts" "$(agy_project_dir)/gradle/libs.versions.toml"; do
+        [ -r "$f" ] || continue
+        case "$f" in
+            *.toml) v="$(sed -n "s/^[[:space:]]*agp[[:space:]]*=[[:space:]]*[\"']\([0-9][0-9.]*\)[\"'].*/\1/p" "$f" 2>/dev/null | head -n1)" ;;
+            *)      v="$(sed -n 's/.*com\.android\.tools\.build:gradle:\([0-9][0-9.]*\).*/\1/p' "$f" 2>/dev/null | head -n1)"
+                    [ -n "$v" ] || v="$(sed -n "s/.*com\.android\.\(application\|library\|dynamic-feature\)[\"']\{0,1\}[[:space:]]*version[[:space:]]*[\"']\([0-9][0-9.]*\)[\"'].*/\2/p" "$f" 2>/dev/null | head -n1)" ;;
+        esac
+        [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    done
+    v="$(agp_read_state)"
+    [ -n "$v" ] || v="$(agp_cached_versions | sort -V 2>/dev/null | tail -n1)"
+    [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    return 1
+}
 gradle_pick_auto() { # -> prints version to stdout, rc!=0 on failure
+    # 0) Явное закрепление версии проектом (.agy-toolchain)
+    local v
+    v="$(toolchain_pin gradle)"
+    case "$v" in [0-9]*) echo "$v"; return 0 ;; esac
     # 1) Gradle wrapper проекта (в cwd или в AGY_PROJECT_DIR)
     local props f
-    for f in "$PWD/gradle/wrapper/gradle-wrapper.properties" "${AGY_PROJECT_DIR:-$PWD}/gradle/wrapper/gradle-wrapper.properties"; do
+    for f in "$PWD/gradle/wrapper/gradle-wrapper.properties" "$(agy_project_dir)/gradle/wrapper/gradle-wrapper.properties"; do
         if [ -r "$f" ]; then
             props="$f"; break
         fi
@@ -839,8 +1037,9 @@ gradle_pick_auto() { # -> prints version to stdout, rc!=0 on failure
     fi
     # 2) Заметка AGP (постоянный файл состояния -> AGENTS.md) -> минимальный Gradle
     local agp gmin
-    agp="$(agp_read_state)"
-    [ -n "$agp" ] || agp="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$HOME/AGENTS.md" 2>/dev/null | head -n1)"
+    agp="$(toolchain_pin agp)"
+    [ -n "$agp" ] || agp="$(agp_read_state)"
+    [ -n "$agp" ] || agp="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$AGENTS_TEMPLATE" 2>/dev/null | head -n1)"
     case "$agp" in
         9.*) gmin="9.1.0" ;;
         8.*) gmin="8.9" ;;
@@ -856,9 +1055,9 @@ gradle_pick_auto() { # -> prints version to stdout, rc!=0 on failure
 }
 
 op_gradle() { # ARG = version(s), space-separated, e.g. "8.9 8.14.7 9.1.0 9.9.1" or "auto"
-    local vers="${ARG:-}" ver pick="" auto=""
+    local vers="${ARG:-}" ver pick="" auto="" resolved=""
+    [ -n "$vers" ] || fail "no gradle version"
     # "auto" может идти вместе с явными версиями — резолвим его отдельно
-    local resolved=""
     for ver in $vers; do
         if [ "$ver" = "auto" ]; then auto=1; else resolved="$resolved $ver"; fi
     done
@@ -869,39 +1068,13 @@ op_gradle() { # ARG = version(s), space-separated, e.g. "8.9 8.14.7 9.1.0 9.9.1"
         resolved="$resolved $pick"
     fi
     vers="${resolved# }"
-    command -v unzip >/dev/null 2>&1 || pkg install unzip || fail "unzip"
-    local url name z dir
-    for ver in $vers; do
-        case "$ver" in ''|*[!0-9.]*) fail "bad gradle version: $ver" ;; esac
-        url="$(GRADLE_URL_VER "$ver")"; name="gradle-$ver-bin.zip"
-        mkdir -p "$GRDIST"
-        dir="$GRDIST/gradle-$ver"
-        if [ ! -x "$dir/bin/gradle" ]; then
-            step "Download Gradle $ver"
-            z="$PREFIX/tmp/$name"
-            curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -C - -o "$z" "$url" \
-                || curl -# -fL --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 900 -o "$z" "$url" \
-                || fail "download $name"
-            step "Unpack"
-            rm -rf "$dir"; mkdir -p "$GRDIST/.agy-unpack-$$"
-            unzip -q "$z" -d "$GRDIST/.agy-unpack-$$" || fail "unpack $name"
-            mv "$GRDIST/.agy-unpack-$$/gradle-$ver" "$dir" || fail "move gradle-$ver"
-            rm -rf "$GRDIST/.agy-unpack-$$" "$z"
-        else
-            step "Gradle $ver already cached"
-        fi
-        say "@@gradle-cached $ver"
-    done
-    # Активируется последняя версия из списка; остальные предзагружены
-    # и переключаются мгновенно (симлинк) без повторного скачивания.
+    [ -n "$vers" ] || fail "no gradle version"
+    for ver in $vers; do gradle_ensure "$ver" || fail "install gradle $ver"; done
+    # Активируется последняя версия из списка; остальные остаются
+    # предзагруженными и переключаются мгновенно (симлинк) без скачивания.
     ver="${vers##* }"
     step "Switch gradle -> $ver"
-    if [ -e "$PREFIX/bin/gradle" ] && [ ! -L "$PREFIX/bin/gradle" ] && [ ! -e "$PREFIX/bin/gradle.agy-original" ]; then
-        cp -p "$PREFIX/bin/gradle" "$PREFIX/bin/gradle.agy-original" || fail "backup pkg gradle"
-    fi
-    ln -sf "$dir/bin/gradle" "$PREFIX/bin/gradle.agy-new" && mv -f "$PREFIX/bin/gradle.agy-new" "$PREFIX/bin/gradle" || fail "switch gradle"
-    refresh_bridges
-    say "@@gradle-active $ver"
+    gradle_activate "$ver"
     say "@@gradle $ver"
     say "@@done"
 }
@@ -915,23 +1088,157 @@ op_gradleremove() {
     refresh_bridges
     say "@@done"
 }
-op_agp() { # ARG = AGP version id(s), space-separated, e.g. "8.7.3 9.0.0"
-    local list="${ARG:-}" agp gmin jdk last=""
+
+# ------------------------------------------------------------ Android Gradle Plugin
+agp_cached_versions() { # -> AGP versions already present in the Gradle cache
+    local d v
+    for d in "$AGP_CACHE"/*/; do
+        [ -d "$d" ] || continue
+        v="$(basename "$d")"
+        case "$v" in [0-9]*[0-9]) printf '%s\n' "$v" ;; esac
+    done
+}
+agp_cached() { # version -> 0 if the artifact tree is in the cache
+    local d="$AGP_CACHE/$1"
+    [ -d "$d" ] && [ -n "$(ls "$d" 2>/dev/null)" ]
+}
+agp_fetch() { # agp-version, gradle-min — resolve the plugin into the Gradle cache
+    local agp="$1" gmin="$2" gv dir log rc
+    gv="$(gradle_pick_for_agp "$agp")"
+    if [ -z "$gv" ]; then
+        gv="$gmin"
+        step "Gradle $gv is required by AGP $agp"
+        gradle_ensure "$gv" || fail "install Gradle $gv"
+        gradle_activate "$gv" || true
+        gv="$(gradle_pick_for_agp "$agp")" || fail "no Gradle distribution for AGP $agp"
+    fi
+    step "Download AGP $agp (Gradle $gv, first run takes a few minutes)"
+    dir="$PREFIX/tmp/agy-agp-fetch-$$"
+    rm -rf "$dir" 2>/dev/null; mkdir -p "$dir" 2>/dev/null || fail "create temp project"
+    cat > "$dir/settings.gradle" <<'AGY_AGP_SETTINGS'
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'agy-agp-fetch'
+AGY_AGP_SETTINGS
+    cat > "$dir/build.gradle" <<AGY_AGP_BUILD
+plugins { id 'java-library' }
+configurations { agpFetch }
+dependencies { agpFetch 'com.android.tools.build:gradle:$agp' }
+tasks.register('fetchAgp') {
+    doLast { println "AGP-ARTIFACTS " + configurations.agpFetch.files.size() }
+}
+AGY_AGP_BUILD
+    log="$PREFIX/tmp/agy-agp-$agp.log"
+    "$GRDIST/gradle-$gv/bin/gradle" -p "$dir" fetchAgp --no-daemon --console=plain -q > "$log" 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        say "$(L "Последние строки журнала Gradle:" "Last Gradle log lines:")"
+        tail -n 15 "$log" 2>/dev/null
+        rm -rf "$dir" 2>/dev/null
+        say "@@fail agp-$agp $(L "загрузка не удалась" "download failed")"
+        fail "download AGP $agp"
+    fi
+    rm -rf "$dir" 2>/dev/null
+    if ! agp_cached "$agp"; then
+        say "@@fail agp-$agp $(L "артефакт не попал в кэш" "artifact did not land in the cache")"
+        fail "AGP $agp is missing from the Gradle cache"
+    fi
+    say "@@agp-cached $agp"
+    say "$(L "AGP $agp готов — сборки берут артефакты из кэша, работает и --offline" "AGP $agp is ready — builds resolve it from the cache, --offline included")"
+}
+op_agp() { # ARG = AGP version(s) or "auto", space-separated, e.g. "8.7.3 9.0.0 9.1.1"
+    local list="${ARG:-}" agp gmin jdk last="" resolved=""
+    [ -n "$list" ] || fail "no AGP version"
     for agp in $list; do
+        if [ "$agp" = "auto" ]; then
+            agp="$(agp_pick_auto)" || fail "pick AGP version for the project"
+            step "AGP for this project: $agp"
+        fi
         case "$agp" in ''|*[!0-9.]*) fail "unknown AGP version: $agp" ;; esac
+        resolved="$resolved $agp"
+    done
+    for agp in $resolved; do
         case "$agp" in
             8.*) gmin="8.9";  jdk="17" ;;
             9.*) gmin="9.1";  jdk="17+" ;;
             *) fail "unknown AGP version: $agp" ;;
         esac
+        if agp_cached "$agp"; then
+            step "AGP $agp already in the Gradle cache"
+            say "@@agp-cached $agp"
+        else
+            agp_fetch "$agp" "$gmin"
+        fi
         gradle_write_agents_note "$agp" "$gmin" "$jdk"
-        mkdir -p "$(dirname "$AGP_STATE")"
-        printf '%s\n' "$agp" > "$AGP_STATE" || fail "save AGP state"
         last="$agp"
     done
     [ -n "$last" ] || fail "no AGP version"
+    say "@@agp-active $last"
+    say "@@agp $last"
     say "@@done"
 }
+
+# ------------------------------------------------------------ self-heal
+# Repairs the pieces that silently break after app updates: the environment
+# profile, the Gradle launcher symlink, the AGP state/note pair and the
+# AGENTS.md blocks. Used by Settings › Tools and by the background daemon.
+op_selfheal() {
+    local fixed=0 gl gv ga note best
+    step "Environment profile and bridges"
+    write_env 2>/dev/null && fixed=$((fixed + 1))
+    refresh_bridges 2>/dev/null || true
+    say "@@selfheal env"
+    # 1) Gradle launcher
+    gl=""
+    if [ -L "$PREFIX/bin/gradle" ]; then
+        gl="$(readlink "$PREFIX/bin/gradle" 2>/dev/null)"
+        [ -x "$gl" ] || gl=""
+    fi
+    case "$gl" in
+        "") best="$(gradle_pick_for_agp "$(agp_read_state)")" || best=""
+            [ -n "$best" ] || best="$(gradle_cached_versions | sort -V 2>/dev/null | tail -n1)"
+            if [ -n "$best" ]; then
+                step "Relink gradle -> $best"
+                gradle_activate "$best" && fixed=$((fixed + 1))
+                say "@@selfheal gradle $best"
+            fi ;;
+        *)  gv="$(printf '%s' "$gl" | sed -n 's|.*/gradle-\([0-9][0-9.]*\)/bin/gradle$|\1|p')"
+            [ -n "$gv" ] && say "@@gradle-active $gv" ;;
+    esac
+    # 2) AGP state <-> AGENTS.md note
+    ga="$(agp_read_state)"
+    note="$(sed -n 's/^# AGY-AGP: \([0-9][0-9.]*\)$/\1/p' "$AGENTS_TEMPLATE" 2>/dev/null | head -n1)"
+    if [ -z "$ga" ] && [ -n "$note" ]; then
+        mkdir -p "$(dirname "$AGP_STATE")" 2>/dev/null
+        if printf '%s\n' "$note" > "$AGP_STATE" 2>/dev/null; then
+            fixed=$((fixed + 1)); say "@@selfheal agp-state $note"
+        fi
+    elif [ -n "$ga" ] && [ "$ga" != "$note" ]; then
+        case "$ga" in
+            8.*) gradle_write_agents_note "$ga" "8.9" "17" ;;
+            9.*) gradle_write_agents_note "$ga" "9.1" "17+" ;;
+        esac
+        fixed=$((fixed + 1)); say "@@selfheal agp-note $ga"
+    fi
+    # 3) Rules blocks (template + live rules the agent reads now)
+    agents_block_put "$AGENTS_TEMPLATE" "AGY-GRADLE-AGP" "$GRADLE_AGP_DOC" && fixed=$((fixed + 1))
+    case "$AGENTS_LIVE" in
+        "$AGENTS_TEMPLATE"|"") : ;;
+        *) agents_block_put "$AGENTS_LIVE" "AGY-GRADLE-AGP" "$GRADLE_AGP_DOC" && fixed=$((fixed + 1)) ;;
+    esac
+    say "@@selfheal agents"
+    # 4) Legacy duplicated "# AGY-AGP:" debris in $HOME/AGENTS.md (old bug)
+    if [ -f "$HOME/AGENTS.md" ] && ! grep -qvE '^(# AGY-AGP:.*|## Android Gradle Plugin.*|-[[:space:]].*|[[:space:]]*)$' "$HOME/AGENTS.md"; then
+        mv -f "$HOME/AGENTS.md" "$HOME/.agy-stray-AGENTS.md" 2>/dev/null && { fixed=$((fixed + 1)); say "@@selfheal stray-agents"; }
+    fi
+    say "@@selfheal fixed=$fixed"
+    say "@@done"
+}
+
 
 op_verify() {
     local ok=0 bad=0
@@ -945,6 +1252,28 @@ op_verify() {
         if [ "$rc" -eq 0 ] && [ -s "$dir/out/com/agytest/ITest.java" ]; then echo "AIDL compilation succeeded"; else rc=1; echo "AIDL compilation failed or output is missing"; fi
         rm -rf "$dir"
         return "$rc"
+    }
+    # Gradle/Maven HTTPS only works when the JVM can read a truststore that
+    # actually contains anchors, so probe the store itself (not `java -version`).
+    verify_truststore() {
+        local st n
+        for st in "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
+                  "$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts" \
+                  "$PREFIX/etc/tls/certs/java/cacerts"; do
+            [ -f "$st" ] || continue
+            n="$(keytool -list -keystore "$st" -storepass changeit 2>/dev/null | grep -c trustedCertEntry)"
+            [ "${n:-0}" -ge 20 ] 2>/dev/null || continue
+            echo "truststore ok: $(basename "$(dirname "$(dirname "$(dirname "$st")")")")/cacerts anchors=$n"
+            return 0
+        done
+        echo "no readable truststore with trust anchors — Gradle/Maven HTTPS will fail"
+        return 1
+    }
+    verify_agp() {
+        local v
+        v="$(agp_cached_versions | tr '\n' ' ')"
+        [ -n "${v% }" ] || { echo "no AGP artifacts in the Gradle cache"; return 1; }
+        echo "cached AGP: ${v% }"
     }
     chk() { # name, command...
         local name="$1"; shift
@@ -983,6 +1312,8 @@ op_verify() {
                 chk "$t" env LD_LIBRARY_PATH="$PREFIX/lib" "$PREFIX/lib/jvm/java-$v-openjdk/bin/$tool" -version ;;
             kotlin)  chk kotlin kotlinc -version ;;
             gradle)  chk gradle gradle -v --no-daemon -q ;;
+            jvm)     chk jvm verify_truststore ;;
+            agp)     chk agp verify_agp ;;
             clang)   chk clang sh -c 'printf "int main(){return 0;}" > "$PREFIX/tmp/agy_t.c" && clang "$PREFIX/tmp/agy_t.c" -o "$PREFIX/tmp/agy_t" && "$PREFIX/tmp/agy_t" && echo compiled' ;;
             cmake)   chk cmake cmake --version ;;
             git)     chk git git --version ;;
@@ -3588,6 +3919,7 @@ case "$OP" in
     gradle)         op_gradle ;;
     gradleremove)   op_gradleremove ;;
     agp)            op_agp ;;
+    selfheal)       op_selfheal ;;
     mcp)            op_mcp ;;
     customizations) op_customizations ;;
     *)              fail "unknown op: $OP" ;;

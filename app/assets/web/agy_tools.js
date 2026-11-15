@@ -77,8 +77,9 @@
       { id: "gradle-9.1.0", kind: "gradle", ru: "Gradle 9.1.0", en: "Gradle 9.1.0", dru: "Минимум для AGP 9.x.", den: "Minimum for AGP 9.x." },
       { id: "gradle-8.14.7", kind: "gradle", ru: "Gradle 8.14.7", en: "Gradle 8.14.7", dru: "Для AGP 8.x. Рекомендуется.", den: "For AGP 8.x. Recommended." },
       { id: "gradle-8.9", kind: "gradle", ru: "Gradle 8.9", en: "Gradle 8.9", dru: "Минимум для AGP 8.x.", den: "Minimum for AGP 8.x." },
-      { id: "agp-9.0.0", kind: "agp", ru: "Android Gradle Plugin 9.0.0", en: "Android Gradle Plugin 9.0.0", dru: "Новейшая ветка AGP; требует Gradle ≥ 9.1.", den: "Newest AGP branch; needs Gradle ≥ 9.1." },
-      { id: "agp-8.7.3", kind: "agp", ru: "Android Gradle Plugin 8.7.3", en: "Android Gradle Plugin 8.7.3", dru: "Стабильная ветка AGP; Gradle ≥ 8.9. Рекомендуется.", den: "Stable AGP branch; Gradle ≥ 8.9. Recommended." }
+      { id: "agp-9.1.1", kind: "agp", ru: "Android Gradle Plugin 9.1.1", en: "Android Gradle Plugin 9.1.1", dru: "Актуальная ветка AGP; требует Gradle ≥ 9.1.", den: "Current AGP branch; needs Gradle ≥ 9.1.", verify: "agp" },
+      { id: "agp-9.0.0", kind: "agp", ru: "Android Gradle Plugin 9.0.0", en: "Android Gradle Plugin 9.0.0", dru: "Предыдущая ветка AGP 9; требует Gradle ≥ 9.1.", den: "Previous AGP 9 branch; needs Gradle ≥ 9.1.", verify: "agp" },
+      { id: "agp-8.7.3", kind: "agp", ru: "Android Gradle Plugin 8.7.3", en: "Android Gradle Plugin 8.7.3", dru: "Стабильная ветка AGP; Gradle ≥ 8.9. Рекомендуется.", den: "Stable AGP branch; Gradle ≥ 8.9. Recommended.", verify: "agp" }
     ] },
     { id: "lang", ru: "Другие языки", en: "Other languages", items: [
       { id: "rust", kind: "pkg", ru: "Rust (cargo)", en: "Rust (cargo)", dru: "Компилятор Rust и менеджер пакетов cargo.", den: "Rust compiler and cargo package manager.", verify: "rust" },
@@ -153,7 +154,7 @@
     if (it.kind === "flutter") return !!special.flutter;
     if (it.kind === "npm") { var n = status["npm:" + it.id]; return !!(n && n.inst); }
     if (it.kind === "gradle") return it.id === "gradle-auto" ? !!special.gradle : special.gradle === it.id.slice(7);
-    if (it.kind === "agp") return special.agp === it.id.slice(4);
+    if (it.kind === "agp") return special.agp === it.id.slice(4) || (special.agpcached || []).indexOf(it.id.slice(4)) >= 0;
     return false;
   }
   function availability(it) {
@@ -227,7 +228,7 @@
   var lastDone = null, hiddenJob = null;
 
   function parse(j) {
-    if (j.op === "status") special = { cmdline: false, platforms: {}, buildtools: {}, ndk: [], flutter: false, sdkhome: null, stubs: [], gradle: "", agp: "", gradlecached: [] };
+    if (j.op === "status") special = { cmdline: false, platforms: {}, buildtools: {}, ndk: [], flutter: false, sdkhome: null, stubs: [], gradle: "", agp: "", gradlecached: [], agpcached: [] };
     (j.log || "").split("\n").forEach(function (line) {
       var m;
       if ((m = /^@@pkg (\S+) (\S+) (\S+)/.exec(line))) status[m[1]] = { avail: m[2], inst: m[3] };
@@ -241,6 +242,7 @@
       else if ((m = /^@@gradle-active (\S+)/.exec(line))) special.gradle = m[1];
       else if ((m = /^@@gradle-cached (\S+)/.exec(line))) { special.gradlecached = special.gradlecached || []; special.gradlecached.push(m[1]); }
       else if ((m = /^@@agp-active (\S+)/.exec(line))) special.agp = m[1];
+      else if ((m = /^@@agp-cached (\S+)/.exec(line))) { special.agpcached = special.agpcached || []; if (special.agpcached.indexOf(m[1]) < 0) special.agpcached.push(m[1]); }
       else if ((m = /^@@(ok|fail) (\S+) ?(.*)$/.exec(line))) checks[m[2]] = { ok: m[1] === "ok", text: m[3] };
       else if ((m = /^@@npm (\S+) (\S+)/.exec(line))) status["npm:" + m[1]] = { inst: m[2] !== "-" };
       else if ((m = /^@@index (\S+)/.exec(line))) hasIndex = m[1] === "ok";
@@ -355,7 +357,12 @@
       if (special.gradlecached && special.gradlecached.indexOf(it.id.slice(7)) >= 0) return '<span class="agy-t-badge ok">' + esc(T("Скачана — переключение мгновенное", "Cached — instant switch")) + '</span>';
       return '<span class="agy-t-badge">' + esc(T("Не активна", "Not active")) + '</span>';
     }
-    if (it.kind === "agp") return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Выбрано", "Selected")) + '</span>' : '<span class="agy-t-badge">' + esc(T("Не выбрано", "Not selected")) + '</span>';
+    if (it.kind === "agp") {
+      if (installed(it) && it.verify && checks[it.verify] && !checks[it.verify].ok) return '<span class="agy-t-badge off">' + esc(T("Ошибка проверки", "Check failed")) + '</span>';
+      if (special.agp === it.id.slice(4)) return '<span class="agy-t-badge ok">' + esc(T("Выбрано", "Selected")) + '</span>';
+      if ((special.agpcached || []).indexOf(it.id.slice(4)) >= 0) return '<span class="agy-t-badge ok">' + esc(T("Скачано — переключение мгновенное", "Cached — instant switch")) + '</span>';
+      return '<span class="agy-t-badge">' + esc(T("Не выбрано", "Not selected")) + '</span>';
+    }
     if (it.kind === "sdk") { var p = it.id.split(";"); if ((p[0] === "platforms" ? special.platforms[p[1]] : special.buildtools[p[1]]) === "incomplete") return '<span class="agy-t-badge off">' + esc(T("Не хватает файлов", "Missing files")) + '</span>'; }
     return installed(it) ? '<span class="agy-t-badge ok">' + esc(T("Установлено", "Installed")) + "</span>"
                          : '<span class="agy-t-badge">' + esc(T("Не установлено", "Not installed")) + "</span>";
@@ -371,7 +378,7 @@
     sdk: [{title: ["Платформа Android", "Android platform"], ids: ["platforms;android-37.1", "platforms;android-37.0", "platforms;android-36", "platforms;android-35", "platforms;android-34"]},
           {title: ["Android Build-tools", "Android Build-tools"], ids: ["build-tools;37.0.0", "build-tools;36.0.0", "build-tools;35.0.0", "build-tools;34.0.0"]}],
     gradle: [{title: ["Gradle", "Gradle"], ids: ["gradle-auto", "gradle-9.9.1", "gradle-9.1.0", "gradle-8.14.7", "gradle-8.9"]},
-             {title: ["Android Gradle Plugin", "Android Gradle Plugin"], ids: ["agp-9.0.0", "agp-8.7.3"]}]
+             {title: ["Android Gradle Plugin", "Android Gradle Plugin"], ids: ["agp-9.1.1", "agp-9.0.0", "agp-8.7.3"]}]
   };
 
   function render() {
@@ -381,6 +388,7 @@
     var h = '<div class="agy-t-head"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div class="agy-t-title">' + esc(T("Инструменты", "Tools")) + '</div><button type="button" class="agy-t-btn sec" data-act="tools-menu" aria-label="' + esc(T("Меню инструментов", "Tools menu")) + '">☰</button></div>' +
       '<div class="agy-t-sub">' + esc(T("Компоненты для разработки прямо в приложении: Node.js для плагинов, Java, Android SDK/NDK, компиляторы. Устанавливаются в окружение агента и сразу доступны ему.", "Development components inside the app: Node.js for plugins, Java, Android SDK/NDK, compilers. Installed into the agent environment and available to it right away.")) + "</div>" +
       '<div class="agy-t-actions"><button type="button" data-act="refresh"' + (busy ? " disabled" : "") + ">" + esc(T("Проверить", "Check")) + "</button>" +
+      '<button type="button" data-act="selfheal"' + (busy ? " disabled" : "") + ">" + esc(T("Починить окружение", "Repair environment")) + "</button>" +
       '<button type="button" data-act="upgrade"' + (busy ? " disabled" : "") + ">" + esc(T("Обновить всё", "Upgrade all")) + "</button>" +
       '<button type="button" data-act="selftest-save"' + (busy ? " disabled" : "") + ">" + esc(T("Тест сохранения", "Save test")) + "</button></div></div>"; /* AGY-P1-5-SELFTEST */
 
@@ -594,6 +602,7 @@
     else if (act === "selftest-save") { try { selftestSave15(); } catch (e15) { alert("selftest error: " + e15); } } /* AGY-P1-5-SELFTEST */
     else if (act === "refresh") refresh(true);
     else if (act === "repairbt") { run("repairbt", "", T("Починка build-tools", "Repairing build-tools")); refresh(true); }
+    else if (act === "selfheal") { run("selfheal", "", T("Починка окружения", "Repairing environment")); refresh(true); }
     /* AGY-P2-11: предпоказ объёма и подтверждение перед pkg upgrade */
     else if (act === "upgrade") {
       var b11 = bridge();

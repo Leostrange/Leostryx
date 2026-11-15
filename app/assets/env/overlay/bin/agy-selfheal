@@ -1,0 +1,22 @@
+#!/data/user/0/com.agyru.t2/files/usr/bin/bash
+# agy-selfheal — repair the Android/Java toolchain without opening the UI.
+#
+# Fixes the same things as Settings › Tools › "Починить окружение":
+#   * $PREFIX/etc/profile.d/65-agy-jvm.sh and the AGY bridges,
+#   * the $PREFIX/bin/gradle launcher symlink,
+#   * the AGP state file ↔ "# AGY-AGP:" note in AGENTS.md,
+#   * the <!-- AGY-GRADLE-AGP --> rules block in both AGENTS.md copies.
+# Idempotent: running it twice in a row changes nothing the second time.
+# Registered with agy-daemon (`agy-daemon task list`) so a toolchain that
+# rots after an app update heals itself in the background.
+set -u
+
+WEB="${AGY_WEB:-$HOME/web}"
+SELF="$WEB/agy_tools.sh"
+
+if [ ! -f "$SELF" ]; then
+    printf 'agy-selfheal: %s is missing — web assets are not installed\n' "$SELF" >&2
+    exit 1
+fi
+
+exec bash "$SELF" selfheal "$@"
