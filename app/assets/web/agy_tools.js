@@ -142,6 +142,141 @@
 
   function bridge() { return window.AgyTools && typeof window.AgyTools.start === "function" ? window.AgyTools : null; }
 
+  /* -------------------------------------------------- уведомления обновления */
+  /* Постятся самим приложением через мост AgyShade. Только у него есть
+     контентный интент (тап открывает приложение), setOnlyAlertOnce (тихое
+     обновление прогресса без повторного звука) и рабочий cancel().
+     Из шелла это невозможно: `cmd notification cancel` в системе отсутствует,
+     а `-c/--content-intent` падает с Permission Denial (uid=2000 не может
+     send as package android). */
+  var UPD_SHADE_TAG = "leostryx_update";
+  var UPD_READY_TAG = "leostryx_ready";
+  var UPD_READY_KEY = "agy.upd.ready";
+  var UPD_READY_TTL_MS = 6 * 60 * 60 * 1000;
+  var UPD_DEFAULT_APK = "/storage/emulated/0/Download/update-temp.apk";
+
+  function shade() {
+    var s = window.AgyShade;
+    return (s && typeof s.notify === "function") ? s : null;
+  }
+
+  function shadeNotify(tag, title, body) {
+    var s = shade();
+    if (!s) return false;
+    try { s.notify(tag, title, body, false); return true; } catch (e) { return false; }
+  }
+
+  function shadeCancel(tag) {
+    var s = shade();
+    if (!s) return;
+    try { if (typeof s.cancel === "function") s.cancel(tag); } catch (e) {}
+  }
+
+  function updTitleText() {
+    return T("Leostryx — обновление", "Leostryx — update");
+  }
+
+  /* «Готово к установке» запоминаем: тап по уведомлению поднимает приложение,
+     но не сообщает, зачем его подняли — окно обновления откроется на возврате. */
+  function setReadyInfo(info) {
+    try { localStorage.setItem(UPD_READY_KEY, JSON.stringify(info)); } catch (e) {}
+  }
+
+  function takeReadyInfo() {
+    var v = null;
+    try { v = JSON.parse(localStorage.getItem(UPD_READY_KEY) || "null"); } catch (e) {}
+    try { localStorage.removeItem(UPD_READY_KEY); } catch (e) {}
+    if (!v || !v.ts || (Date.now() - v.ts) > UPD_READY_TTL_MS) return null;
+    return v;
+  }
+
+  var updSheet = null;
+
+  function closeUpdateSheet() {
+    if (updSheet && updSheet.parentNode) updSheet.parentNode.removeChild(updSheet);
+    updSheet = null;
+  }
+
+  function openUpdateSheet(info) {
+    var ACCENT = "#0b84ff";
+    var BORDER = "rgba(127,127,127,.18)";
+    var ver = (info && info.version) ? String(info.version) : "";
+    var apkPath = (info && info.path) ? String(info.path) : UPD_DEFAULT_APK;
+    closeUpdateSheet();
+
+    var ov = document.createElement("div");
+    ov.setAttribute("data-update-sheet", "");
+    ov.setAttribute("data-agy-no-translate", "");
+    ov.style.cssText = "position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box";
+    ov.onclick = function (e) { if (e.target === ov) closeUpdateSheet(); };
+
+    var sheet = document.createElement("div");
+    sheet.style.cssText = "width:100%;max-width:420px;background:var(--background,#141414);border:1px solid " + BORDER + ";border-radius:18px;padding:18px;box-sizing:border-box;box-shadow:0 24px 64px rgba(0,0,0,.55)";
+
+    var title = document.createElement("div");
+    title.style.cssText = "font-size:17px;font-weight:600;color:var(--foreground,#eee);margin-bottom:6px";
+    title.textContent = T("Обновление Leostryx", "Leostryx update");
+    sheet.appendChild(title);
+
+    var sub = document.createElement("div");
+    sub.style.cssText = "font-size:13px;color:#888;line-height:1.5;margin-bottom:16px";
+    sub.textContent = ver
+      ? T("Версия " + ver + " загружена. Осталось установить.", "Version " + ver + " is downloaded. One tap to install.")
+      : T("Обновление загружено. Осталось установить.", "The update is downloaded. One tap to install.");
+    sheet.appendChild(sub);
+
+    var btnInstall = document.createElement("button");
+    btnInstall.style.cssText = "width:100%;padding:12px;border:0;border-radius:12px;background:" + ACCENT + ";color:#fff;font-size:14px;font-weight:500;cursor:pointer";
+    btnInstall.textContent = T("Обновить и установить", "Update & install");
+    btnInstall.onclick = function () {
+      shadeCancel(UPD_READY_TAG);
+      var ok = false;
+      try {
+        if (window.AgyTools && typeof window.AgyTools.installApk === "function") {
+          window.AgyTools.installApk(apkPath);
+          ok = true;
+        }
+      } catch (e) {
+        console.warn("installApk error:", e);
+      }
+      if (ok) { closeUpdateSheet(); return; }
+      sub.textContent = T("Не удалось открыть установщик. APK лежит в Download/update-temp.apk.",
+                          "Could not open the installer. The APK is at Download/update-temp.apk.");
+    };
+    sheet.appendChild(btnInstall);
+
+    var btnLog = document.createElement("button");
+    btnLog.style.cssText = "width:100%;margin-top:8px;padding:11px;border:1px solid " + BORDER + ";border-radius:12px;background:transparent;color:" + ACCENT + ";font-size:13px;font-weight:500;cursor:pointer";
+    btnLog.textContent = T("История изменений", "Changelog");
+    btnLog.onclick = function () {
+      closeUpdateSheet();
+      try { if (typeof window.__agyOpenChangelog === "function") window.__agyOpenChangelog(ver ? "v" + ver : null); } catch (e) {}
+    };
+    sheet.appendChild(btnLog);
+
+    var btnLater = document.createElement("button");
+    btnLater.style.cssText = "width:100%;margin-top:8px;padding:11px;border:0;border-radius:12px;background:transparent;color:#888;font-size:13px;cursor:pointer";
+    btnLater.textContent = T("Позже", "Later");
+    btnLater.onclick = closeUpdateSheet;
+    sheet.appendChild(btnLater);
+
+    ov.appendChild(sheet);
+    document.body.appendChild(ov);
+    updSheet = ov;
+  }
+
+  function maybeOpenUpdateSheet() {
+    if (document.hidden) return;
+    var info = takeReadyInfo();
+    if (!info) return;
+    openUpdateSheet(info);
+  }
+
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) maybeOpenUpdateSheet(); });
+  window.addEventListener("focus", maybeOpenUpdateSheet);
+  setTimeout(maybeOpenUpdateSheet, 2500);
+  window.__agyOpenUpdate = openUpdateSheet;
+
   /* Язык интерфейса сообщаем shell-бэкенду: фоновые операции (уведомления
      обновления в шторке, сообщения об ошибках) обязаны говорить на том же
      языке, что и экран. Пишем только при смене значения. */
@@ -1246,7 +1381,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.1.10";
+    appVer.textContent = "3.1.11";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1342,7 +1477,7 @@
     wrap.appendChild(c2);
 
     /* ── Card 3: Обновления + Changelog ── */
-    var CURRENT_VERSION = "3.1.10";
+    var CURRENT_VERSION = "3.1.11";
     /* ── Changelog: окно тянет текст живьём с GitHub Releases ── */
     var clOverlay = null;
     function closeChangelog() {
@@ -1575,13 +1710,15 @@
     btnHistory.onclick = function () { openChangelog(null); };
     c3.appendChild(btnHistory);
 
-    var downloadedApkPath = "/storage/emulated/0/Download/update-temp.apk";
+    var downloadedApkPath = UPD_DEFAULT_APK;
     var pendingApkUrl = null;
+    var pendingTag = "";
     var updState = "check"; // "check" | "available" | "downloading" | "ready"
 
     /* Рядом с номером релиза — мини-кнопка, открывающая Changelog этого релиза. */
     function showAvailable(tag, apkUrl) {
       pendingApkUrl = apkUrl;
+      pendingTag = String(tag || "").replace(/^v/, "");
       updState = "available";
       updStatus.innerHTML = "";
       var line = document.createElement("span");
@@ -1680,6 +1817,7 @@
 
         var dlId = b.start("updatedownload", pendingApkUrl);
         if (!dlId || /^ERR/.test(dlId)) {
+          shadeCancel(UPD_SHADE_TAG);
           updStatus.textContent = T("Не удалось начать загрузку.", "Download failed to start.");
           btnUpd.disabled = false;
           btnUpd.textContent = T("Скачать обновление", "Download update");
@@ -1687,15 +1825,25 @@
           return;
         }
 
+        /* Одно уведомление на всю загрузку: тот же тег = та же запись в шторке,
+           а setOnlyAlertOnce не даёт ей звонить на каждом обновлении. */
+        shadeNotify(UPD_SHADE_TAG, updTitleText(), T("Загрузка… 0%", "Downloading… 0%"));
+
         /* b.read() возвращает JSON {"log": "...", "rc": ...} — разбираем его,
            иначе экранированные \n не находятся и берётся самое первое значение
            прогресса (отсюда прежние «5–7%, а потом сразу готово»). */
-        var dlTarget = 0, dlShown = 0;
+        var dlTarget = 0, dlShown = 0, dlShadeStep = 0;
         var dlSmoothTimer = setInterval(function () {
           if (dlShown < dlTarget) {
             dlShown = Math.min(dlTarget, dlShown + Math.max(1, Math.ceil((dlTarget - dlShown) / 5)));
             btnUpd.textContent = T("Скачивание… " + dlShown + "%", "Downloading… " + dlShown + "%");
             updStatus.textContent = T("Загрузка APK: " + dlShown + "% (прогресс виден в шторке)", "Downloading APK: " + dlShown + "% (progress is in the notification shade)");
+            var step = Math.floor(dlShown / 10);
+            if (step > dlShadeStep && dlShown < 100) {
+              dlShadeStep = step;
+              shadeNotify(UPD_SHADE_TAG, updTitleText(),
+                          T("Загрузка " + dlShown + "%", "Downloading " + dlShown + "%"));
+            }
           }
         }, 120);
         var dlPollTimer = setInterval(function () {
@@ -1734,8 +1882,16 @@
             btnUpd.textContent = T("Обновить и установить", "Update & install");
             updStatus.textContent = T("Загрузка завершена. Запускаю системный установщик…", "Download complete. Launching the system installer…");
             updState = "ready";
+            /* Прогресс снимаем, «готово» ставим отдельным тегом: так в шторке
+               всегда ровно одно уведомление, и оно звонит один раз. */
+            shadeCancel(UPD_SHADE_TAG);
+            shadeNotify(UPD_READY_TAG, updTitleText(),
+                        T("Готово к установке. Нажмите, чтобы открыть.",
+                          "Ready to install. Tap to open."));
+            setReadyInfo({ path: downloadedApkPath, version: pendingTag, ts: Date.now() });
             triggerInstall(downloadedApkPath);
           } else {
+            shadeCancel(UPD_SHADE_TAG);
             updStatus.textContent = T("Ошибка загрузки.", "Download error.");
             btnUpd.disabled = false;
             btnUpd.textContent = T("Повторить скачивание", "Retry download");

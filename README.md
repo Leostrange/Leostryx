@@ -1,26 +1,26 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.10-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.11-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.10).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.11).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a> &nbsp;·&nbsp; <a href="https://t.me/+qji9jQ68cWRmZDky">Telegram</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a> &nbsp;·&nbsp; <a href="https://t.me/+qji9jQ68cWRmZDky">Telegram</a></p>
 
 > [!NOTE]
-> **3.1.10 — актуальный релиз.** APK `Leostryx-3.1.10-standard.apk` и `Leostryx-3.1.10-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.10.txt` и архивом исходников `Leostryx-repo.zip`.
+> **3.1.11 — актуальный релиз.** APK `Leostryx-3.1.11-standard.apk` и `Leostryx-3.1.11-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.11.txt` и архивом исходников `Leostryx-repo.zip`.
 
 ---
 
-## Leostryx для Android 3.1.10
+## Leostryx для Android 3.1.11
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -50,8 +50,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.10-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.10-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.11-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.11-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -60,10 +60,18 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.10](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) и сверьте SHA-256 с файлом [`SHA256SUMS-3.1.10.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.10/SHA256SUMS-3.1.10.txt).
-2. Установите скачанный APK 3.1.10 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.11](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11) и сверьте SHA-256 с файлом [`SHA256SUMS-3.1.11.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.11/SHA256SUMS-3.1.11.txt).
+2. Установите скачанный APK 3.1.11 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.10 (см. также [CHANGELOG.md](CHANGELOG.md))
+## Что нового в 3.1.11 (см. также [CHANGELOG.md](CHANGELOG.md))
+
+- **одно уведомление вместо двух после загрузки обновления**: прогресс и «готово к установке» больше не висят рядом. Снять уведомление из шелла было нечем — команды `cmd notification cancel` в системе нет (проверено: `cmd notification post -h` знает только `post`), поэтому старый `notify_cancel()` молча ничего не делал. Теперь оба состояния ставит и снимает само приложение через мост `AgyShade`, где `cancel()` действительно работает по тегу;
+- **никакого постоянного звука при загрузке**: `cmd notification post` пишет в системный канал `shell_cmd` с `flags=0`, то есть без флага «оповещать один раз», а прогресс постился каждые 5 % — до 20 сигналов за загрузку. Теперь шаг 10 %, и `AgyShade.notify` ставит `setOnlyAlertOnce(true)`: запись обновляется молча, звучит только финальное «Готово к установке»;
+- **тап по уведомлению открывает окно обновления**: `cmd notification post -c "activity …"` падает с `Permission Denial: getIntentSender()` (uid=2000 не может слать интенты от имени пакета `android`), так что контентного интента у шелл-уведомления быть не может. Уведомление теперь ставит приложение, и тап поверх любого экрана показывает модальное окно «Обновление Leostryx» с версией и кнопками «Обновить и установить», «История изменений», «Позже». Факт готовности переносится через `localStorage["agy.upd.ready"]` (срок 6 часов) и окно открывается при возврате в приложение — по `visibilitychange`, `focus` и через 2,5 с после запуска;
+- **кнопка установки работает на реальный файл**: путь `/storage/emulated/0/Download/update-temp.apk` передаётся в `AgyTools.installApk()` вместе с версией, системный установщик открывается на нужном APK;
+- **версия 3.1.11** в манифесте (`versionCode` 37), «О приложении» и кэш-бастерах `index.html` (`?v=3.1.11` для `generated/main.js`, `agy_tools.js` и `agy_fun_notify.js`).
+
+### Что было в 3.1.10 (см. также [CHANGELOG.md](CHANGELOG.md))
 
 - **звук завершения теперь действительно играет**: WebView запускается с `setMediaPlaybackRequiresUserGesture`, поэтому `play()` отклонялся с `NotAllowedError`, а ошибка гасилась пустым `.catch()`. Теперь общий `Audio`-элемент разблокируется первым касанием (тихим прогоном), а заблокированный вызов не теряется — он ставится в очередь `soundQueued` и повторяется при следующем касании;
 - **оповещения из фона и из других бесед больше не теряются**: правило `done:background → skip` глушило их полностью, и если задача завершалась при свёрнутом приложении или в другом чате, не было ни гифки, ни звука. Теперь событие хранится в `pendingDone` (TTL 15 минут) и доставляется на `visibilitychange`;
@@ -84,7 +92,7 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 - **детальный просмотр релиза не обрезается**: лимит окна «Что нового» поднят с 14 000 до 32 000 символов — самое крупное тело (`v3.1.0` ≈ 29 КБ) раньше заканчивалось на «…» посреди списка;
 - **в `AGENTS.md` добавлены блоки `AGY-LANG` и `AGY-BUILD-VERSION`**: агент отвечает на языке пользователя, а версия поднимается один раз за сборку — фиксы и фичи по ходу сборки входят в текущую версию, `CHANGELOG.md` пишется после успешного билда и совпадает с именем APK и `SHA256SUMS`;
 - **байткод Python больше не едет в APK**: `__pycache__` каталога `app/assets/env/overlay` исключался только при упаковке архива исходников, а при сборке APK — нет; пять `.pyc`-файлов убраны из установочного пакета;
-- **версия 3.1.10** в манифесте (`versionCode` 36), «О приложении» и «Что нового»; cache-buster `?v=3.1.10` для `generated/main.js` и `agy_fun_notify.js`.
+- **версия 3.1.10** в манифесте (`versionCode` 36), «О приложении» и «Что нового»; cache-buster `?v=3.1.10` для `generated/main.js` и `agy_fun_notify.js` (историческая запись).
 
 > [!IMPORTANT]
 > Всё перечисленное выше вышло **в 3.1.10**, хотя часть работ была закоммичена раньше: опубликованная сборка 3.1.9 уехала на GitHub до того, как появились truststore, `agy-selfheal`, фикс фоновых задач и правила в `AGENTS.md` — в её APK нет ни `agy-selfheal`, ни `AgyTruststore`.
@@ -247,7 +255,7 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 ```
 
 > [!NOTE]
-> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
+> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.11) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
 
 ## Сборка APK
 

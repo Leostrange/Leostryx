@@ -3826,26 +3826,23 @@ PYUC
 
 # AGY-UPDATE: скачивание и установка APK
 #
-# Уведомления в шторке: само приложение постить их не может
-# (`cmd notification post` -> permission denied, callingUid=app), поэтому всё
-# идёт через Shizuku (`rish -c`, uid=2000). Прогресс дополнительно пишется в
-# файл `<apk>.progress`, чтобы UI мог читать его независимо от лога задачи
+# Уведомления в шторке постит JS-сторона через мост AgyShade (agy_tools.js):
+# только он умеет контентный интент (тап открывает приложение), setOnlyAlertOnce
+# и реальную отмену. Из шелла это невозможно — `cmd notification cancel` в
+# системе отсутствует, а `-c/--content-intent` падает с Permission Denial
+# (uid=2000 не может send as package android). Шелл публикует прогресс в лог
+# задачи и в файл `<apk>.progress`, чтобы UI читал его независимо от лога
 # (лог обрезается до 24 КБ хвоста в AgyTools.read()).
 op_updatedownload() {
     AGY_LANG="$AGY_LANG" AGY_APKURL="$ARG" python3 - <<'PYUD'
-import os, re, sys, subprocess, urllib.request, ssl
+import os, sys, subprocess, urllib.request, ssl
 url = os.environ.get("AGY_APKURL", "").strip()
-EN = (os.environ.get("AGY_LANG") or "ru").strip() == "en"
-def L(ru, en):
-    return en if EN else ru
 if not url.startswith("https://"):
     print("@@UPD ERR:bad url", flush=True); sys.exit(1)
 dst = "/storage/emulated/0/Download/update-temp.apk"
 prog = dst + ".progress"
 pkg = (os.environ.get("AGY_APPLICATION_ID") or "com.agyru.t2").strip()
 
-NOTIF_TITLE = "Leostryx \u2014 " + L("\u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "update")
-NOTIF_INSTALL = "Leostryx \u2014 " + L("\u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430", "installation")
 
 def _rish(cmd, timeout=15):
     try:
@@ -3853,16 +3850,6 @@ def _rish(cmd, timeout=15):
         return True
     except Exception:
         return False
-
-def _safe(s):
-    s = re.sub(r'[^0-9A-Za-z\u0410-\u044f\u0401\u0451 .,:;!?%()\-/+_=#]', ' ', str(s))
-    return " ".join(s.split())[:140]
-
-def notify(tag, title, text):
-    _rish('cmd notification post -S bigtext -t "%s" %s "%s"' % (_safe(title)[:60], tag, _safe(text)))
-
-def notify_cancel(tag):
-    _rish("cmd notification cancel " + tag, timeout=10)
 
 # Без этого appop системный установщик молча игнорирует ACTION_VIEW на .apk.
 _rish("appops set %s REQUEST_INSTALL_PACKAGES allow" % pkg, timeout=20)
@@ -3876,14 +3863,12 @@ except Exception:
     pf = None
 
 print("@@UPD downloading...", flush=True)
-notify("leostryx_update", NOTIF_TITLE, L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430: 0%", "Downloading: 0%"))
 ctx = ssl._create_unverified_context()
 try:
     req = urllib.request.Request(url, headers={"User-Agent": "Antigravity-App"})
     with urllib.request.urlopen(req, timeout=180, context=ctx) as r, open(dst, "wb") as f:
         total = int(r.headers.get("Content-Length", 0) or 0)
         done = 0
-        last_pct = -10
         milestone = 0
         while True:
             chunk = r.read(131072)
@@ -3892,22 +3877,12 @@ try:
             done += len(chunk)
             if total > 0:
                 print("@@UPDPROGRESS %d %d" % (done, total), flush=True)
-                pct = int(done * 100 / total)
-                if pct >= last_pct + 5:
-                    last_pct = pct
-                    notify("leostryx_update", NOTIF_TITLE,
-                           L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 %d%%  (%d / %d \u041c\u0411)",
-                             "Downloading %d%%  (%d / %d MB)")
-                           % (pct, done // 1048576, total // 1048576))
             else:
                 # Content-Length не пришёл (chunked): отчитываемся по 10 МБ
                 mb = done // (10 * 1048576)
                 if mb > milestone:
                     milestone = mb
                     print("@@UPDPROGRESS %d 0" % done, flush=True)
-                    notify("leostryx_update", NOTIF_TITLE,
-                           L("\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 %d \u041c\u0411", "Downloading %d MB")
-                           % (done // 1048576))
             if pf:
                 try:
                     pf.seek(0); pf.truncate()
@@ -3919,14 +3894,14 @@ try:
         except Exception: pass
     sz = os.path.getsize(dst)
     print("@@UPD downloaded %d" % sz, flush=True)
-    notify_cancel("leostryx_update")
     # Установку делает системный установщик Android: JS-сторона сразу после
     # @@UPDREADY вызывает AgyTools.installApk() -> ACTION_VIEW с FileProvider.
     # Тихая установка через `rish pm install` намеренно не используется.
-    notify("leostryx_ready", NOTIF_TITLE, L("\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0435", "Ready to install"))
+    # Уведомление «готово к установке» постит JS через мост AgyShade: из шелла
+    # нельзя ни отменить прежнее (`cmd notification cancel` отсутствует), ни
+    # задать контентный интент (Permission Denial для uid=2000).
     print("@@UPDREADY " + dst, flush=True)
 except Exception as e:
-    notify_cancel("leostryx_update")
     if pf:
         try: pf.close()
         except Exception: pass

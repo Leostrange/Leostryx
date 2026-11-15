@@ -11,7 +11,7 @@
 выравнивание.
 
 Использование:
-  python3 tools/axml_version.py app/AndroidManifest.xml --name 3.1.10 --code 35
+  python3 tools/axml_version.py app/AndroidManifest.xml --name 3.1.11 --code 37
   python3 tools/axml_version.py app/AndroidManifest.xml            # только показать
 """
 import argparse

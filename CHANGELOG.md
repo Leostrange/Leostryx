@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.10)
-# Changelog — Leostryx (3.1.10)
+# Список изменений — Leostryx (3.1.11)
+# Changelog — Leostryx (3.1.11)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,24 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.11 — 2026-11-15 (Одно уведомление об обновлении, без звука, тап открывает окно)
+
+<!-- RU -->
+- **После загрузки обновления в шторке висели два уведомления.** Прогресс постился под тегом `leostryx_update`, «готово» — под `leostryx_ready`, а снять первое было нечем: команды `cmd notification cancel` в этой системе просто нет (проверено через `rish -c "cmd notification post -h"` — существует только `post`). Старый `notify_cancel()` молча ничего не делал, поэтому уведомление о загрузке оставалось висеть рядом с готовым. Теперь оба состояния ставит и снимает само приложение через мост `AgyShade` (`notify`/`cancel` с настоящим `cancel` по тегу): прогресс снимается в момент готовности, и в шторке всегда ровно одна запись.
+- **Загрузка сопровождалась непрерывным звуком.** `cmd notification post` пишет в системный канал `shell_cmd` с `flags=0`, то есть без флага «оповещать один раз», а посты шли каждые 5 % — до 20 сигналов за одну загрузку. Теперь прогресс обновляется шагом 10 % через `AgyShade.notify`, который ставит `setOnlyAlertOnce(true)`: запись в шторке обновляется молча, звучит только финальное «Готово к установке».
+- **Тап по уведомлению никуда не вёл.** `cmd notification post -c "activity …"` падает с `Permission Denial: getIntentSender() … not allowed to send as package android` (uid=2000 не вправе отправлять интенты от имени пакета `android`), поэтому контентного интента у уведомления из шелла быть не может. Уведомления теперь ставит приложение, у которого контентный интент есть. Тап открывает приложение и поверх любого экрана — модальное окно «Обновление Leostryx» с версией и кнопками «Обновить и установить», «История изменений» и «Позже». Показывать окно сразу нельзя: контентный интент не несёт признака «зачем подняли приложение», поэтому факт готовности сохраняется в `localStorage["agy.upd.ready"]` (срок 6 часов), а окно открывается при возврате в приложение — по `visibilitychange`, `focus` и через 2,5 с после загрузки страницы.
+- **Кнопка установки в окне работает на реальный файл.** Путь скачанного APK (`/storage/emulated/0/Download/update-temp.apk`) передаётся в `AgyTools.installApk()` вместе с версией — системный установщик открывается на нужном файле, а не на пустом значении.
+- **Версия 3.1.11** (`versionCode` 37) в манифесте, «О приложении» и кэш-бастерах `index.html`.
+<!-- /RU -->
+
+<!-- EN -->
+- **Two notifications were left in the shade after an update download.** Progress was posted under the tag `leostryx_update` and "ready" under `leostryx_ready`, while the first one could not be removed at all: this system has no `cmd notification cancel` command (verified with `rish -c "cmd notification post -h"` — only `post` exists). The old `notify_cancel()` silently did nothing, so the download notification stayed next to the finished one. Both states are now posted and cancelled by the app itself through the `AgyShade` bridge (`notify`/`cancel` with a real tag-based `cancel`): the progress entry is removed the moment the download completes, and there is always exactly one entry in the shade.
+- **The download was accompanied by a continuous sound.** `cmd notification post` writes into the system `shell_cmd` channel with `flags=0`, i.e. without the "alert once" flag, and posts happened every 5 % — up to 20 dings per download. Progress now updates in 10 % steps through `AgyShade.notify`, which sets `setOnlyAlertOnce(true)`: the shade entry refreshes silently, and only the final "Ready to install" makes a sound.
+- **Tapping the notification led nowhere.** `cmd notification post -c "activity …"` fails with `Permission Denial: getIntentSender() … not allowed to send as package android` (uid=2000 may not send intents as the `android` package), so a shell-posted notification physically cannot carry a content intent. Notifications are now posted by the app, which does have one. A tap opens the app and, over any screen, a modal "Leostryx update" sheet with the version and the buttons "Update & install", "Changelog" and "Later". The sheet cannot be shown immediately: the content intent carries no hint of why the app was raised, so the ready state is stored in `localStorage["agy.upd.ready"]` (6-hour TTL) and the sheet opens when the user returns to the app — on `visibilitychange`, `focus` and 2.5 s after page load.
+- **The install button in the sheet acts on the real file.** The downloaded APK path (`/storage/emulated/0/Download/update-temp.apk`) is passed to `AgyTools.installApk()` together with the version, so the system installer opens on the right file instead of an empty value.
+- **Version 3.1.11** (`versionCode` 37) in the manifest, in "About the app" and in the `index.html` cache-busters.
+<!-- /EN -->
 
 ## v3.1.10 — 2026-11-15 (Оповещение о завершении: гифка и звук действительно срабатывают)
 
