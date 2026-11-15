@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.9)
-# Changelog — Leostryx (3.1.9)
+# Список изменений — Leostryx (3.1.10)
+# Changelog — Leostryx (3.1.10)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,34 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.10 — 2026-11-15 (Оповещение о завершении: гифка и звук действительно срабатывают)
+
+<!-- RU -->
+- **Звук завершения не проигрывался вообще.** WebView запускается с `setMediaPlaybackRequiresUserGesture`, поэтому `play()` отклонялся с `NotAllowedError`, а ошибка молча гасилась пустым `.catch()`. Теперь общий `Audio`-элемент «разблокируется» первым же касанием (тихим проигрыванием), а заблокированный вызов не теряется: он ставится в очередь `soundQueued` и повторяется при следующем касании — звук догоняет гифку, а не пропадает.
+- **Оповещения из фоновых чатов и из других бесед отбрасывались.** Правило `done:background → skip` глушило их полностью: если задача завершалась, пока приложение было свёрнуто или открыт другой чат, не было ни гифки, ни звука. Теперь такое событие сохраняется в `pendingDone` (TTL 15 минут) и доставляется на `visibilitychange`, то есть при возврате в приложение.
+- **Гифка могла вставиться в чужую беседу.** Найдено тестом, а не на глаз: `announce()` передавал пустой `cascadeId` в значении «не вставлять», но пустой идентификатор отключал защиту внутри `chatInsert`, и гифка попадала в открытый чат вместо того, где задача закончилась. Теперь вызов идёт как `funShow("", { force: true, overlay: true })`, а в `announce()` появился явный выход `if (!inChat || opts.overlay) { show(); playSound(); return; }`.
+- **Перерисовка React стирала гифку.** Узел удалялся при следующем ре-рендере, и вместо трёх секунд гифка жила один кадр. Добавлен интервал `_agyKeep`, который возвращает узел на место (не более 10 раз за 35 секунд) и снимает его при смене беседы; `deferred`-таймер `arm` при этом больше не держит ссылку на чужой чат.
+- **Возврат из фона срабатывал «на глазок».** Проверка `Date.now() - arm.at > 5000` заменена на отложенную проверку `GRACE_MS = 1500`, которая внутри таймера заново убеждается, что `arm` ещё актуален, `seenBusy` не выставлен и `isAgentBusy()` ложно — иначе возврат в приложение засчитывался как завершение задачи, которая всё ещё работала.
+- **Кулдаун снижен с 12 до 2 секунд** (`skip:dup`), чтобы две задачи, завершившиеся подряд, не «съедали» второе оповещение.
+- **Появилась диагностика.** `__agyFunDiag()` показывает состояние разблокировки звука, очередь `pendingDone` и счётчики срабатываний; `__agyFunFire()` принудительно запускает оповещение — проверять больше не нужно реальным ожиданием задачи.
+- **Тест-стенд на 19 проверок.** `fun_notify_test.js` — офлайн-стенд с фейковым DOM и виртуальными таймерами, 7 сценариев (в том числе фон, чужой чат и перерисовка); запуск `node fun_notify_test.js agy_fun_notify.js` из `app/assets/web`. Именно он нашёл ошибку с вставкой в чужой чат.
+- **Новый инструмент `tools/axml_version.py`.** Манифест в репозитории — это скомпилированный AXML, а не текст, и раньше версия правилась в нём вручную. Теперь скрипт переписывает пул строк (чанк `0x0001`) и встроенное значение `versionCode`, умеет работать в режиме проверки и выдаёт результат, который принимает `aapt2 dump badging`.
+- **Версия 3.1.10** (`versionCode` 35) в манифесте, «О приложении» и кэш-бастерах `index.html`.
+<!-- /RU -->
+
+<!-- EN -->
+- **The completion sound never played at all.** The WebView starts with `setMediaPlaybackRequiresUserGesture`, so `play()` was rejected with `NotAllowedError` and the error was swallowed by an empty `.catch()`. A shared `Audio` element is now unlocked by the first touch (a silent run), and a blocked playback is not lost: it is queued in `soundQueued` and retried on the next touch, so the sound catches up with the gif instead of vanishing.
+- **Notifications from background chats and from other conversations were dropped.** The `done:background → skip` rule silenced them completely: if a task finished while the app was in the background or another chat was open, there was neither a gif nor a sound. Such an event is now stored in `pendingDone` (15-minute TTL) and delivered on `visibilitychange`, i.e. when the user returns to the app.
+- **The gif could be inserted into the wrong conversation.** This was found by the harness, not by eye: `announce()` passed an empty `cascadeId` to mean "do not insert", but an empty id disabled `chatInsert`'s internal guard, so the gif landed in whichever chat was open instead of the one where the task had finished. The call is now `funShow("", { force: true, overlay: true })`, and `announce()` gained an explicit `if (!inChat || opts.overlay) { show(); playSound(); return; }` exit.
+- **A React repaint erased the gif.** The node was removed on the next re-render, so the gif lived for a single frame instead of three seconds. A `_agyKeep` interval now puts the node back (at most 10 times per 35 seconds) and drops it on a conversation change; the deferred `arm` timer no longer keeps a reference to someone else's chat.
+- **Background return was settled by eye.** The `Date.now() - arm.at > 5000` check was replaced with a deferred `GRACE_MS = 1500` check that re-verifies inside the timer that `arm` is still current, `seenBusy` is unset and `isAgentBusy()` is false — otherwise returning to the app counted as the completion of a task that was still running.
+- **The cooldown was reduced from 12 to 2 seconds** (`skip:dup`), so two tasks finishing back to back no longer swallow the second notification.
+- **Diagnostics were added.** `__agyFunDiag()` reports the audio unlock state, the `pendingDone` queue and the fired counters; `__agyFunFire()` forces a notification — no more waiting for a real task to check the behaviour.
+- **A 19-check test harness.** `fun_notify_test.js` is an offline stand with a fake DOM and virtual timers, covering 7 scenarios (including background, another chat and a repaint); run `node fun_notify_test.js agy_fun_notify.js` from `app/assets/web`. It is exactly what found the wrong-chat insertion bug.
+- **New tool `tools/axml_version.py`.** The manifest in the repository is compiled AXML rather than text, and the version used to be edited in it by hand. The script now rewrites the string pool (chunk `0x0001`) and the inline `versionCode`, supports a check-only mode, and produces a manifest that `aapt2 dump badging` accepts.
+- **Version 3.1.10** (`versionCode` 35) in the manifest, in "About the app" and in the `index.html` cache-busters.
+<!-- /EN -->
 
 ## v3.1.9 — 2026-11-15 (Полная локализация RU/EN, просмотр Changelog, загрузка обновлений)
 

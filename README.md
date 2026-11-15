@@ -1,26 +1,26 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.9-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.10-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.9).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.10).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a> &nbsp;·&nbsp; <a href="https://t.me/+qji9jQ68cWRmZDky">Telegram</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a> &nbsp;·&nbsp; <a href="https://t.me/+qji9jQ68cWRmZDky">Telegram</a></p>
 
 > [!NOTE]
-> **3.1.9 — актуальный релиз.** APK `Leostryx-3.1.9-standard.apk` и `Leostryx-3.1.9-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.9.txt` и архивом исходников `Leostryx-repo.zip`.
+> **3.1.10 — актуальный релиз.** APK `Leostryx-3.1.10-standard.apk` и `Leostryx-3.1.10-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.10.txt` и архивом исходников `Leostryx-repo.zip`.
 
 ---
 
-## Leostryx для Android 3.1.9
+## Leostryx для Android 3.1.10
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -50,8 +50,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.9-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.9-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.10-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.10-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -60,10 +60,23 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.9](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9) и сверьте SHA-256 с файлом [`SHA256SUMS-3.1.9.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.9/SHA256SUMS-3.1.9.txt).
-2. Установите скачанный APK 3.1.9 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.10](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) и сверьте SHA-256 с файлом [`SHA256SUMS-3.1.10.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.10/SHA256SUMS-3.1.10.txt).
+2. Установите скачанный APK 3.1.10 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.9 (см. также [CHANGELOG.md](CHANGELOG.md))
+## Что нового в 3.1.10 (см. также [CHANGELOG.md](CHANGELOG.md))
+
+- **звук завершения теперь действительно играет**: WebView запускается с `setMediaPlaybackRequiresUserGesture`, поэтому `play()` отклонялся с `NotAllowedError`, а ошибка гасилась пустым `.catch()`. Теперь общий `Audio`-элемент разблокируется первым касанием (тихим прогоном), а заблокированный вызов не теряется — он ставится в очередь `soundQueued` и повторяется при следующем касании;
+- **оповещения из фона и из других бесед больше не теряются**: правило `done:background → skip` глушило их полностью, и если задача завершалась при свёрнутом приложении или в другом чате, не было ни гифки, ни звука. Теперь событие хранится в `pendingDone` (TTL 15 минут) и доставляется на `visibilitychange`;
+- **гифка не вставляется в чужую беседу**: `announce()` передавал пустой `cascadeId` в значении «не вставлять», но пустой идентификатор отключал защиту внутри `chatInsert` — гифка попадала в открытый чат вместо того, где задача закончилась. Найдено тестом, а не на глаз;
+- **перерисовка React больше не стирает гифку**: интервал `_agyKeep` возвращает узел на место (не более 10 раз за 35 секунд) и снимает его при смене беседы;
+- **возврат из фона срабатывает по факту**: проверка `Date.now() - arm.at > 5000` заменена отложенной проверкой `GRACE_MS = 1500`, которая заново убеждается, что задача всё ещё не выполняется;
+- **кулдаун снижен с 12 до 2 секунд** (`skip:dup`), чтобы две задачи, завершившиеся подряд, не «съедали» второе оповещение;
+- **диагностика оповещений**: `__agyFunDiag()` показывает состояние разблокировки звука, очередь `pendingDone` и счётчики, `__agyFunFire()` запускает оповещение принудительно;
+- **тест-стенд на 19 проверок** (`fun_notify_test.js`, 7 сценариев с фейковым DOM и виртуальными таймерами) — именно он нашёл ошибку с вставкой в чужой чат;
+- **новый инструмент `tools/axml_version.py`**: манифест в репозитории — скомпилированный AXML, и версия больше не правится в нём вручную — скрипт переписывает пул строк и встроенный `versionCode`, режим проверки входит в него же;
+- **версия 3.1.10** в манифесте (`versionCode` 35) и «О приложении»; cache-buster `?v=3.1.10` для `generated/main.js` и `agy_fun_notify.js`.
+
+### Что было в 3.1.9
 
 - **полная локализация на английский**: переведено всё, что видит пользователь — статусы и ошибки «Инструментов», единицы размера, описания всех девяти шрифтов и образец предпросмотра, 21 тег MCP-серверов и описания компонентов, 16 тегов правил/скиллов/плагинов и три шаблона правил, заголовки уведомлений в шторке и каталог субагентов, вся панель мем-гифок и звука, заголовки `transcript.md`, `MANIFEST.txt`, всплывающие сообщения и ошибки экспорта;
 - **язык передаётся в shell-бэкенд**: новая операция `setlang` пишет выбор в `$HOME/.agy_lang` (учитывается и `AGY_LANG`), в `agy_tools.sh` добавлен общий хелпер `L(ru, en)` — уведомления в шторке больше не приходят по-русски при английском интерфейсе;
@@ -219,11 +232,12 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 ├── mcp_config.example.json                шаблон конфига MCP-серверов
 ├── tools/uber-apk-signer.jar              подпись + zipalign
 ├── tools/brand.py                         брендинг (иконки + label + dex strings)
+├── tools/axml_version.py                  правка versionName/versionCode в скомпилированном AXML
 └── dist/antigravity-signing.p12           ключ подписи (встаёт поверх установленного)
 ```
 
 > [!NOTE]
-> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.0.7) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
+> Полный архив исходников — [`Leostryx-repo.zip`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.10) в релизе. Два файла ядра `liblanguage_server.so` (по 181 МБ) не хранятся в git из-за лимита GitHub в 100 МБ на файл — они внутри APK и в архиве исходников.
 
 ## Сборка APK
 
