@@ -1,26 +1,26 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.6-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.8-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.6).</b><br/>
+<p align="center"><b>Leostryx для Android — русская сборка Antigravity (v3.1.8).</b><br/>
 Полная русификация, встроенное обновление с установкой APK, щит безопасности агента, вкладка и быстрый вызов субагентов в чате, уведомления в шторке с прямым ответом, оптимизация памяти, темы и матовое стекло, смена иконки и цвета на лету, Flutter SDK, MCP- и UTCP-серверы.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
 
 > [!NOTE]
-> **3.1.6 — актуальный релиз.** APK `Leostryx-3.1.6-standard.apk` и `Leostryx-3.1.6-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.6.txt` и архивом исходников `Leostryx-repo.zip`.
+> **3.1.8 — актуальный релиз.** APK `Leostryx-3.1.8-standard.apk` и `Leostryx-3.1.8-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.8.txt` и архивом исходников `Leostryx-repo.zip`.
 
 ---
 
-## Leostryx для Android 3.1.6
+## Leostryx для Android 3.1.8
 
 **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux 6.1, AArch64, Bionic) внутри процесса приложения — без PRoot, QEMU и chroot. Агент на моделях Gemini сам осматривает кодовую базу, правит файлы, запускает сборку и проверяет результат прямо на устройстве.
 
@@ -50,8 +50,8 @@
 
 | Сборка | Назначение | Файл |
 |---|---|---|
-| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.6-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) |
-| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.6-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) |
+| **Standard** | базовая, без обхода региональных ограничений | [`Leostryx-3.1.8-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) |
+| **Bypass** | с обходом региональных ограничений (region bypass) | [`Leostryx-3.1.8-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) |
 
 Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх местах байтовые проверки заменены на запись константы `1` (форс-пропуск), плюс обновляется `assets/runtime/manifest.json` с sha256 ядра. В standard-сборке стоят оригинальные инструкции, в bypass — патченые. Дельта лежит отдельно в `variants/bypass/`.
 
@@ -60,10 +60,24 @@ Region bypass — патч Go-ядра `liblanguage_server.so`: в трёх ме
 > [!WARNING]
 > **Чистая установка (только с нуля):** Сборка 3.0+ **не устанавливается поверх** старых версий 2.x (возникает ошибка «Приложение не установлено, так как оно конфликтует с другим пакетом» из-за обновления пакета `com.agyru.t2` и ключа подписи). Поверх версий 3.0.x (`com.agyru.t2`) обновление встаёт штатно без удаления.
 
-1. Скачайте APK из [релиза v3.1.6](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.6) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.6/SHA256SUMS-3.1.6.txt).
-2. Установите скачанный APK 3.1.6 (`standard` или `bypass`) и запустите приложение.
+1. Скачайте APK из [релиза v3.1.8](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.8) и сверьте SHA-256 с файлом [`SHA256SUMS.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.8/SHA256SUMS-3.1.8.txt).
+2. Установите скачанный APK 3.1.8 (`standard` или `bypass`) и запустите приложение.
 
-## Что нового в 3.1.6 (см. также [CHANGELOG.md](CHANGELOG.md))
+## Что нового в 3.1.8 (см. также [CHANGELOG.md](CHANGELOG.md))
+
+- **прикрепление файлов любых типов**: убрано тупиковое сообщение `Unsupported file format`. Файлы, которых нет в белом списке (`extensions.json`, `Dockerfile`, `Makefile`, `.env`, скрипты, конфиги, дампы, неизвестный бинарник), теперь прикрепляются к сообщению;
+- **перетаскивание больше не фильтруется**: раньше `drag&drop` молча отбрасывал файлы, чей MIME-тип не входил в белый список и чьё расширение не встречалось в наборе из 22 значений. Теперь принимается любой файл;
+- **распознавание типа по расширению и содержимому**: ~120 расширений (код, конфиги, разметка, архивы, шрифты, офисные документы) сопоставляются с MIME-типом. Если расширение неизвестно и браузер не сообщил тип, проверяются первые 64 КБ: текст уходит как `text/plain`, бинарник — как `application/octet-stream`;
+- **предохранители**: пустой файл и файл больше 20 МБ отклоняются с понятным сообщением вместо тихого сбоя;
+- **лимит текстовых вложений поднят с 1 МБ до 10 МБ** — крупный лог или большой исходник больше не отваливается;
+- **версия 3.1.8** в манифесте (`versionCode` 33) и «О приложении».
+
+### Что было в 3.1.7
+
+- **фикс сторонних провайдеров (OpenAI, DeepSeek, Claude, локальные серверы)**: исправлен сбой ядра `liblanguage_server.so` (`unsupported inline data mime type: "text/x-python": invalid argument`). При прикреплении любых программных или текстовых файлов (`.py`, `.md`, `.json`, `.ts`, `.pdf`) конвертер OpenAI-формата больше не падает, а безопасно пропускает неподдерживаемые OpenAI не-графические `inlineData` и передаёт текстовый запрос модели;
+- **версия 3.1.7** в манифесте (`versionCode` 32) и «О приложении».
+
+### Что было в 3.1.6
 
 - **свои звуки завершения задачи**: пресеты `Chime` и `Pop` больше не тянутся с CDN jsDelivr — вместо них в APK лежат собственные файлы `leostryx_portal.mp3` и `leostryx_bell.mp3`, а кнопки в настройках переименованы в **🌀 Portal** и **🛎 Bell**. Раньше без интернета звук молчал, а сам запрос уходил на сторонний сервер;
 - ключи настроек (`chime` / `pop`) сохранены прежними, поэтому уже выбранный звук продолжает работать без сброса;

@@ -113,7 +113,7 @@ web/
 | **`patches/touch_model_menu.js`** | IIFE | ~6.7 KB | Адаптация hover-меню выбора моделей Base UI под сенсорный ввод. |
 | **`patches/theme_sync.js`** | IIFE | ~4.7 KB | MutationObserver за классами `<html>`/`<body>` и передача смены темы в нативный Android. |
 | **`patches/startup_ready.js`** | IIFE | ~4.7 KB | Детектор первого полезного рендера DOM и перехватчик JS-ошибок для `AndroidBridge`. |
-| **`main.js`** | Raw + Patch | ~9.5 MB | Рабочий бандл React UI, пропатченный скриптом `patch_main.py`. |
+| **`main.js`** | Raw + Patch | ~9.5 MB | Рабочий бандл React UI, пропатченный скриптами `patch_main.py` и [`tools/patch_main_any_files.py`](../../tools/patch_main_any_files.py). |
 
 ### Проверка валидности (Verification)
 После сборки `build.sh` запускает статический синтаксический анализатор V8 (`node --check`) для каждого сгенерированного файла. Если Node.js не установлен в окружении, проверка пропускается с информационным предупреждением.
@@ -135,6 +135,22 @@ web/
 3. **Монохроматизация логотипа Eza**:
    - Upstream-логотип Antigravity содержит жестко зашитый многоцветный SVG (`mask0_6153_71`).
    - Патчер заменяет тело компонента `var Eza=...` на монохромный плоский SVG, использующий CSS-токены `text-[#9AA0A6]` (тёмная тема) и `text-[#5F6368]` (светлая тема).
+
+### Патчер вложений любых типов (`tools/patch_main_any_files.py`)
+
+Отдельный идемпотентный патчер, снимающий ограничение композера «только изображения, PDF, офисные документы, zip, текст, аудио, видео».
+
+| Что делает | Где в `main.js` | Сигнатура |
+|---|---|---|
+| **A. Добавляет `agyMimeForName()`** — таблица на ~120 расширений → MIME | перед `var u5a=` | `function agyMimeForName(a){…}` |
+| **B. Снимает фильтр `dragover`** | `m5a`, обработчик `r` | `some(w=>w.kind==="file")` вместо проверки `CB(...) \|\| image/ \|\| …` |
+| **B. Снимает фильтр `drop`** | `m5a`, обработчик `t` | `!y.has(C.name)&&B.items.add(C)` вместо `…&&CB(C.name,C.type)&&…` |
+| **C. Заменяет терминальный `else e?.("Unsupported file format")`** | `u5a`, конец цепочки валидации | общая ветка: `ArrayBuffer` → `I.MediaSchema` с `inlineData`, определение типа по расширению и первым 64 КБ |
+| **D. Поднимает лимит текста 1 МБ → 10 МБ** | `u5a`, ветка `vNa` | `Text file size exceeds 10MB limit` |
+
+Почему правится сам бандл, а не sidecar-патч из `patches/`: валидатор `u5a` — переменная модульного замыкания, снаружи (`window`) её не достать. Все sidecar-патчи работают только с глобальными объектами.
+
+Проверка после применения: `node --check app/assets/web/generated/main.js` и отсутствие строки `Unsupported file format`.
 
 ---
 
