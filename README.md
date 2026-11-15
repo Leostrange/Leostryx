@@ -13,7 +13,7 @@
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> — сборка <a href="https://github.com/Leostrange">@Leostrange</a>.</sub></p>
 
-<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a></p>
+<p align="center"><a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9"><b>Скачать APK</b></a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.9">Исходный код</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Изменения</a> &nbsp;·&nbsp; <a href="https://github.com/Leostrange/Leostryx/issues">Issues</a> &nbsp;·&nbsp; <a href="https://t.me/+qji9jQ68cWRmZDky">Telegram</a></p>
 
 > [!NOTE]
 > **3.1.9 — актуальный релиз.** APK `Leostryx-3.1.9-standard.apk` и `Leostryx-3.1.9-bypass.apk` собраны из этого дерева и приложены к релизу вместе с `SHA256SUMS-3.1.9.txt` и архивом исходников `Leostryx-repo.zip`.

@@ -30,6 +30,8 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - весь текст карточки проходит через `T(ru, en)` и меняется вместе с языком интерфейса.
 - **Changelog подтягивается с GitHub и показывается на языке интерфейса.** Тела релизов на GitHub теперь содержат обе версии текста, разделённые маркерами `<!-- RU --> … <!-- /RU -->` и `<!-- EN --> … <!-- /EN -->`; `op_changelog` выбирает нужную по языку, а если английского блока в старом релизе нет — аккуратно показывает русский.
 - **`CHANGELOG.md` стал двуязычным.** Каждая секция релиза сохранена дословно под маркером RU и продублирована английским переводом под маркером EN — это единый источник и для файла в репозитории, и для тел релизов на GitHub.
+- **Окно «Что нового» больше не обрезает крупные релизы.** Детальный просмотр релиза читал тело с лимитом 14 000 символов, поэтому тело `v3.1.0` (≈ 29 КБ) заканчивалось многоточием посреди списка — у английской версии отрезалась даже финальная строка «Full changelog». Лимит поднят до 32 000 символов (`op_changelog`, `emit(sel[:1], 32000)`); список последних релизов по-прежнему показывает по 700 символов на запись, чтобы окно открывалось мгновенно.
+- **Добавлена Telegram-группа для связи.** В карточке «О разработчике» появился контакт «Telegram · группа Leostryx» (долгое нажатие копирует ссылку-приглашение, обычный тап открывает её), а в «Обратной связи» — строка «Быстрее получить ответ можно в группе **Telegram**». Ссылка: `https://t.me/+qji9jQ68cWRmZDky`.
 - **Версия 3.1.9** (`versionCode` 34) в манифесте и «О приложении».
 <!-- /RU -->
 
@@ -53,6 +55,8 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - every string on the card goes through `T(ru, en)` and follows the interface language.
 - **The changelog is pulled from GitHub and shown in the interface language.** GitHub release bodies now carry both versions of the text, separated by the `<!-- RU --> … <!-- /RU -->` and `<!-- EN --> … <!-- /EN -->` markers; `op_changelog` picks the right one for the language and, if an older release has no English block, gracefully falls back to Russian.
 - **`CHANGELOG.md` is bilingual.** Every release section is preserved verbatim under the RU marker and duplicated with an English translation under the EN marker — one source of truth for both the repository file and the GitHub release bodies.
+- **The "What's new" window no longer truncates large releases.** The release detail view read the body with a 14,000-character cap, so the `v3.1.0` body (≈ 29 KB) ended in an ellipsis in the middle of the list — the English version even lost its final "Full changelog" line. The cap is raised to 32,000 characters (`op_changelog`, `emit(sel[:1], 32000)`); the recent-releases list still shows 700 characters per entry so the window opens instantly.
+- **A Telegram group was added for contact.** The "About the developer" card now shows a "Telegram · Leostryx group" contact (long-press copies the invite link, a normal tap opens it), and the Feedback screen gained the line "For a faster reply, join the group **Telegram**". Link: `https://t.me/+qji9jQ68cWRmZDky`.
 - **Version 3.1.9** (`versionCode` 34) in the manifest and in "About the app".
 <!-- /EN -->
 
