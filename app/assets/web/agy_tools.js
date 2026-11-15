@@ -1341,7 +1341,27 @@
       } catch (e) { return ""; }
     }
     function clLang() { return ru() ? "ru" : "en"; }
-    /* Парсит поток @@CLMETA / @@CLL / @@CLEND, который печатает op_changelog. */
+    /* Распаковка payload: op_changelog отдаёт gzip+base64, разбитый на
+       `@@CLGZ <i>/<n> <base64>`. Кириллица в сыром base64 занимала
+       ~2.7 байта на символ и упиралась в 24 КБ хвоста лога AgyTools.read(). */
+    function clUnpack(b64, cb) {
+      var bin, bytes, i;
+      try {
+        bin = atob(String(b64 || "").replace(/-/g, "+").replace(/_/g, "/"));
+        bytes = new Uint8Array(bin.length);
+        for (i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } catch (e) { cb(null); return; }
+      if (typeof DecompressionStream !== "function") { cb(null); return; }
+      try {
+        var st = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+        new Response(st).arrayBuffer().then(function (buf) {
+          cb(new TextDecoder("utf-8").decode(new Uint8Array(buf)));
+        }).catch(function () { cb(null); });
+      } catch (e) { cb(null); }
+    }
+    /* Парсит поток @@CLMETA / @@CLL / @@CLEND, который печатает op_changelog.
+       Ищем маркеры регуляркой в любом месте строки (а не indexOf === 0):
+       AgyTools.read() может отдавать строки с \r или служебным префиксом. */
     function fetchChangelog(tag, cb) {
       var b = bridge();
       if (!b) { cb(null, "bridge"); return; }
@@ -1351,23 +1371,47 @@
       pollStandalone(id, function (r) {
         var log = String(r.log || "");
         var em = /@@CLERR ([^\n]*)/.exec(log);
-        if (em) { cb(null, em[1].trim()); return; }
-        var out = [], cur = null;
+        if (em) { cb(null, em[1].trim(), log.length); return; }
+
+        var parts = [], pm, pre = /@@CLGZ\s+(\d+)\/(\d+)\s+(\S+)/g;
+        while ((pm = pre.exec(log)) !== null) parts[parseInt(pm[1], 10) - 1] = pm[3];
+        if (parts.length) {
+          clUnpack(parts.join(""), function (jsonText) {
+            if (!jsonText) { cb(null, "unpack", log.length); return; }
+            var arr = null;
+            try { arr = JSON.parse(jsonText); } catch (_) {}
+            if (!arr || !arr.length) { cb(null, "parse", log.length); return; }
+            cb(arr.map(function (o) {
+              return {
+                tag: o.tag, name: o.name, date: o.date,
+                items: (o.items || []).map(function (p) { return { k: p[0], v: p[1] }; })
+              };
+            }), null, log.length);
+          });
+          return;
+        }
+
+        /* запасной путь — старый построчный протокол */
+        var out = [], cur = null, mm, ln;
         var lines = log.split("\n");
         for (var i = 0; i < lines.length; i++) {
-          var ln = lines[i];
-          if (ln.indexOf("@@CLMETA ") === 0) {
-            var p = ln.slice(9).trim().split(" ");
-            cur = { tag: b64utf8(p[0]), name: b64utf8(p[1]), date: b64utf8(p[2]), items: [] };
+          ln = lines[i].replace(/\r+$/, "").trim();
+          if (!ln) continue;
+          mm = /@@CLMETA\s+(\S+)\s+(\S+)\s+(\S+)/.exec(ln);
+          if (mm) {
+            cur = { tag: b64utf8(mm[1]), name: b64utf8(mm[2]), date: b64utf8(mm[3]), items: [] };
             out.push(cur);
-          } else if (ln.indexOf("@@CLL ") === 0 && cur) {
-            var raw = b64utf8(ln.slice(6).trim());
-            if (raw.length >= 2) cur.items.push({ k: raw.charAt(0), v: raw.slice(2) });
-          } else if (ln.indexOf("@@CLEND") === 0) {
-            cur = null;
+            continue;
           }
+          mm = /@@CLL\s+(\S+)/.exec(ln);
+          if (mm && cur) {
+            var raw = b64utf8(mm[1]);
+            if (raw.length >= 2) cur.items.push({ k: raw.charAt(0), v: raw.slice(2) });
+            continue;
+          }
+          if (ln.indexOf("@@CLEND") >= 0) { cur = null; continue; }
         }
-        cb(out.length ? out : null, out.length ? null : "empty");
+        cb(out.length ? out : null, out.length ? null : "empty", log.length);
       }, 0);
     }
 
@@ -1420,7 +1464,7 @@
       document.body.appendChild(ov);
       clOverlay = ov;
 
-      fetchChangelog(tag, function (releases, err) {
+      fetchChangelog(tag, function (releases, err, logLen) {
         if (!clOverlay) return;
         body.innerHTML = "";
         if (!releases) {
@@ -1430,7 +1474,7 @@
           body.appendChild(er);
           var hint = document.createElement("div");
           hint.style.cssText = "font-size:12px;color:#777";
-          hint.textContent = err ? String(err) : "";
+          hint.textContent = (err ? String(err) : "") + (typeof logLen === "number" ? " · log " + logLen + " b" : "");
           body.appendChild(hint);
           return;
         }

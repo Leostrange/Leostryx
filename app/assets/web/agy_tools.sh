@@ -3321,7 +3321,7 @@ op_updprogress() {
 #      суффикс/слово "fresh" — игнорировать локальный кеш.
 op_changelog() {
     AGY_CL_ARG="${ARG:-ru}" python3 - <<'PYCL'
-import os, sys, re, ssl, json, base64, urllib.request
+import os, sys, re, ssl, json, base64, gzip, urllib.request
 
 arg = (os.environ.get("AGY_CL_ARG") or "ru").strip().lower()
 home = os.environ.get("HOME") or "/data/user/0/com.agyru.t2/files"
@@ -3365,20 +3365,21 @@ def load_cache():
         pass
     return []
 
-rels = [] if force else load_cache()
-if not rels:
+# Всегда сначала сеть: описания релизов правятся на GitHub, и кеш
+# (в т.ч. от прошлой версии приложения) показывал устаревший текст.
+# Кеш — только запасной путь, когда сети нет.
+try:
+    rels = load_remote()
     try:
-        rels = load_remote()
-        try:
-            with open(cache, "w", encoding="utf-8") as f:
-                json.dump(rels, f, ensure_ascii=False)
-        except Exception:
-            pass
-    except Exception as e:
-        rels = load_cache()
-        if not rels:
-            print("@@CLERR " + str(e).replace("\n", " ")[:110])
-            sys.exit(0)
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump(rels, f, ensure_ascii=False)
+    except Exception:
+        pass
+except Exception as e:
+    rels = load_cache()
+    if not rels:
+        print("@@CLERR " + str(e).replace("\n", " ")[:110])
+        sys.exit(0)
 
 MARK = re.compile(r"^[ \t]*<!--\s*(RU|EN)\s*-->[ \t]*$(.*?)^[ \t]*<!--\s*/\1\s*-->[ \t]*$",
                   re.S | re.M | re.I)
@@ -3429,25 +3430,47 @@ def plain(md):
 def b64(s):
     return base64.b64encode(s.encode("utf-8")).decode("ascii")
 
+# Транспорт: JSON -> gzip -> base64 -> чанки по 6000 символов.
+# AgyTools.read() отдаёт только 24 КБ хвоста лога, а сырой текст в base64
+# кириллицей занимает ~2.7 байта на символ (v3.1.0 = 37 КБ) и обрезался.
+# В gzip даже весь список влезает в несколько килобайт.
+CHUNK = 6000
+BUDGET = 20000
+
+def pack(objs):
+    raw = json.dumps(objs, ensure_ascii=False).encode("utf-8")
+    return base64.b64encode(gzip.compress(raw, 6)).decode("ascii")
+
 def emit(items, cap):
+    objs = []
     for r in items:
         ru, en = split_lang(r["body"])
         txt = (en if (lang == "en" and en) else ru) or ""
         if lang == "en" and not en:
             txt = ru  # английского ещё нет в этом релизе — показываем что есть
         lines = plain(txt)
-        used, kept = 0, []
+        used, kept, cut = 0, [], False
         for kind, val in lines:
             if used + len(val) > cap:
-                kept.append(("E", ""))
-                kept.append(("P", "\u2026"))
+                cut = True
                 break
-            kept.append((kind, val))
+            kept.append([kind, val])
             used += len(val)
-        print("@@CLMETA %s %s %s" % (b64(r["tag"]), b64(r["name"]), b64(r["date"] or "-")))
-        for kind, val in kept:
-            print("@@CLL " + b64(kind + "\t" + val))
-        print("@@CLEND")
+        if cut:
+            kept.append(["E", ""])
+            kept.append(["P", "\u2026"])
+        objs.append({"tag": r["tag"], "name": r["name"],
+                     "date": r["date"] or "-", "items": kept})
+        if len(objs) > 1 and len(pack(objs)) > BUDGET:
+            objs.pop()
+            break
+    enc = pack(objs)
+    if not enc:
+        print("@@CLERR empty payload")
+        return
+    n = (len(enc) + CHUNK - 1) // CHUNK
+    for i in range(n):
+        print("@@CLGZ %d/%d %s" % (i + 1, n, enc[i * CHUNK:(i + 1) * CHUNK]))
     print("@@CLDONE")
 
 if want:
@@ -3456,9 +3479,7 @@ if want:
     if not sel:
         print("@@CLERR not found: " + want[:40])
         sys.exit(0)
-    # 32000 — с запасом на самый крупный живой релиз (v3.1.0 ≈ 29 КБ),
-    # чтобы детальный просмотр не обрезался на «…» посреди списка.
-    emit(sel[:1], 32000)
+    emit(sel[:1], 15000)
 else:
     emit(rels[:12], 700)
 PYCL
