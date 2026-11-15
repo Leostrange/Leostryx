@@ -46,6 +46,11 @@ CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-110
 NDK_REPO="lzhiyong/termux-ndk"
 ENVF="$PREFIX/etc/profile.d/60-agy-android.sh"
 AGENTS="$PREFIX/etc/antigravity/AGENTS.md"
+# JVM trust store normalisation (see AgyTruststore.java for the rationale).
+AGY_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+TS_DIR="$PREFIX/etc/antigravity/truststore"
+TS_SRC="$AGY_SELF_DIR/AgyTruststore.java"
+TS_OUT="$TS_DIR/cacerts.jks"
 
 say()  { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
@@ -61,7 +66,7 @@ fail() { printf '@@error %s\n' "$*"; exit 1; }
 # dies with "the trustAnchors parameter must be non-empty".
 # Repair it in-process so downloads work no matter how we were started.
 jvm_env_ensure() {
-    local c store="" pass="" magic add=""
+    local c store="" pass="" magic add="" selfsuff=""
     for c in "${JAVA_HOME:-}/lib/security/cacerts" \
              "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
              "$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts" \
@@ -71,8 +76,14 @@ jvm_env_ensure() {
         store="$c"
         magic="$(od -An -tx1 -N4 "$c" 2>/dev/null | tr -d ' \n')"
         case "$magic" in
-            feedfeed) pass="" ;;        # JKS keeps the default (empty) password
-            *)        pass="changeit" ;; # Termux PKCS12 stores
+            feedfeed)
+                pass=""                     # JKS keeps the default (empty) password
+                # The JDK's own store, once normalised by jvm_truststore_normalize,
+                # is an empty-password JKS: a default JVM opens it with no flags at
+                # all, and forcing trustStorePassword would only break the MAC.
+                case "$c" in */lib/security/cacerts) selfsuff=1 ;; esac
+                ;;
+            *) pass="changeit" ;;           # Termux PKCS12 stores
         esac
         break
     done
@@ -84,7 +95,7 @@ jvm_env_ensure() {
         *-Djava.io.tmpdir=*) : ;;
         *) add="$add -Djava.io.tmpdir=$PREFIX/tmp" ;;
     esac
-    if [ -n "$store" ]; then
+    if [ -n "$store" ] && [ -z "$selfsuff" ]; then
         case "${JAVA_TOOL_OPTIONS:-}" in
             *-Djavax.net.ssl.trustStore=*) : ;;
             *) add="$add -Djavax.net.ssl.trustStore=$store -Djavax.net.ssl.trustStorePassword=$pass" ;;
@@ -95,6 +106,72 @@ jvm_env_ensure() {
     fi
 }
 jvm_env_ensure
+
+# ------------------------------------------------------------ JVM trust store
+# The flags above only reach processes that source profile.d or call this
+# script. The app core forks JVMs with the environment it had at launch, and
+# that environment carries -Duser.home but no truststore flags — so those JVMs
+# open the bundled PKCS12 cacerts with an EMPTY password, get ZERO anchors and
+# fail every HTTPS call with:
+#   InvalidAlgorithmParameterException: the trustAnchors parameter must be non-empty
+# (measured: Gradle resolved nothing from Maven Central/Google until this was
+# fixed; `verify jvm` was green because the flags made the check pass).
+# The durable fix is to normalise the store itself: merge every CA bundle we
+# have into one JKS written with an empty password — the only encoding a
+# default JVM opens with all certificates intact (PKCS12 re-encoded with an
+# empty password reloads with 0 entries) — and install it as the JDK default.
+ts_magic() { od -An -tx1 -N4 "$1" 2>/dev/null | tr -d ' \n'; }
+
+jdk_home_active() { # -> the JDK a plain `java` resolves to
+    local j
+    for j in "${JAVA_HOME:-}" "$PREFIX/lib/jvm/java-21-openjdk" "$PREFIX/lib/jvm/java-17-openjdk"; do
+        [ -n "$j" ] && [ -x "$j/bin/java" ] && { printf '%s' "$j"; return 0; }
+    done
+    return 1
+}
+
+ts_compile() { # compile AgyTruststore once; rc!=0 when javac or the source is missing
+    local cls="$TS_DIR/AgyTruststore.class"
+    [ -f "$TS_SRC" ] || return 1
+    [ -f "$cls" ] && [ ! "$TS_SRC" -nt "$cls" ] && return 0
+    mkdir -p "$TS_DIR" 2>/dev/null || return 1
+    javac -d "$TS_DIR" "$TS_SRC" >/dev/null 2>&1 || return 1
+    [ -f "$cls" ]
+}
+
+ts_java() { java -cp "$TS_DIR" AgyTruststore "$@"; }
+
+ts_selfsuff() { # <store> -> 0 when a flag-free JVM opens it with all certs
+    [ -f "$1" ] || return 1
+    [ "$(ts_magic "$1")" = feedfeed ] || return 1
+    [ "$(stat -c %s "$1" 2>/dev/null || echo 0)" -ge 100000 ] 2>/dev/null
+}
+
+jvm_truststore_normalize() { # -> 0 when this run installed/repaired the default store
+    local jdk ts spec n out
+    local -a specs=()
+    jdk="$(jdk_home_active)" || return 1
+    ts="$jdk/lib/security/cacerts"
+    ts_selfsuff "$ts" && return 1
+    ts_compile || return 1
+    # Sources worth merging: the store in place, our backup of it, the Termux
+    # CA bundle. Format "type:password:path", "-" meaning an empty password.
+    if [ -f "$ts" ]; then specs+=("PKCS12:changeit:$ts"); fi
+    if [ -f "$ts.pkcs12.orig" ]; then specs+=("PKCS12:changeit:$ts.pkcs12.orig"); fi
+    if [ -f "$PREFIX/etc/tls/certs/java/cacerts" ]; then specs+=("JKS:-:$PREFIX/etc/tls/certs/java/cacerts"); fi
+    [ "${#specs[@]}" -gt 0 ] || return 1
+    out="$(ts_java union "$TS_OUT" "${specs[@]}" 2>&1)" || return 1
+    n="$(printf '%s\n' "$out" | sed -n 's/^@@entries \([0-9][0-9]*\)$/\1/p' | tail -n1)"
+    [ "${n:-0}" -ge 100 ] 2>/dev/null || return 1
+    if [ -f "$ts" ] && [ ! -f "$ts.pkcs12.orig" ]; then cp -f "$ts" "$ts.pkcs12.orig" 2>/dev/null || :; fi
+    cp -f "$TS_OUT" "$ts" 2>/dev/null || return 1
+    # Prove it with the environment a Gradle daemon actually gets: no flags.
+    if ! env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck >/dev/null 2>&1; then
+        [ -f "$ts.pkcs12.orig" ] && cp -f "$ts.pkcs12.orig" "$ts" 2>/dev/null
+        return 1
+    fi
+    return 0
+}
 
 # pkg_retry <cmd...> — retry a pkg/network command on transient failures.
 # Mobile/VPN links routinely reset connections (curl error 35 "Recv failure"),
@@ -1192,6 +1269,10 @@ op_selfheal() {
     write_env 2>/dev/null && fixed=$((fixed + 1))
     refresh_bridges 2>/dev/null || true
     say "@@selfheal env"
+    # 0) JVM trust store: the only fix that also reaches JVMs the app forks with
+    # its own environment (Gradle daemon, sdkmanager, Maven, jadx).
+    step "JVM trust store"
+    jvm_truststore_normalize && { fixed=$((fixed + 1)); say "@@selfheal truststore"; }
     # 1) Gradle launcher
     gl=""
     if [ -L "$PREFIX/bin/gradle" ]; then
@@ -1253,21 +1334,33 @@ op_verify() {
         rm -rf "$dir"
         return "$rc"
     }
-    # Gradle/Maven HTTPS only works when the JVM can read a truststore that
-    # actually contains anchors, so probe the store itself (not `java -version`).
+    # Gradle/Maven HTTPS only works when a JVM can open a store with real
+    # anchors. The flags-free case is the one that matters: the app forks Gradle
+    # daemons/sdkmanager with its own environment, where profile.d never ran.
+    # So assert BOTH the store contents and what a flag-free JVM actually sees —
+    # the old check only proved a flagged shell could read some store, which is
+    # why it stayed green while every real build failed with
+    # "the trustAnchors parameter must be non-empty".
     verify_truststore() {
-        local st n
-        for st in "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
-                  "$PREFIX/lib/jvm/java-17-openjdk/lib/security/cacerts" \
-                  "$PREFIX/etc/tls/certs/java/cacerts"; do
-            [ -f "$st" ] || continue
-            n="$(keytool -list -keystore "$st" -storepass changeit 2>/dev/null | grep -c trustedCertEntry)"
-            [ "${n:-0}" -ge 20 ] 2>/dev/null || continue
-            echo "truststore ok: $(basename "$(dirname "$(dirname "$(dirname "$st")")")")/cacerts anchors=$n"
-            return 0
-        done
-        echo "no readable truststore with trust anchors — Gradle/Maven HTTPS will fail"
-        return 1
+        local jdk ts spec n d
+        jdk="$(jdk_home_active)" || { echo "no usable JDK found"; return 1; }
+        ts="$jdk/lib/security/cacerts"
+        [ -f "$ts" ] || { echo "missing $ts"; return 1; }
+        case "$(ts_magic "$ts")" in
+            feedfeed) spec="JKS:-:$ts" ;;
+            *)        spec="PKCS12:changeit:$ts" ;;
+        esac
+        if ts_compile; then
+            n="$(ts_java check "$spec" 2>/dev/null | sed -n 's/^@@entries \([0-9][0-9]*\)$/\1/p' | head -n1)"
+            d="$(env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS "$jdk/bin/java" -cp "$TS_DIR" AgyTruststore defcheck 2>/dev/null \
+                 | sed -n 's/.*anchors=\([0-9][0-9]*\).*/\1/p' | head -n1)"
+        else
+            n="$(keytool -list -keystore "$ts" -storepass changeit 2>/dev/null | grep -c trustedCertEntry)"
+            d="$n"
+        fi
+        [ "${n:-0}" -ge 20 ] 2>/dev/null || { echo "store $ts holds ${n:-0} anchors"; return 1; }
+        [ "${d:-0}" -ge 20 ] 2>/dev/null || { echo "default JVM sees ${d:-0} anchors (flag-only repair)"; return 1; }
+        echo "truststore ok: $(basename "$jdk")/cacerts anchors=$n default=$d"
     }
     verify_agp() {
         local v

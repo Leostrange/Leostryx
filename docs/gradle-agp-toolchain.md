@@ -48,13 +48,58 @@ java.security.InvalidAlgorithmParameterException:
 | `etc/tls/certs/java/cacerts` | `FEEDFEED` (JKS) | пустой | 118 |
 | `lib/jvm/java-17-openjdk/lib/security/cacerts` | битый симлинк → Termux | — | — |
 
-`65-agy-jvm.sh` поэтому:
+### 1.1 Почему флагов окружения недостаточно (v3)
 
-1. перебирает кандидатов и берёт **первый существующий** файл;
-2. определяет формат по первым 4 байтам (`od -An -tx1 -N4`) и выводит пароль:
-   `feedfeed` → пустой (JKS), `3082*`/`3083*` → `changeit`;
-3. экспортирует `-Djavax.net.ssl.trustStore` **вместе с**
-   `-Djavax.net.ssl.trustStorePassword`.
+До v3 фиксом считались флаги `-Djavax.net.ssl.trustStore` /
+`-Djavax.net.ssl.trustStorePassword` в `JAVA_TOOL_OPTIONS`. Их видит только тот
+процесс, который **сам** подхватил окружение: логин-шелл (через
+`profile.d/65-agy-jvm.sh`) или скрипт, вызвавший `jvm_env_ensure()`. Ядро
+приложения форкает JVM — Gradle single-use daemon, `sdkmanager`, Maven, `jadx` —
+с окружением, которое было у приложения при старте, а там есть `-Duser.home` и
+**нет** truststore-флагов.
+
+Измерено на этом устройстве:
+
+| Окружение | `bash $HOME/web/agy_tools.sh verify jvm` (старая проверка) | `gradle resolveProbe --no-daemon` |
+|---|---|---|
+| логин-шелл, флаги есть | `anchors=149` ✅ | `BUILD SUCCESSFUL`, guava + AGP реально скачаны |
+| шелл без флагов (как у агента и демона) | `anchors=149` ✅ (потому что проверка вызывала `jvm_env_ensure`) | `the trustAnchors parameter must be non-empty` ❌ |
+
+Отсюда правило v3: **чинить хранилище, а не окружение**.
+
+1. `AgyTruststore` (`$HOME/web/AgyTruststore.java`, класс компилируется в
+   `$PREFIX/etc/antigravity/truststore/`) собирает **union** всех найденных
+   CA-бандлов — дедупликация по SHA-256 отпечатку сертификата;
+2. пишет его как **JKS с пустым паролем** — единственная кодировка, которую
+   дефолтная JVM открывает целиком. Проверено: PKCS12, пересохранённый с пустым
+   паролем, перезагружается с **0 записями**, JKS — со всеми 149;
+3. ставит результат на место `$JAVA_HOME/lib/security/cacerts`, оригинал
+   сохраняя в `cacerts.pkcs12.orig`;
+4. проверяет результат **без единого флага**
+   (`env -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS java -cp … AgyTruststore defcheck`)
+   и откатывается на бэкап, если корней 0.
+
+После этого `65-agy-jvm.sh` (маркер `JVM-TRUSTSTORE-FIX-v3`) флаги truststore
+**не добавляет вообще**: для JKS с пустым паролем
+`-Djavax.net.ssl.trustStorePassword` только ломает MAC хранилища. Флаги
+остаются лишь как fallback для ненормализованного PKCS12 (свежая установка до
+первого self-heal).
+
+Проверки (обе считают реальные корни, а не менеджеры):
+
+```bash
+bash $HOME/web/agy_tools.sh verify jvm
+# @@ok jvm truststore ok: java-21-openjdk/cacerts anchors=149 default=149
+#                                                   ^ в файле   ^ без флагов
+
+java -cp "$PREFIX/etc/antigravity/truststore" AgyTruststore https
+# @@https 200 https://repo.maven.apache.org/maven2/
+```
+
+> [!WARNING]
+> `anchors>0`, но `default=0` — это ровно тот сценарий «всё зелёное, но ничего
+> не качается»: хранилище открывается только с флагами, которых у форкнутых JVM
+> нет. `verify jvm` теперь падает в этом случае намеренно.
 
 > [!WARNING]
 > Историческая ошибка, которую легко вернуть: профиль проверял
@@ -62,13 +107,6 @@ java.security.InvalidAlgorithmParameterException:
 > Приложение уже добавляет `-Duser.home`, поэтому truststore-флаги не
 > добавлялись **никогда**. Сейчас каждый флаг проверяется и добавляется
 > отдельно.
-
-Проверка (реально считает корни, а не менеджеры):
-
-```bash
-bash $HOME/web/agy_tools.sh verify jvm
-# @@ok jvm ... anchors=149
-```
 
 > [!NOTE]
 > Раньше проверка использовала `getTrustManagers().length` — это **всегда 1**
@@ -169,16 +207,21 @@ agy-daemon task run-now "Toolchain self-heal"
 
 Что чинится:
 
-1. `60-agy-android.sh` и `65-agy-jvm.sh` (по маркеру `JVM-TRUSTSTORE-FIX-v2`);
-2. мосты в `$HOME/runtime/bin`;
-3. симлинк `$PREFIX/bin/gradle` → совместимая с активным AGP версия;
-4. пара `agy-agp.state` ↔ заметка `# AGY-AGP:`;
-5. блоки `<!-- AGY-GRADLE-AGP -->` в шаблоне и в «живых» правилах агента;
-6. мусорный `$HOME/AGENTS.md` (архивируется в `.agy-stray-AGENTS.md`).
+1. `60-agy-android.sh` и `65-agy-jvm.sh` (по маркеру `JVM-TRUSTSTORE-FIX-v3`);
+2. **JVM trust store** — union CA-бандлов → JKS с пустым паролем на месте
+   `$JAVA_HOME/lib/security/cacerts` (шаг `@@selfheal truststore`, см. §1.1);
+3. мосты в `$HOME/runtime/bin`;
+4. симлинк `$PREFIX/bin/gradle` → совместимая с активным AGP версия;
+5. пара `agy-agp.state` ↔ заметка `# AGY-AGP:`;
+6. блоки `<!-- AGY-GRADLE-AGP -->` в шаблоне и в «живых» правилах агента;
+7. мусорный `$HOME/AGENTS.md` (архивируется в `.agy-stray-AGENTS.md`).
 
 `fixed=N` считает **реальные** правки: второй запуск подряд печатает
 `@@selfheal fixed=0`. Это и есть проверка идемпотентности — если число не
 падает до нуля, значит какая-то функция пишет файл, не сравнивая содержимое.
+Нормализация truststore идемпотентна по формату хранилища: пока
+`$JAVA_HOME/lib/security/cacerts` остаётся JKS (`FEEDFEED`) размером ≥100 КБ,
+шаг ничего не делает.
 
 ---
 

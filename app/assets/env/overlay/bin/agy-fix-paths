@@ -63,12 +63,12 @@ done < <(grep -rIlZ -E -m 1 -e '^#! */usr/bin/env' -- "${targets[@]}" 2>/dev/nul
 #    (Gradle/AGP resolution, Maven, sdkmanager). We export both path+password.
 #    Keep in sync with assets/env/overlay/etc/profile.d/65-agy-jvm.sh.
 jvm_profile="$PREFIX/etc/profile.d/65-agy-jvm.sh"
-jvm_marker='JVM-TRUSTSTORE-FIX-v2'
+jvm_marker='JVM-TRUSTSTORE-FIX-v3'
 if [ ! -f "$jvm_profile" ] || ! grep -q "$jvm_marker" "$jvm_profile" 2>/dev/null; then
     mkdir -p "$PREFIX/etc/profile.d" 2>/dev/null || true
     if cat > "$jvm_profile.agyfix.$$" 2>/dev/null <<'JVMPROF'
 # 65-agy-jvm.sh — Antigravity JVM sandbox paths + truststore (agy-fix-paths step 3).
-# JVM-TRUSTSTORE-FIX-v2 — bump when the logic below changes; agy-fix-paths
+# JVM-TRUSTSTORE-FIX-v3 — bump when the logic below changes; agy-fix-paths
 # rewrites any copy that does not carry the current marker.
 _agy_jvm_tmp=""
 if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && touch "$TMPDIR/.agy_jvm_w" 2>/dev/null; then
@@ -82,6 +82,7 @@ mkdir -p "$_agy_jvm_tmp" 2>/dev/null || true
 # FEEDFEED = JKS (empty default password), 3082/3083 = PKCS12 ("changeit").
 _agy_ts_store=""
 _agy_ts_pass=""
+_agy_ts_selfsuff=""
 for _agy_c in \
     "$JAVA_HOME/lib/security/cacerts" \
     "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
@@ -94,6 +95,11 @@ do
         feedfeed)        _agy_p="" ;;
         3082*|3083*)     _agy_p="changeit" ;;
         *)               _agy_p="changeit" ;;
+    esac
+    # agy-selfheal normalises the JDK store into an empty-password JKS, which a
+    # flag-free JVM opens with all certs intact; a password flag would break it.
+    case "$_agy_magic:$_agy_c" in
+        feedfeed:*"/lib/security/cacerts") _agy_ts_selfsuff=1 ;;
     esac
     _agy_ts_store="$_agy_c"
     _agy_ts_pass="$_agy_p"
@@ -110,7 +116,7 @@ case "${JAVA_TOOL_OPTIONS:-}" in
     *-Djava.io.tmpdir=*) : ;;
     *) _agy_add="$_agy_add -Djava.io.tmpdir=$_agy_jvm_tmp" ;;
 esac
-if [ -n "$_agy_ts_store" ]; then
+if [ -n "$_agy_ts_store" ] && [ -z "$_agy_ts_selfsuff" ]; then
     case "${JAVA_TOOL_OPTIONS:-}" in
         *-Djavax.net.ssl.trustStore=*) : ;;
         *) _agy_add="$_agy_add -Djavax.net.ssl.trustStore=$_agy_ts_store -Djavax.net.ssl.trustStorePassword=$_agy_ts_pass" ;;
@@ -119,7 +125,7 @@ fi
 if [ -n "$_agy_add" ]; then
     export JAVA_TOOL_OPTIONS="${_agy_add# }${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"
 fi
-unset _agy_jvm_tmp _agy_ts_store _agy_ts_pass _agy_add
+unset _agy_jvm_tmp _agy_ts_store _agy_ts_pass _agy_ts_selfsuff _agy_add
 JVMPROF
     then
         if cmp -s "$jvm_profile" "$jvm_profile.agyfix.$$" 2>/dev/null; then

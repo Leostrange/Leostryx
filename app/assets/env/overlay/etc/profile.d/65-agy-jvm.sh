@@ -1,5 +1,5 @@
 # 65-agy-jvm.sh — Antigravity JVM sandbox paths + truststore.
-# JVM-TRUSTSTORE-FIX-v2 — bump when the logic below changes; agy-fix-paths
+# JVM-TRUSTSTORE-FIX-v3 — bump when the logic below changes; agy-fix-paths
 # rewrites any copy that does not carry the current marker.
 #
 # Termux-OpenJDK (bundled in AGY) hardcodes Termux locations:
@@ -17,7 +17,12 @@
 #   java.security.InvalidAlgorithmParameterException:
 #   the trustAnchors parameter must be non-empty
 # which breaks Gradle/AGP resolution, sdkmanager, Maven, etc.
-# We therefore always export the store path AND its password.
+#
+# v3: flags are no longer the primary fix. agy-selfheal (`agy-selfheal`, hourly
+# from agy-daemon) installs a union CA store as an empty-password JKS at the
+# JDK default path, so ANY JVM - including the ones the app core forks with its
+# own environment, where this profile never runs - opens it with no flags at
+# all. Flags are only added as a fallback for stores that still need a password.
 #
 # Sourced by $PREFIX/etc/profile; idempotent.
 
@@ -35,6 +40,7 @@ mkdir -p "$_agy_jvm_tmp" 2>/dev/null || true
 # (Termux builds these with "changeit").
 _agy_ts_store=""
 _agy_ts_pass=""
+_agy_ts_selfsuff=""
 for _agy_c in \
     "$JAVA_HOME/lib/security/cacerts" \
     "$PREFIX/lib/jvm/java-21-openjdk/lib/security/cacerts" \
@@ -47,6 +53,12 @@ do
         feedfeed)        _agy_p="" ;;         # JKS, default (empty) password
         3082*|3083*)     _agy_p="changeit" ;; # DER/PKCS12
         *)               _agy_p="changeit" ;;
+    esac
+    # agy-selfheal normalises the JDK store into an empty-password JKS. Such a
+    # store is opened by a flag-free JVM with all certs intact, so forcing
+    # trustStorePassword onto it would only break the key-store MAC.
+    case "$_agy_magic:$_agy_c" in
+        feedfeed:*"/lib/security/cacerts") _agy_ts_selfsuff=1 ;;
     esac
     _agy_ts_store="$_agy_c"
     _agy_ts_pass="$_agy_p"
@@ -67,7 +79,7 @@ case "${JAVA_TOOL_OPTIONS:-}" in
     *-Djava.io.tmpdir=*) : ;;
     *) _agy_add="$_agy_add -Djava.io.tmpdir=$_agy_jvm_tmp" ;;
 esac
-if [ -n "$_agy_ts_store" ]; then
+if [ -n "$_agy_ts_store" ] && [ -z "$_agy_ts_selfsuff" ]; then
     case "${JAVA_TOOL_OPTIONS:-}" in
         *-Djavax.net.ssl.trustStore=*) : ;;
         *) _agy_add="$_agy_add -Djavax.net.ssl.trustStore=$_agy_ts_store -Djavax.net.ssl.trustStorePassword=$_agy_ts_pass" ;;
@@ -77,4 +89,4 @@ if [ -n "$_agy_add" ]; then
     export JAVA_TOOL_OPTIONS="${_agy_add# }${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"
 fi
 
-unset _agy_jvm_tmp _agy_ts_store _agy_ts_pass _agy_add
+unset _agy_jvm_tmp _agy_ts_store _agy_ts_pass _agy_ts_selfsuff _agy_add
