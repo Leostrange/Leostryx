@@ -23,6 +23,7 @@
     return /^ru\b/i.test(navigator.language || "");
   }
   function T(r, e) { return ruLang() ? r : e; }
+  window.__agyT = T;
 
   /* ---- Dynamic Theme-Adaptive Glass Variables ----------------------------
    * Reads the active theme tokens (--background, --foreground) directly from
@@ -240,56 +241,43 @@
   }
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start, { once: true });
 
-  /* ---- Composer focus guard (ТЗ 6.3, B-08) ---------------------------------
-   * Keyboard must open ONLY when user focuses directly on the chat editor,
-   * after selecting Mentions/Actions/Browser, or when an attachment is added.
-   * Tapping buttons (+, model selector, shield, mic, subagent) must NOT open keyboard. */
+  /* ---- Composer focus stability --------------------------------------------
+   * Tapping toolbar controls (+, model selector, shield, mic, subagent) must NOT
+   * steal focus or cause unwanted keyboard opening when closed, but user focus
+   * on the editor must NEVER be blocked, rejected or blurred. */
   var BOX = "[data-testid='agent-input-box']";
-  var MENUISH = "[role='menu'],[role='menuitem'],[role='listbox'],[role='option'],[role='dialog']," +
-                "[data-testid^='model-selector'],[aria-label='Add context'],[aria-label='Добавить контекст']," +
-                "#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']";
-  var guard = { t: 0, block: false };
+  var CONTROL_BUTTONS = "[data-testid^='model-selector'],[aria-label='Add context'],[aria-label='Добавить контекст']," +
+                        "#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']";
 
   function isEditor(el) {
     return !!(el && el.nodeType === 1 && el.closest && el.closest(BOX) &&
-      (el.isContentEditable || el.tagName === "TEXTAREA"));
+      (el.isContentEditable || el.tagName === "TEXTAREA" || el.getAttribute("contenteditable") === "true"));
   }
-  function menuOpen() {
-    return !!document.querySelector("[role='menu'],[role='listbox'],[role='dialog'],[data-testid='model-selector-panel'],#agy-subagents-popover,#agy-shield");
-  }
+
+  // При клике на кнопки панели управления (модель, щит, субагенты), если открывается меню,
+  // плавно убираем фокус с редактора, чтобы меню отобразилось без открытой клавиатуры.
   document.addEventListener("pointerdown", function (e) {
     var t = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
     if (!t || !t.closest) return;
-    var item = t.closest("[role='menuitem'],[role='option'],button");
-    var label = item ? (item.textContent || "").trim() : "";
-    var needsInput = /^(Mentions|Actions|Browser|Упоминания|Действия|Браузер)$/.test(label);
-    /* File picker (Media/Folder) needs a clean user-gesture context on Android.
-       If we blur/block here, input.click() won't open the system file dialog.
-       Return early — let React's onClick handle everything. */
-    if (/^(Media|Медиа|Folder|Папка)$/.test(label)) return;
-    var onEditor = isEditor(t) || !!t.closest(BOX + " [contenteditable='true']");
-    var onControls = !!t.closest(MENUISH) || !!t.closest("#agy-subagent-btn,.agy-shield-btn,[data-testid='model-selector-trigger']");
-
-    if (!onEditor && !needsInput && (onControls || menuOpen())) {
-      guard = { t: Date.now(), block: true };
+    var btn = t.closest(CONTROL_BUTTONS);
+    if (btn) {
       var ae = document.activeElement;
-      if (ae && isEditor(ae)) { try { ae.blur(); } catch (_) {} }
-    } else if (onEditor || needsInput) {
-      guard = { t: 0, block: false };
+      if (ae && isEditor(ae)) {
+        try { ae.blur(); } catch (_) {}
+      }
     }
   }, true);
 
-  function shouldBlock(el) {
-    return guard.block && Date.now() - guard.t < 1500 && isEditor(el) && document.activeElement !== el;
-  }
-  var nativeFocus = HTMLElement.prototype.focus;
-  HTMLElement.prototype.focus = function () {
-    if (shouldBlock(this)) return;
-    return nativeFocus.apply(this, arguments);
-  };
-  document.addEventListener("focusin", function (e) {
-    if (guard.block && Date.now() - guard.t < 1500 && isEditor(e.target)) {
-      try { e.target.blur(); } catch (err) {}
+  // Клик в любую свободную область поля ввода (padding, border) надежно передает фокус в редактор
+  document.addEventListener("click", function (e) {
+    var t = e.target && e.target.nodeType === 1 ? e.target : null;
+    if (!t || !t.closest) return;
+    var box = t.closest(BOX);
+    if (box && !t.closest("button,[role='button'],input,select,textarea,.agy-shield-btn,#agy-subagent-btn,[data-testid='input-attachment']")) {
+      var ed = box.querySelector("[contenteditable='true']");
+      if (ed && document.activeElement !== ed) {
+        try { ed.focus({ preventScroll: true }); } catch (_) { try { ed.focus(); } catch (__) {} }
+      }
     }
   }, true);
 
@@ -300,7 +288,6 @@
       for (var j = 0; j < added.length; j++) {
         var n = added[j];
         if (n.nodeType === 1 && (n.matches("[data-testid='input-attachment']") || n.querySelector("[data-testid='input-attachment']"))) {
-          guard = { t: 0, block: false };
           setTimeout(focusEditor, 120);
           return;
         }
@@ -314,7 +301,6 @@
     if (!box) return;
     var el = box.querySelector("[contenteditable='true']");
     if (!el || box.contains(document.activeElement)) return;
-    guard = { t: 0, block: false };
     try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (_) {} }
   }
 
@@ -1658,15 +1644,20 @@
   }, true);
 
   function attachSubagentButton() {
-    if (document.getElementById("agy-subagent-btn")) return;
     var box = document.querySelector(BOX);
-    if (!box) return;
+    if (!box) { closeSubagentsMenu(); return; }
 
-    var plus = box.querySelector("[aria-label='Add context'],[aria-label='Добавить контекст'],[data-testid='attach-button']");
+    var existing = document.getElementById("agy-subagent-btn");
+    if (existing) {
+      if (box.contains(existing) && existing.isConnected) return;
+      try { existing.remove(); } catch (_) {}
+    }
+
+    var plus = box.querySelector("button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']");
     var footer = plus ? plus.closest("[class*='input-footer']") : box.querySelector("[class*='input-footer']");
     if (!footer) return;
     var group = footer.lastElementChild;
-    if (!group) return;
+    if (!group || (plus && group.contains(plus))) return;
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1679,10 +1670,7 @@
       "color:var(--secondary-foreground, currentColor);flex-shrink:0;transition:background-color .15s, color .15s";
     btn.innerHTML = SVG_ICONS.bot;
     btn.addEventListener("pointerdown", function (e) {
-      e.preventDefault();
-      guard = { t: Date.now(), block: true };
-      var ae = document.activeElement;
-      if (ae && isEditor(ae)) { try { ae.blur(); } catch (_) {} }
+      e.stopPropagation();
     });
     btn.addEventListener("click", function (e) {
       e.preventDefault();
@@ -1691,39 +1679,88 @@
     });
 
     var shield = group.querySelector(".agy-shield-btn");
-    if (shield) group.insertBefore(btn, shield);
-    else group.insertBefore(btn, group.firstChild);
+    if (shield) {
+      group.insertBefore(btn, shield);
+    } else {
+      group.insertBefore(btn, group.firstChild);
+    }
   }
 
-  setInterval(attachSubagentButton, 600);
+  // Double trigger: interval + fast animation frame on DOM changes
+  setInterval(attachSubagentButton, 400);
+  try {
+    var subagentRaf = 0;
+    var subagentObs = new MutationObserver(function () {
+      if (!subagentRaf) {
+        subagentRaf = requestAnimationFrame(function () {
+          subagentRaf = 0;
+          attachSubagentButton();
+        });
+      }
+    });
+    if (document.body) subagentObs.observe(document.body, { childList: true, subtree: true });
+    else document.addEventListener("DOMContentLoaded", function () { subagentObs.observe(document.body, { childList: true, subtree: true }); });
+  } catch (_) {}
 
   /* ---- Background Keep-Alive for Uninterrupted Chat & Agent Execution ------
    * When the user minimizes the app, Chromium WebView on Android throttles
-   * timers and suspends streaming fetch/SSE connections unless an active media
-   * session is present.
-   * We maintain a silent HTML5 audio loop while generation/chat is active.
-   * This signals Android/Chromium to keep the renderer alive, preventing
-   * chat disconnects or streaming aborts when the app is in the background. */
+   * DOM timers to >=1min and suspends streaming fetch/SSE connections unless
+   * a background thread (Web Worker) and active media playback are present.
+   * We combine:
+   * 1. Dedicated background Web Worker with high-frequency tick.
+   * 2. Silent PCM HTML5 Audio loop with MediaSession metadata (immune to Doze/freezing).
+   * 3. Network keep-alive ping on return from background. */
   var bgAudio = null;
+  var bgWorker = null;
   var isKeepAliveActive = false;
   var lastUserActivity = 0;
-
-  /* A user who touched the app within this window may still have an agent run
-     in flight — or, more importantly, may just have put the phone down with the
-     screen about to lock. Keeping the audio session armed for that long is
-     essentially free (silent, volume 0.001) and removes the dependence on
-     fragile DOM probing. */
   var PROTECT_WINDOW_MS = 30 * 60 * 1000;
+
+  function generateSilentPcmWav() {
+    try {
+      var sampleRate = 8000;
+      var numSamples = sampleRate; // 1 second mono
+      var buffer = new Uint8Array(44 + numSamples);
+      buffer.set([0x52, 0x49, 0x46, 0x46]); // "RIFF"
+      var fileSize = 36 + numSamples;
+      buffer[4] = fileSize & 0xff; buffer[5] = (fileSize >> 8) & 0xff;
+      buffer[6] = (fileSize >> 16) & 0xff; buffer[7] = (fileSize >> 24) & 0xff;
+      buffer.set([0x57, 0x41, 0x56, 0x45], 8); // "WAVE"
+      buffer.set([0x66, 0x6d, 0x74, 0x20], 12); // "fmt "
+      buffer.set([16, 0, 0, 0], 16); buffer.set([1, 0], 20); buffer.set([1, 0], 22);
+      buffer[24] = sampleRate & 0xff; buffer[25] = (sampleRate >> 8) & 0xff;
+      buffer[28] = sampleRate & 0xff; buffer[29] = (sampleRate >> 8) & 0xff;
+      buffer.set([1, 0], 32); buffer.set([8, 0], 34);
+      buffer.set([0x64, 0x61, 0x74, 0x61], 36); // "data"
+      buffer[40] = numSamples & 0xff; buffer[41] = (numSamples >> 8) & 0xff;
+      for (var i = 0; i < numSamples; i++) buffer[44 + i] = 128; // PCM 8-bit center/silence
+      var binary = "";
+      for (var j = 0; j < buffer.length; j++) binary += String.fromCharCode(buffer[j]);
+      return "data:audio/wav;base64," + btoa(binary);
+    } catch (_) {
+      return "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+    }
+  }
+
+  function initWorker() {
+    if (bgWorker) return;
+    try {
+      var code = "var t=null;self.onmessage=function(e){if(e.data==='start'){if(!t)t=setInterval(function(){self.postMessage('tick');},1000);}else if(e.data==='stop'){if(t){clearInterval(t);t=null;}}};";
+      var blob = new Blob([code], { type: "application/javascript" });
+      bgWorker = new Worker(URL.createObjectURL(blob));
+      bgWorker.onmessage = function (ev) {
+        if (ev.data === "tick" && document.hidden) {
+          // Keep internal timing alive in background
+          if (shouldProtect() && !isKeepAliveActive) startKeepAlive();
+        }
+      };
+    } catch (_) {}
+  }
 
   function markUserActivity() {
     lastUserActivity = Date.now();
   }
 
-  /* Detection against the real shipped bundle (generated/main.js):
-       data-tooltip-id="input-send-button-cancel-tooltip"  – cancel/stop button
-       data-testid="send-button-pending"                   – request in flight
-     The remaining selectors are defensive fallbacks for other bundle versions
-     and for the RU localisation. */
   function isChatRunning() {
     try {
       if (document.querySelector(
@@ -1749,14 +1786,25 @@
   function startKeepAlive() {
     if (isKeepAliveActive) return;
     try {
+      initWorker();
+      if (bgWorker) bgWorker.postMessage("start");
       if (!bgAudio) {
-        bgAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        bgAudio = new Audio(generateSilentPcmWav());
         bgAudio.loop = true;
-        bgAudio.volume = 0.001;
+        bgAudio.volume = 0.05;
       }
       isKeepAliveActive = true;
       var p = bgAudio.play();
       if (p && p.catch) p.catch(function () { isKeepAliveActive = false; });
+      if ("mediaSession" in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: "Leostryx Background Worker",
+            artist: "Leostryx"
+          });
+          navigator.mediaSession.playbackState = "playing";
+        } catch (_) {}
+      }
     } catch (e) {
       isKeepAliveActive = false;
     }
@@ -1765,15 +1813,17 @@
   function stopKeepAlive() {
     if (!isKeepAliveActive) return;
     try {
+      if (bgWorker) bgWorker.postMessage("stop");
       if (bgAudio) bgAudio.pause();
+      if ("mediaSession" in navigator) {
+        try { navigator.mediaSession.playbackState = "paused"; } catch (_) {}
+      }
     } catch (e) {}
     isKeepAliveActive = false;
   }
 
   function checkBackgroundState() {
     if (document.hidden) {
-      /* Arm unconditionally on hide: a process kill loses the chat whether or
-         not the stop button happened to be mounted at that instant. */
       markUserActivity();
       startKeepAlive();
     } else if (isChatRunning()) {
@@ -1788,20 +1838,12 @@
   document.addEventListener("keydown", markUserActivity, true);
   document.addEventListener("input", markUserActivity, true);
 
-  /* First paint: the user is obviously present, open the protection window. */
   markUserActivity();
-
   setInterval(function () {
     if (isKeepAliveActive) return;
     if (document.hidden && shouldProtect()) startKeepAlive();
   }, 1500);
 
-  /* ---- Return from background / screen lock -------------------------------
-   * The host dispatches `agy:host-resume` from WebViewLifecycle.resume(). After
-   * a screen-off the silent media session is usually torn down by the system,
-   * so the next background period would lose its protection. Re-arm it, and
-   * nudge the reconnectable streams (`$i` in main.js retries every 1s, but its
-   * timer can be throttled while the page is hidden). */
   function recoverAfterBackground() {
     markUserActivity();
     if (document.hidden || shouldProtect()) startKeepAlive();

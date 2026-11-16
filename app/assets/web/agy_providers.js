@@ -605,6 +605,67 @@
     }
   }
 
+  /* ---- Quick toggle from chat header (...) -------------------------------- */
+  function showToast(msg, isWarn) {
+    try {
+      var old = document.getElementById("agy-toast-msg");
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+      var t = document.createElement("div");
+      t.id = "agy-toast-msg";
+      t.style.cssText = "position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:2147483647;" +
+        "background:" + (isWarn ? "rgba(220,53,69,0.92)" : "rgba(30,30,30,0.95)") + ";" +
+        "color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:500;" +
+        "box-shadow:0 8px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.15);" +
+        "display:flex;align-items:center;gap:8px;pointer-events:none;transition:opacity .3s ease;white-space:nowrap";
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function () {
+        t.style.opacity = "0";
+        setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 350);
+      }, 3500);
+    } catch (_) {}
+  }
+
+  window.__agyIsProvidersMode = function () {
+    load();
+    return !!state.useProviders;
+  };
+
+  window.__agyProviderIcon = function () {
+    load();
+    return state.useProviders ? "dns" : "smart_toy";
+  };
+
+  window.__agyProviderTooltip = function () {
+    load();
+    if (state.useProviders) {
+      return T("Ядро: Сторонние провайдеры (нажмите для Google Gemini)", "Core: Providers (tap for Google Gemini)");
+    }
+    return T("Ядро: Google Gemini (нажмите для сторонних провайдеров)", "Core: Google Gemini (tap for Providers)");
+  };
+
+  window.__agyToggleProviders = function () {
+    load();
+    var anySelected = state.connections.some(function (c) { return (c.selected || []).length; });
+    if (!state.useProviders && !anySelected) {
+      showToast(T("Сначала настройте провайдера и выберите модель в Настройки › Провайдеры",
+                  "Configure a provider and select a model in Settings › Providers first"), true);
+      return;
+    }
+    state.useProviders = !state.useProviders;
+    save();
+    syncModels();
+    applyRestart();
+    if (root && root.isConnected) render();
+    if (state.useProviders) {
+      showToast(T("Включён режим сторонних провайдеров. Ядро перезапускается…",
+                  "Providers mode enabled. Restarting core…"), false);
+    } else {
+      showToast(T("Включены стандартные модели Google. Ядро перезапускается…",
+                  "Standard Google models enabled. Restarting core…"), false);
+    }
+  };
+
   window.__agyProvidersMount = function (el) {
     if (!el) return;
     if (root && root.parentElement === el && el.children.length === 1) { render(); return; }
