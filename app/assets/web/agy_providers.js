@@ -638,7 +638,7 @@
 
   window.__agyProviderTooltip = function () {
     load();
-    // Bug 2: short label — long text was making the dropdown menu very wide
+    // Баг 2: короткие метки — длинные делали dropdown слишком широким
     if (state.useProviders) {
       return T("Провайдеры", "Providers");
     }
@@ -654,16 +654,20 @@
       return;
     }
 
-    // Bug 3: Save composer draft before restart — WebView fully reloads, but localStorage survives
+    // Баг 1 + 3: сохраняем маршрут и черновик текста ДО перезапуска
+    // WebView после restartCore() делает полный reload — localStorage переживает его
+    try {
+      var path = window.location.pathname + window.location.search + window.location.hash;
+      if (path && path !== "/") {
+        localStorage.setItem("__agyNavRestore", JSON.stringify({ path: path, ts: Date.now() }));
+      }
+    } catch (_) {}
     try {
       var draftEl = document.querySelector("[data-testid='agent-input-box'] [contenteditable='true']");
       if (draftEl) {
         var draftText = (draftEl.textContent || "").trim();
         if (draftText) {
-          localStorage.setItem("__agyProviderSwitchDraft", JSON.stringify({
-            text: draftText,
-            ts: Date.now()
-          }));
+          localStorage.setItem("__agyDraftRestore", JSON.stringify({ text: draftText, ts: Date.now() }));
         }
       }
     } catch (_) {}

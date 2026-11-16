@@ -5,6 +5,28 @@
   if (window.__agyRuFixes) return;
   window.__agyRuFixes = true;
 
+  /* ---- Баг 1: Восстановление маршрута после перезапуска ядра ---------------
+   * restartCore() делает полный reload WebView → React монтируется на «/» (проекты).
+   * Сохранённый href читаем ДО монтирования React (defer-скрипты выполняются
+   * синхронно в порядке загрузки, React тоже defer — выполняется раньше нас,
+   * но history.replaceState здесь меняет URL ДО рендера роутера). */
+  try {
+    var __agyNavRestore = localStorage.getItem("__agyNavRestore");
+    if (__agyNavRestore) {
+      var __agyNavData = JSON.parse(__agyNavRestore);
+      if (__agyNavData && __agyNavData.ts && (Date.now() - __agyNavData.ts) < 30000 && __agyNavData.path) {
+        localStorage.removeItem("__agyNavRestore");
+        // replaceState до рендера роутера — React Router читает location при монтировании
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, "", __agyNavData.path);
+        }
+      } else {
+        localStorage.removeItem("__agyNavRestore");
+      }
+    }
+  } catch (_) {}
+
+
   /* Локализация: этот слой дописывает поверх бандла элементы интерфейса,
      поэтому нужен собственный выбор строки RU/EN. Опираемся на тот же
      источник истины, что и остальные модули (window.__agyI18n), с откатом
@@ -413,7 +435,7 @@
   }
 
   function removeChip(root, chip) {
-    /* guard cleared (variable removed — was causing ReferenceError) */
+    guard = { t: 0, block: false };
     var label = chipText(chip);
     if (removeMentionNode(root, label)) { setTimeout(focusEditor, 60); return; }
     /* Fallback: Lexical's own Backspace handler with the caret right after it. */
@@ -1380,28 +1402,29 @@
     return ok;
   };
 
-  // Bug 3: Restore composer draft after core restart (page reloads, localStorage survives same origin)
-  (function tryRestoreDraft() {
+  /* ---- Баг 3: Восстановление черновика текста после перезапуска ядра --------
+   * agy_providers.js сохраняет текст в __agyDraftRestore перед restartCore().
+   * localStorage переживает reload (тот же origin). Ждём появления редактора. */
+  (function restoreDraftAfterRestart() {
     try {
-      var raw = localStorage.getItem("__agyProviderSwitchDraft");
+      var raw = localStorage.getItem("__agyDraftRestore");
       if (!raw) return;
       var d = JSON.parse(raw);
-      if (!d || !d.text || (Date.now() - d.ts) > 90000) {
-        localStorage.removeItem("__agyProviderSwitchDraft"); return;
+      if (!d || !d.text || (Date.now() - d.ts) > 60000) {
+        localStorage.removeItem("__agyDraftRestore"); return;
       }
+      localStorage.removeItem("__agyDraftRestore");
       var attempts = 0;
-      var draftTimer = setInterval(function () {
-        var ed = document.querySelector(BOX + " [contenteditable='true']");
-        if (ed || ++attempts > 30) {
-          clearInterval(draftTimer);
-          localStorage.removeItem("__agyProviderSwitchDraft");
+      var t = setInterval(function () {
+        var BOX_SEL = "[data-testid='agent-input-box']";
+        var ed = document.querySelector(BOX_SEL + " [contenteditable='true']");
+        if (ed || ++attempts > 40) {
+          clearInterval(t);
           if (ed && d.text) {
-            setTimeout(function () {
-              window.__agyInsertIntoChat(d.text, false);
-            }, 400);
+            setTimeout(function () { window.__agyInsertIntoChat(d.text, false); }, 500);
           }
         }
-      }, 400);
+      }, 300);
     } catch (_) {}
   })();
 
@@ -1672,30 +1695,17 @@
     var box = document.querySelector(BOX);
     if (!box) { closeSubagentsMenu(); return; }
 
-    // Require plus button to anchor the footer reliably
-    var plus = box.querySelector(
-      "button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']"
-    );
-    if (!plus) return; // footer not rendered yet — interval/MutationObserver retries
+    var existing = document.getElementById("agy-subagent-btn");
+    if (existing) {
+      if (box.contains(existing) && existing.isConnected) return;
+      try { existing.remove(); } catch (_) {}
+    }
 
-    var footer = plus.closest("[class*='justify-between']") || plus.closest("[class*='input-footer']");
+    var plus = box.querySelector("button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']");
+    var footer = plus ? plus.closest("[class*='input-footer']") : box.querySelector("[class*='input-footer']");
     if (!footer) return;
     var group = footer.lastElementChild;
-    if (!group || group.contains(plus)) return;
-
-    // KEY FIX (Bug 1): check button presence IN the target group, not document-wide
-    if (group.querySelector("#agy-subagent-btn")) return;
-
-    // Remove stale button from wrong DOM location
-    var stale = document.getElementById("agy-subagent-btn");
-    if (stale) { try { stale.remove(); } catch (_) {} }
-
-    // KEY FIX (Bug 5): skip DOM insertion while editor is focused to avoid keyboard dismiss on Android
-    var ae = document.activeElement;
-    if (ae && ae !== document.body && ae.closest && ae.closest(BOX) &&
-        (ae.isContentEditable || ae.getAttribute("contenteditable") === "true")) {
-      return; // try next interval tick (after user pauses or blurs)
-    }
+    if (!group || (plus && group.contains(plus))) return;
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1708,7 +1718,6 @@
       "color:var(--secondary-foreground, currentColor);flex-shrink:0;transition:background-color .15s, color .15s";
     btn.innerHTML = SVG_ICONS.bot;
     btn.addEventListener("pointerdown", function (e) {
-      e.preventDefault(); // KEY FIX (Bug 5): prevents focus steal + keyboard open/close (like shield button)
       e.stopPropagation();
     });
     btn.addEventListener("click", function (e) {

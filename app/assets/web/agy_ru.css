@@ -614,7 +614,7 @@ html[data-base-ui-scroll-locked] {
   min-height: 0 !important; padding-top: 4px !important; padding-bottom: 4px !important; font-size: 13px !important;
 }
 
-/* Bug 4: Truncate overly long custom provider model names in the footer chip */
+/* Баг: длинное имя кастомного провайдера сжимает остальные кнопки в футере */
 [data-testid="model-selector-trigger"] > span:first-child {
   max-width: 130px;
   overflow: hidden;
