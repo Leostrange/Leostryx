@@ -638,10 +638,11 @@
 
   window.__agyProviderTooltip = function () {
     load();
+    // Bug 2: short label — long text was making the dropdown menu very wide
     if (state.useProviders) {
-      return T("Ядро: Сторонние провайдеры (нажмите для Google Gemini)", "Core: Providers (tap for Google Gemini)");
+      return T("Провайдеры", "Providers");
     }
-    return T("Ядро: Google Gemini (нажмите для сторонних провайдеров)", "Core: Google Gemini (tap for Providers)");
+    return T("Google Gemini", "Google Gemini");
   };
 
   window.__agyToggleProviders = function () {
@@ -652,6 +653,21 @@
                   "Configure a provider and select a model in Settings › Providers first"), true);
       return;
     }
+
+    // Bug 3: Save composer draft before restart — WebView fully reloads, but localStorage survives
+    try {
+      var draftEl = document.querySelector("[data-testid='agent-input-box'] [contenteditable='true']");
+      if (draftEl) {
+        var draftText = (draftEl.textContent || "").trim();
+        if (draftText) {
+          localStorage.setItem("__agyProviderSwitchDraft", JSON.stringify({
+            text: draftText,
+            ts: Date.now()
+          }));
+        }
+      }
+    } catch (_) {}
+
     state.useProviders = !state.useProviders;
     save();
     syncModels();

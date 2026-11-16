@@ -413,7 +413,7 @@
   }
 
   function removeChip(root, chip) {
-    guard = { t: 0, block: false };
+    /* guard cleared (variable removed — was causing ReferenceError) */
     var label = chipText(chip);
     if (removeMentionNode(root, label)) { setTimeout(focusEditor, 60); return; }
     /* Fallback: Lexical's own Backspace handler with the caret right after it. */
@@ -1380,6 +1380,31 @@
     return ok;
   };
 
+  // Bug 3: Restore composer draft after core restart (page reloads, localStorage survives same origin)
+  (function tryRestoreDraft() {
+    try {
+      var raw = localStorage.getItem("__agyProviderSwitchDraft");
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || !d.text || (Date.now() - d.ts) > 90000) {
+        localStorage.removeItem("__agyProviderSwitchDraft"); return;
+      }
+      var attempts = 0;
+      var draftTimer = setInterval(function () {
+        var ed = document.querySelector(BOX + " [contenteditable='true']");
+        if (ed || ++attempts > 30) {
+          clearInterval(draftTimer);
+          localStorage.removeItem("__agyProviderSwitchDraft");
+          if (ed && d.text) {
+            setTimeout(function () {
+              window.__agyInsertIntoChat(d.text, false);
+            }, 400);
+          }
+        }
+      }, 400);
+    } catch (_) {}
+  })();
+
   var lastShadeTime = 0;
   window.__agyOnShadeReply = function(payload) {
     if (!payload) return;
@@ -1647,17 +1672,30 @@
     var box = document.querySelector(BOX);
     if (!box) { closeSubagentsMenu(); return; }
 
-    var existing = document.getElementById("agy-subagent-btn");
-    if (existing) {
-      if (box.contains(existing) && existing.isConnected) return;
-      try { existing.remove(); } catch (_) {}
-    }
+    // Require plus button to anchor the footer reliably
+    var plus = box.querySelector(
+      "button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']"
+    );
+    if (!plus) return; // footer not rendered yet — interval/MutationObserver retries
 
-    var plus = box.querySelector("button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']");
-    var footer = plus ? plus.closest("[class*='input-footer']") : box.querySelector("[class*='input-footer']");
+    var footer = plus.closest("[class*='justify-between']") || plus.closest("[class*='input-footer']");
     if (!footer) return;
     var group = footer.lastElementChild;
-    if (!group || (plus && group.contains(plus))) return;
+    if (!group || group.contains(plus)) return;
+
+    // KEY FIX (Bug 1): check button presence IN the target group, not document-wide
+    if (group.querySelector("#agy-subagent-btn")) return;
+
+    // Remove stale button from wrong DOM location
+    var stale = document.getElementById("agy-subagent-btn");
+    if (stale) { try { stale.remove(); } catch (_) {} }
+
+    // KEY FIX (Bug 5): skip DOM insertion while editor is focused to avoid keyboard dismiss on Android
+    var ae = document.activeElement;
+    if (ae && ae !== document.body && ae.closest && ae.closest(BOX) &&
+        (ae.isContentEditable || ae.getAttribute("contenteditable") === "true")) {
+      return; // try next interval tick (after user pauses or blurs)
+    }
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1670,6 +1708,7 @@
       "color:var(--secondary-foreground, currentColor);flex-shrink:0;transition:background-color .15s, color .15s";
     btn.innerHTML = SVG_ICONS.bot;
     btn.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); // KEY FIX (Bug 5): prevents focus steal + keyboard open/close (like shield button)
       e.stopPropagation();
     });
     btn.addEventListener("click", function (e) {

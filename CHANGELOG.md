@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.11)
-# Changelog — Leostryx (3.1.11)
+# Список изменений — Leostryx (3.1.12)
+# Changelog — Leostryx (3.1.12)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,26 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.12 — 2026-11-16 (Кнопка субагентов, меню ядра, черновик после перезапуска, имя модели, клавиатура)
+
+<!-- RU -->
+- **Кнопка субагентов не появлялась после переключения чата.** Старая проверка «кнопка уже есть» смотрела на весь документ по `id` — если элемент существовал, но оторвался от нужного контейнера (например, React пересоздал кнопочную группу), функция молча выходила. Теперь проверка ведётся внутри целевой группы (`group.querySelector("#agy-subagent-btn")`): кнопка пересоздаётся всякий раз, когда оказывается не на своём месте. Также улучшен поиск строки-футера: за якорь берётся кнопка «+», а подходящий контейнер ищется вверх сначала по `justify-between`, затем по `input-footer`, что исключает ложные совпадения.
+- **Пункт «переключить ядро» в меню трёх точек делал список слишком широким.** Метки `"Ядро: Сторонние провайдеры (нажмите для Google Gemini)"` и `"Ядро: Google Gemini (нажмите для сторонних провайдеров)"` (45–55 символов) растягивали выпадающее меню. Теперь функция `__agyProviderTooltip()` возвращает короткие строки `"Провайдеры"` / `"Google Gemini"`.
+- **При переключении ядра исчезали текст и прикреплённые файлы из поля ввода.** `applyRestart()` вызывает нативный `restartCore()`, после которого `watchCore()` в MainActivity обнаруживает изменение `readyGeneration` и делает полный `webView.loadDataWithBaseURL()` — WebView перезагружается с нуля. `localStorage` при этом сохраняется (тот же origin). Теперь `__agyToggleProviders()` сохраняет черновик текста в `localStorage["__agyProviderSwitchDraft"]` перед перезапуском, а `tryRestoreDraft()` при загрузке страницы дожидается редактора и вставляет его обратно. TTL черновика — 90 секунд.
+- **Имя кастомного провайдера в поле ввода занимало всю ширину.** Строки вида `deepseek/deepseek-v4.1-flash-1017` растягивали кнопку выбора модели и выталкивали кнопку субагентов за край. Добавлено CSS-правило `[data-testid="model-selector-trigger"] > span:first-child { max-width: 130px }` — длинные имена теперь обрезаются с `…`.
+- **Клавиатура закрывалась при нажатии кнопки субагентов.** Нажатие без `e.preventDefault()` на `pointerdown` крало фокус у редактора, из-за чего Android закрывал клавиатуру. Добавлен `e.preventDefault()` (как у кнопки щита). Дополнительно: вставка кнопки в DOM пропускается, пока редактор сфокусирован, — DOM-мутации во время набора текста также могли провоцировать закрытие клавиатуры. Устранена ошибка `ReferenceError` в `removeChip`: строка `guard = { t: 0, block: false }` ссылалась на удалённую переменную.
+- **Версия 3.1.12** (`versionCode` 38) в манифесте.
+<!-- /RU -->
+
+<!-- EN -->
+- **The subagents button did not appear after switching chats.** The old "button already exists" check scanned the whole document by id — if the element was found but had been detached from its container (e.g. React recreated the button group), the function silently returned. The check is now scoped to the target group (`group.querySelector("#agy-subagent-btn")`): the button is recreated whenever it is not in the right place. Footer row discovery was also improved: the `+` button is used as the anchor and the container is found by walking up through `justify-between` then `input-footer`, eliminating false matches.
+- **The "switch core" item in the three-dot menu made the dropdown too wide.** Labels `"Ядро: Сторонние провайдеры (нажмите для Google Gemini)"` and `"Ядро: Google Gemini (нажмите для сторонних провайдеров)"` (45–55 characters) stretched the dropdown. `__agyProviderTooltip()` now returns short strings `"Провайдеры"` / `"Google Gemini"`.
+- **Switching the core wiped the text and attached files from the input box.** `applyRestart()` calls the native `restartCore()`, after which `watchCore()` in MainActivity detects the incremented `readyGeneration` and calls `webView.loadDataWithBaseURL()` — a full WebView reload from scratch. `localStorage` survives (same origin). `__agyToggleProviders()` now saves the draft text to `localStorage["__agyProviderSwitchDraft"]` before restarting, and `tryRestoreDraft()` waits for the editor on page load and inserts the text back. Draft TTL is 90 seconds.
+- **A custom provider's model name consumed the full input-row width.** Strings like `deepseek/deepseek-v4.1-flash-1017` expanded the model-selector button and pushed the subagents button off-screen. A CSS rule `[data-testid="model-selector-trigger"] > span:first-child { max-width: 130px }` now clips long names with `…`.
+- **The keyboard closed when tapping the subagents button.** A `pointerdown` tap without `e.preventDefault()` stole focus from the editor, causing Android to dismiss the keyboard. `e.preventDefault()` was added (matching the shield button). Additionally, button DOM insertion is now skipped while the editor is focused — DOM mutations during typing could also trigger keyboard dismissal. Fixed a `ReferenceError` in `removeChip`: the line `guard = { t: 0, block: false }` referenced a removed variable.
+- **Version 3.1.12** (`versionCode` 38) in the manifest.
+<!-- /EN -->
 
 ## v3.1.11 — 2026-11-15 (Лог фоновых задач в реальном времени, работа в фоне, кнопка субагентов, одно уведомление об обновлении)
 

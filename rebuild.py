@@ -190,8 +190,8 @@ def main():
         zipalign4(unsigned)
         sign(unsigned)
 
-    # Finalize release 3.1.11 artifacts
-    version = "3.1.11"
+    # Finalize release 3.1.12 artifacts
+    version = "3.1.12"
     signed_dir = ROOT / "dist/signed"
     parent_dir = ROOT.parent
     built = [name for name, _ in jobs]
