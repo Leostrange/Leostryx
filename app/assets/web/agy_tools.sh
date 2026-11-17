@@ -3534,6 +3534,7 @@ op_brand() {
         || fail "brand: cannot write agy_firstrun_logo.png"
     # Keep a copy the web UI can re-read for previews/verification.
     cp -f "$src/ic_launcher_logo.png" "$web/brand/current_logo.png" 2>/dev/null || true
+    cp -f "$src/ic_notification.png" "$web/brand/current_notification.png" 2>/dev/null || true
 
     # Persist for the next APK build (splash + launcher icon + label + colour + recolorLogo).
     AGY_BRAND_PACK="$pack" AGY_BRAND_COLOUR="$colour" AGY_BRAND_RECOLOR="$recolor" AGY_BRAND_WEB="$web" python3 - <<'PYBR'

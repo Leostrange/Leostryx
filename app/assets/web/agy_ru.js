@@ -14,12 +14,39 @@
     var __agyNavRestore = localStorage.getItem("__agyNavRestore");
     if (__agyNavRestore) {
       var __agyNavData = JSON.parse(__agyNavRestore);
-      if (__agyNavData && __agyNavData.ts && (Date.now() - __agyNavData.ts) < 30000 && __agyNavData.path) {
-        localStorage.removeItem("__agyNavRestore");
+      if (__agyNavData && __agyNavData.ts && (Date.now() - __agyNavData.ts) < 300000 && __agyNavData.path) {
+        // Относительные URL страницы должны резолвиться от корня ядра: после
+        // replaceState на глубокий маршрут (/c/<uuid>/section/…) без <base>
+        // ./generated/… уходит в /c/generated/…, ядро отдаёт HTML, и скрипты
+        // падают с "Unexpected token '<'". index.html ставит <base> раньше нас,
+        // это страховка для повторного выполнения/отдельной сборки.
+        try {
+          if (!document.querySelector("base")) {
+            var __agyBase = document.createElement("base");
+            __agyBase.setAttribute("href", "/");
+            (document.head || document.documentElement).appendChild(__agyBase);
+          }
+        } catch (_) {}
         // replaceState до рендера роутера — React Router читает location при монтировании
         if (window.history && window.history.replaceState) {
           window.history.replaceState(null, "", __agyNavData.path);
         }
+        // Запись оставляем: сорвавшаяся загрузка (ядро отдало HTML вместо
+        // скрипта) лечится повторной загрузкой, и путь должен пережить её.
+        // Удаляем только когда нужный маршрут действительно отрисовался.
+        (function () {
+          var tries = 0;
+          var t = setInterval(function () {
+            var cur = location.pathname + location.search + location.hash;
+            var box = document.querySelector("[data-testid='agent-input-box']");
+            if ((cur === __agyNavData.path && box) || ++tries > 60) {
+              clearInterval(t);
+              if (cur === __agyNavData.path && box) {
+                try { localStorage.removeItem("__agyNavRestore"); } catch (_) {}
+              }
+            }
+          }, 250);
+        })();
       } else {
         localStorage.removeItem("__agyNavRestore");
       }
@@ -435,7 +462,6 @@
   }
 
   function removeChip(root, chip) {
-    guard = { t: 0, block: false };
     var label = chipText(chip);
     if (removeMentionNode(root, label)) { setTimeout(focusEditor, 60); return; }
     /* Fallback: Lexical's own Backspace handler with the caret right after it. */
@@ -579,7 +605,6 @@
   }
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
-      guard = { t: Date.now(), block: true };
       nudgePageSeries();
     }
   });
@@ -1350,6 +1375,13 @@
 (function() {
   var BOX = "[data-testid='agent-input-box']";
 
+  /* Этот IIFE имеет собственный scope: T() из первого блока здесь не виден.
+     Раньше строки были захардкожены по-русски, а в 3.1.9 их перевели на T() —
+     из-за этого блок падал с ReferenceError при инициализации и всё, что ниже
+     (кнопка субагентов, keep-alive, восстановление черновика), не запускалось.
+     Берём общий локализатор из window.__agyT, иначе остаёмся на русском. */
+  var T = window.__agyT || function (r, e) { return r; };
+
   function getEditor() {
     var box = document.querySelector(BOX);
     if (!box) return document.querySelector("[contenteditable='true']");
@@ -1378,9 +1410,21 @@
     placeCaretAtEnd(ed);
 
     var ok = false;
-    try {
-      ok = document.execCommand("insertText", false, text);
-    } catch (e) {}
+    // Если в тексте есть переносы строк, вставляем через Clipboard/DataTransfer (paste):
+    // execCommand("insertText") в Lexical склеивает строки, а paste создаёт полноценные абзацы.
+    if (text.indexOf("\n") >= 0) {
+      try {
+        var dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        var pasteEv = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+        ok = ed.dispatchEvent(pasteEv);
+      } catch (ePaste) { ok = false; }
+    }
+    if (!ok) {
+      try {
+        ok = document.execCommand("insertText", false, text);
+      } catch (e) {}
+    }
     if (!ok) {
       try {
         ed.dispatchEvent(new InputEvent("beforeinput", { inputType: "insertText", data: text, bubbles: true, cancelable: true }));
@@ -1404,25 +1448,92 @@
 
   /* ---- Баг 3: Восстановление черновика текста после перезапуска ядра --------
    * agy_providers.js сохраняет текст в __agyDraftRestore перед restartCore().
-   * localStorage переживает reload (тот же origin). Ждём появления редактора. */
+   * localStorage переживает reload (тот же origin). Ждём появления редактора.
+   * Вставка может попасть в момент, когда приложение ещё поднимает сессию и
+   * затирает содержимое окна ввода, поэтому проверяем результат и повторяем. */
   (function restoreDraftAfterRestart() {
     try {
       var raw = localStorage.getItem("__agyDraftRestore");
       if (!raw) return;
       var d = JSON.parse(raw);
-      if (!d || !d.text || (Date.now() - d.ts) > 60000) {
+      if (!d || !d.text || (Date.now() - d.ts) > 300000) {
         localStorage.removeItem("__agyDraftRestore"); return;
       }
-      localStorage.removeItem("__agyDraftRestore");
+
+      var navTarget = null;
+      try {
+        var nav = JSON.parse(localStorage.getItem("__agyNavRestore") || "null");
+        if (nav && nav.path) navTarget = nav.path;
+      } catch (_) {}
+
+      // Черновик принадлежит конкретному диалогу. Если первая загрузка после
+      // рестарта ядра сорвалась (ядро отдало HTML вместо скрипта), приложение
+      // открывается на «Проектах» — вставлять текст в композер главного экрана
+      // нельзя, он должен вернуться в тот же чат.
+      function convId(p) {
+        var m = /^\/c\/([0-9a-f-]{8,})/i.exec(p || "");
+        return m ? m[1] : null;
+      }
+
+      // Маршрут после перезагрузки может отличаться хэшем/query (приложение
+      // нормализует адрес), из-за чего строгое сравнение не срабатывало и текст
+      // черновика удалялся. Сравниваем ещё и по id диалога.
+      function onTargetRoute() {
+        var cur = location.pathname + location.search + location.hash;
+        if (navTarget && cur === navTarget) return true;
+        var a = convId(location.pathname), b = convId(navTarget);
+        if (a && b) return a === b;
+        if (navTarget) return false;
+        return location.pathname !== "/";
+      }
+
+      function insertDraft(left) {
+        var BOX_SEL = "[data-testid='agent-input-box']";
+        var ed = document.querySelector(BOX_SEL + " [contenteditable='true']");
+        if (!ed) {
+          if (left > 0) setTimeout(function () { insertDraft(left - 1); }, 400);
+          return;
+        }
+        var cur = ((ed.innerText !== undefined ? ed.innerText : ed.textContent) || "").trim();
+        var targetText = (d.text || "").trim();
+        // Защита от дублирования: если текст уже присутствует в редакторе (React восстановил состояние сам) — не дублируем!
+        if (cur && (cur === targetText || cur.indexOf(targetText) >= 0 || targetText.indexOf(cur) >= 0)) {
+          try { localStorage.removeItem("__agyDraftRestore"); } catch (_) {}
+          return;
+        }
+        window.__agyInsertIntoChat(d.text, false);
+        try { console.info("[AGY draft] restored " + targetText.length + " chars into " + location.pathname); } catch (_) {}
+        // React может перерисовать композер и стереть вставку — проверяем и
+        // повторяем один раз, но запись удаляем только после успешной вставки.
+        setTimeout(function () {
+          try {
+            var ed2 = document.querySelector(BOX_SEL + " [contenteditable='true']");
+            var now = ed2 ? ((ed2.innerText !== undefined ? ed2.innerText : ed2.textContent) || "").trim() : "";
+            if (now && now.indexOf(targetText) >= 0) {
+              localStorage.removeItem("__agyDraftRestore");
+            } else {
+              try { console.warn("[AGY draft] text vanished after insert, retrying"); } catch (_) {}
+              window.__agyInsertIntoChat(d.text, false);
+              setTimeout(function () { try { localStorage.removeItem("__agyDraftRestore"); } catch (_) {} }, 600);
+            }
+          } catch (_) {}
+        }, 1200);
+      }
+
       var attempts = 0;
       var t = setInterval(function () {
         var BOX_SEL = "[data-testid='agent-input-box']";
         var ed = document.querySelector(BOX_SEL + " [contenteditable='true']");
-        if (ed || ++attempts > 40) {
+        if (ed && onTargetRoute()) {
           clearInterval(t);
-          if (ed && d.text) {
-            setTimeout(function () { window.__agyInsertIntoChat(d.text, false); }, 500);
-          }
+          setTimeout(function () { insertDraft(3); }, 500);
+          return;
+        }
+        if (++attempts > 100) {
+          clearInterval(t);
+          // маршрут так и не вернулся — не оставляем черновик чужому чату
+          try { console.warn("[AGY draft] route did not return (" + navTarget + " vs " + location.pathname + "), draft dropped"); } catch (_) {}
+          try { localStorage.removeItem("__agyDraftRestore"); } catch (_) {}
         }
       }, 300);
     } catch (_) {}
@@ -1691,21 +1802,36 @@
     }
   }, true);
 
+  /* React владеет футером окна ввода, а наша кнопка — чужой узел в его списке
+   * детей. React перерисовывает эту строку на каждое изменение состояния
+   * композера (первый символ, появление «отправить», чипы вложений); вставка
+   * узла в этот момент заставляет React пересобрать строку, contenteditable
+   * пересоздаётся, фокус теряется, и Android закрывает клавиатуру — она
+   * начинает открываться/закрываться при каждом тапе по полю. Поэтому футер
+   * правится только когда редактор НЕ в фокусе; после потери фокуса кнопка
+   * возвращается сразу (focusout) или следующим тиком 400 мс. */
+  function composerEditorFocused() {
+    var ae = document.activeElement;
+    if (!ae || ae === document.body || !ae.closest) return false;
+    if (!ae.closest(BOX)) return false;
+    return !!(ae.isContentEditable || ae.tagName === "TEXTAREA" ||
+      ae.getAttribute("contenteditable") === "true");
+  }
+
   function attachSubagentButton() {
     var box = document.querySelector(BOX);
     if (!box) { closeSubagentsMenu(); return; }
-
-    var existing = document.getElementById("agy-subagent-btn");
-    if (existing) {
-      if (box.contains(existing) && existing.isConnected) return;
-      try { existing.remove(); } catch (_) {}
-    }
+    if (composerEditorFocused()) return;     // не трогаем DOM во время ввода
 
     var plus = box.querySelector("button[aria-label='Add context'], button[aria-label='Добавить контекст'], [data-testid='attach-button']");
     var footer = plus ? plus.closest("[class*='input-footer']") : box.querySelector("[class*='input-footer']");
     if (!footer) return;
     var group = footer.lastElementChild;
     if (!group || (plus && group.contains(plus))) return;
+    if (group.querySelector("#agy-subagent-btn")) return;
+
+    var stale = document.getElementById("agy-subagent-btn");
+    if (stale) { try { stale.remove(); } catch (_) {} }
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1718,6 +1844,7 @@
       "color:var(--secondary-foreground, currentColor);flex-shrink:0;transition:background-color .15s, color .15s";
     btn.innerHTML = SVG_ICONS.bot;
     btn.addEventListener("pointerdown", function (e) {
+      e.preventDefault();       // иначе тап по кнопке уводит фокус и дёргает клавиатуру
       e.stopPropagation();
     });
     btn.addEventListener("click", function (e) {
@@ -1749,6 +1876,12 @@
     if (document.body) subagentObs.observe(document.body, { childList: true, subtree: true });
     else document.addEventListener("DOMContentLoaded", function () { subagentObs.observe(document.body, { childList: true, subtree: true }); });
   } catch (_) {}
+
+  // Пока редактор в фокусе мы молчим — вернуть кнопку сразу после blur.
+  document.addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest(BOX)) setTimeout(attachSubagentButton, 0);
+  }, true);
 
   /* ---- Background Keep-Alive for Uninterrupted Chat & Agent Execution ------
    * When the user minimizes the app, Chromium WebView on Android throttles
@@ -1940,4 +2073,212 @@
   })();
 
   try { sessionStorage.removeItem("agy_composer_draft"); } catch (e) {}
+})();
+
+/* ---- Баг 3: вложения в окне ввода переживают переключение ядра ------------
+ * Переключение ядра — это остановка core. UI грузится по HTTPS с того же
+ * самого core (https://127.0.0.1:48155/), поэтому restartCore() = страница
+ * умирает и грузится заново: React-состояние окна ввода (текст и файлы)
+ * исчезает. Текст восстанавливает __agyDraftRestore, а вложения так нельзя —
+ * File-объекты живут только в памяти вкладки.
+ *
+ * Поэтому выбранные файлы сразу складываем в IndexedDB (origin тот же —
+ * https://127.0.0.1:48155) и после возврата ядра отдаём их обратно в штатный
+ * <input type=file> окна ввода: приложение само их загрузит и покажет как
+ * обычные вложения, без обходов React-состояния.
+ *
+ * Копию удаляем, когда вложения исчезли из окна ввода (отправка или удаление),
+ * чтобы при следующем переключении не воскресить уже отправленный файл. */
+(function () {
+  var DB_NAME = "agyComposerRestore", STORE = "pending", KEY = "attachments";
+  var TS_KEY = "__agyAttachTs";
+  var TTL = 180000;          // сколько живёт отметка о выборе файлов
+  var injecting = false;     // защита от повторного перехвата своего же change
+  var lastPickAt = 0;
+
+  function openDB() {
+    return new Promise(function (resolve, reject) {
+      var req;
+      try { req = indexedDB.open(DB_NAME, 1); } catch (e) { reject(e); return; }
+      req.onupgradeneeded = function () {
+        try { req.result.createObjectStore(STORE); } catch (e) {}
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function tx(mode, fn) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve) {
+        try {
+          var t = db.transaction(STORE, mode), st = t.objectStore(STORE), out;
+          out = fn(st);
+          t.oncomplete = function () { resolve(out && out.result !== undefined ? out.result : true); };
+          t.onerror = function () { resolve(false); };
+          t.onabort = function () { resolve(false); };
+        } catch (e) { resolve(false); }
+      });
+    }).catch(function () { return false; });
+  }
+  function store(files) { return tx("readwrite", function (st) { return st.put(files, KEY); }); }
+  function drop() { return tx("readwrite", function (st) { return st.delete(KEY); }); }
+  function peek() {
+    return tx("readonly", function (st) {
+      var out = { result: null };
+      var req = st.get(KEY);
+      req.onsuccess = function () { out.result = req.result || null; };
+      return out;
+    });
+  }
+  function appendFiles(newFiles) {
+    return peek().then(function (existing) {
+      var list = (existing && Array.isArray(existing)) ? existing.slice() : [];
+      for (var i = 0; i < newFiles.length; i++) {
+        var f = newFiles[i];
+        var dup = false;
+        for (var j = 0; j < list.length; j++) {
+          if (list[j].name === f.name && list[j].size === f.size && list[j].lastModified === f.lastModified) {
+            dup = true;
+            break;
+          }
+        }
+        if (!dup) list.push(f);
+      }
+      return store(list);
+    });
+  }
+  window.__agyAppendFiles = appendFiles;
+
+  function take() {
+    return tx("readwrite", function (st) {
+      var out = { result: null };
+      var req = st.get(KEY);
+      req.onsuccess = function () { out.result = req.result || null; };
+      st.delete(KEY);
+      return out;
+    });
+  }
+
+  function fileInputs() {
+    var all = Array.prototype.slice.call(document.querySelectorAll("input[type='file']"));
+    return all.filter(function (el) {
+      // У загрузки файлов проекта свой data-testid, у диалогов — свои input'ы:
+      // трогаем только поле выбора вложений окна ввода.
+      if (el.getAttribute("data-testid")) return false;
+      if (el.closest("[role='dialog'],[aria-modal='true']")) return false;
+      return true;
+    });
+  }
+  function composerInput() {
+    var list = fileInputs();
+    if (list.length <= 1) return list[0] || null;
+    var near = list.filter(function (el) {
+      return !!(el.closest("[data-testid='agent-input-box']") || el.closest("footer"));
+    });
+    return near[near.length - 1] || list[list.length - 1];
+  }
+
+  /* 1. Запоминаем каждый выбор файла в окне ввода (накапливаем, а не перезаписываем). */
+  document.addEventListener("change", function (e) {
+    if (injecting) return;
+    var el = e.target;
+    if (!el || el.tagName !== "INPUT" || el.type !== "file") return;
+    if (el.getAttribute("data-testid")) return;
+    if (el.closest("[role='dialog'],[aria-modal='true']")) return;
+    var files = el.files;
+    if (!files || !files.length) return;
+    lastPickAt = Date.now();
+    var arr = Array.prototype.slice.call(files);
+    appendFiles(arr).then(function (ok) {
+      try { localStorage.setItem(TS_KEY, String(Date.now())); } catch (e) {}
+      if (!ok) console.warn("[AGY draft] attachments were not stored for restore");
+    });
+  }, true);
+
+  /* 2. Вложения удаляем ТОЛЬКО после отправки сообщения или явного удаления пользователем. */
+  (function watchConsumed() {
+    var prev = -1;
+    setInterval(function () {
+      // Защита: во время смены ядра или показа экрана загрузки НЕ сбрасываем вложения!
+      try {
+        if (localStorage.getItem("__agyCoreRestart") || (window.__agyLoading && typeof window.__agyLoading.isActive === "function" && window.__agyLoading.isActive())) {
+          return;
+        }
+      } catch (_) {}
+
+      var chips = document.querySelectorAll("[data-testid='input-attachment']");
+      var n = chips.length;
+      if (prev > 0 && n === 0 && Date.now() - lastPickAt > 4000) {
+        drop();
+      } else if (prev > n && n > 0) {
+        peek().then(function (existing) {
+          if (!existing || !existing.length) return;
+          var labels = Array.prototype.map.call(chips, function (c) {
+            var open = c.querySelector("[data-testid='input-attachment-open']");
+            return ((open && open.getAttribute("aria-label")) || c.getAttribute("aria-label") || c.textContent || "").toLowerCase();
+          });
+          var filtered = existing.filter(function (f) {
+            var fn = (f.name || "").toLowerCase();
+            return labels.some(function (l) { return l.indexOf(fn) >= 0; });
+          });
+          if (filtered.length !== existing.length) store(filtered);
+        });
+      }
+      prev = n;
+    }, 900);
+  })();
+
+  /* 3. После возврата ядра отдаём файлы обратно в окно ввода. */
+  (function restoreAfterRestart() {
+    var ts = 0;
+    try { ts = parseInt(localStorage.getItem(TS_KEY) || "0", 10); } catch (e) { return; }
+    if (!ts || (Date.now() - ts) > TTL) return;
+    var navTarget = null;
+    try {
+      var nav = JSON.parse(localStorage.getItem("__agyNavRestore") || "null");
+      if (nav && nav.path) navTarget = nav.path;
+    } catch (_) {}
+    function onTargetRoute() {
+      var cur = location.pathname + location.search + location.hash;
+      if (navTarget) return cur === navTarget;
+      return location.pathname !== "/";
+    }
+    var attempts = 0;
+    var timer = setInterval(function () {
+      var input = composerInput();
+      var editor = document.querySelector("[data-testid='agent-input-box'] [contenteditable='true']");
+      if ((input && editor && onTargetRoute()) || ++attempts > 60) {
+        clearInterval(timer);
+        if (!input || !editor || !onTargetRoute()) {
+          drop(); try { localStorage.removeItem(TS_KEY); } catch (e) {}
+          return;
+        }
+        setTimeout(function () {
+          take().then(function (files) {
+            if (!files || !files.length) { try { localStorage.removeItem(TS_KEY); } catch (e) {} return; }
+            try { localStorage.removeItem(TS_KEY); } catch (e) {}
+            try {
+              var dt = new DataTransfer();
+              for (var i = 0; i < files.length; i++) {
+                var f = files[i];
+                if (f instanceof File) {
+                  dt.items.add(f);
+                } else if (f instanceof Blob) {
+                  dt.items.add(new File([f], f.name || ("attachment-" + i), { type: f.type || "application/octet-stream" }));
+                }
+              }
+              injecting = true;
+              input.files = dt.files;
+              input.dispatchEvent(new Event("change", { bubbles: true }));
+              input.dispatchEvent(new Event("input", { bubbles: true }));
+              setTimeout(function () { injecting = false; }, 4000);
+            } catch (err) {
+              injecting = false;
+              console.warn("[AGY draft] attachment restore failed: " + err);
+            }
+          });
+        }, 1200);
+      }
+    }, 500);
+  })();
 })();

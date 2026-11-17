@@ -31,6 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "tools"))
 import brand  # noqa: E402  (Leostryx icon pack + display name overlay)
+import gen_runtime_manifest as runtime_manifest  # noqa: E402  (seed sha256 table)
+import gen_env_overlay_sha as env_overlay  # noqa: E402  (overlay re-copy token)
 APP = ROOT / "app"
 MAP = json.loads((ROOT / "compress-map.json").read_text(encoding="utf-8"))
 BYPASS = {
@@ -181,10 +183,28 @@ def main():
     else:
         print("brand: no valid app/assets/web/brand/config.json — building unbranded")
 
+    # The env overlay token is generated data as well: EnvInstaller re-copies
+    # assets/env/overlay into $PREFIX only when this value differs from the one
+    # recorded on the device. Left stale after an overlay edit (3.1.12 shipped
+    # a pre-edit etc/antigravity/AGENTS.md) the old copy silently survives.
+    new_overlay = env_overlay.overlay_sha256()
+    env_data = json.loads(env_overlay.MANIFEST.read_text(encoding="utf-8"))
+    if env_data.get("overlaySha256") != new_overlay:
+        env_data["overlaySha256"] = new_overlay
+        env_overlay.MANIFEST.write_text(json.dumps(env_data, indent=2) + "\n",
+                                        encoding="utf-8")
+        print("env overlay: overlaySha256 refreshed")
+
     for name, overlay in jobs:
         merged = dict(overlay)
         if brand_cfg:
             merged.update(brand.build_overlay(ROOT, brand_cfg, ROOT / "dist" / ".brand"))
+        # assets/runtime/manifest.json is the integrity table the app verifies
+        # before it starts the core. It must describe the files that actually go
+        # into this APK: one stale entry (3.1.12 shipped a stale seed/AGENTS.md
+        # hash) and the core refuses to start with "runtime integrity check
+        # failed", so refresh it from the merged tree right before packing.
+        runtime_manifest.refresh(name)
         unsigned = ROOT / "dist" / f"{name}-unsigned.apk"
         pack(unsigned, merged)
         zipalign4(unsigned)

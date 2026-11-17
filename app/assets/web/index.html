@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Экран перезапуска ядра: грузим первым и показываем немедленно,
+         не дожидаясь DOMContentLoaded (его откладывает defer-бандл). -->
+    <script src="./agy_loading.js?v=3.1.12.19"></script>
     <title>Jetski Web</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, interactive-widget=resizes-content" />
     <!-- Preconnect secondary CDNs for dynamic UI icons (Drive, Docs, Colab) -->
@@ -15,6 +18,45 @@
     <link rel="stylesheet" href="./jetbox.css?v=3.1.0" />
     <link rel="stylesheet" href="./compiled_tailwind.css?v=3.1.0" />
     <link rel="stylesheet" href="./agy_ru.css?v=3.1.7" />
+
+    <!-- Возврат в текущий чат после перезапуска ядра.
+         Переключение ядра останавливает core, а UI грузится с него же — WebView
+         перезагружается на корневой URL. Роутер (TanStack) читает location один
+         раз при старте, поэтому путь нужно вернуть ДО загрузки бандла: позже
+         replaceState на маршрут уже не влияет и пользователя выкидывает в проекты.
+         agy_providers.js кладёт путь в __agyNavRestore перед restartCore(). -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("__agyNavRestore");
+          if (!raw) return;
+          var d = JSON.parse(raw);
+          if (!d || !d.path || !d.ts || (Date.now() - d.ts) > 300000) {
+            localStorage.removeItem("__agyNavRestore");
+            return;
+          }
+          // Запись НЕ удаляем: если первая загрузка после рестарта ядра сорвётся
+          // (ядро отдаст HTML вместо скрипта), повторная загрузка должна снова
+          // вернуть путь. Удаляет agy_ru.js, когда маршрут реально отрисован.
+          var cur = location.pathname + location.search + location.hash;
+          if (d.path === cur) return;
+          // Пока не подменили URL: относительные пути страницы (./generated/main.js
+          // и остальные) должны резолвиться от корня ядра. Без <base> после
+          // replaceState на глубокий маршрут (/c/<uuid>/section/…) браузер ищет
+          // скрипты по /c/generated/…, ядро отдаёт на неизвестный путь index.html
+          // с кодом 200, и КАЖДЫЙ скрипт падает с "Unexpected token '<'" —
+          // получается пустой (чёрный) экран после переключения ядра.
+          try {
+            if (!document.querySelector("base")) {
+              var baseEl = document.createElement("base");
+              baseEl.setAttribute("href", "/");
+              (document.head || document.documentElement).appendChild(baseEl);
+            }
+          } catch (e) {}
+          history.replaceState(history.state, "", d.path);
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- Boot fragments (generated from web/src/boot/**). -->
     <!-- Workaround for custom elements in overlay bundle -->
@@ -83,11 +125,14 @@
     <script defer src="./prism_bundle.js?v=3.1.0"></script>
     <script src="./agy_export_session.js?v=3.1.0"></script>
     <script defer src="./generated/main.js?v=3.1.11"></script>
-    <script defer src="./agy_ru.js?v=3.1.7"></script>
+    <script defer src="./agy_ru.js?v=3.1.12.4"></script>
     <script defer src="./agy_i18n.js?v=3.1.0"></script>
-    <script defer src="./agy_shield.js?v=3.1.0"></script>
-    <script defer src="./agy_tools.js?v=3.1.11"></script>
-    <script defer src="./agy_providers.js?v=3.1.0"></script>
+    <script defer src="./agy_shield.js?v=3.1.12.1"></script>
+    <script defer src="./agy_tools.js?v=3.1.12.1"></script>
+    <script defer src="./agy_providers.js?v=3.1.12.7"></script>
+    <script defer src="./agy_paths.js?v=3.1.12.7"></script>
+    <script defer src="./agy_media.js?v=3.1.12.4"></script>
+    <script defer src="./agy_player.js?v=3.1.12.2"></script>
     <script defer src="./agy_mcp.js?v=3.1.0"></script>
     <script defer src="./agy_customizations.js?v=3.1.0"></script>
     <script defer src="./agy_dictation.js?v=3.1.0"></script>

@@ -44,11 +44,52 @@
   /* Restart the core so it re-reads the provider env (switch standard<->providers
      mode, or pick up a changed connection) — no manual Force Stop needed. */
   var restarting = false, restartTimer = 0;
-  function applyRestart() {
+  function applyRestart(targetLabel) {
     if (restarting) return;
-    try { if (bridge && typeof bridge.restartCore === "function") bridge.restartCore(); } catch (e) {}
+    var label = targetLabel || "";
+    // Отметка для следующей загрузки страницы: этот reload вызван рестартом
+    // ядра, поэтому startup_ready.js разрешено агрессивнее лечить пустой экран
+    // (сначала авто-перезагрузки, и только потом фатальный экран), а
+    // agy_loading.js показывает экран возврата в чат.
+    try {
+      localStorage.setItem("__agyCoreRestart", JSON.stringify({
+        ts: Date.now(),
+        path: location.pathname + location.search + location.hash,
+        label: label
+      }));
+    } catch (e) {}
+    // Вместо тоста — полноэкранный экран перезапуска ядра. Даём браузеру
+    // отрисовать его (два кадра), и только потом останавливаем ядро.
+    try { if (window.__agyLoading) window.__agyLoading.show({ target: label, mode: "switch", guardMs: 60000 }); } catch (e) {}
     restarting = true;
     clearTimeout(restartTimer);
+    setTimeout(function () {
+      try { if (bridge && typeof bridge.restartCore === "function") bridge.restartCore(); } catch (e) {}
+    }, 360);
+
+    // WebView больше не перезагружается при смене ядра (патч watchCore), поэтому
+    // экран держим до первого ответа НОВОГО ядра и убираем без перезагрузки
+    // страницы. Два успешных ответа подряд — чтобы не поймать ещё живой старый
+    // процесс в момент остановки.
+    (function waitForCore() {
+      var startedAt = Date.now(), okCount = 0;
+      var timer = setInterval(function () {
+        if (Date.now() - startedAt > 60000) { clearInterval(timer); return; }
+        if (Date.now() - startedAt < 1200) return;
+        fetch("./?agy_ping=" + Date.now(), { method: "HEAD", cache: "no-store" })
+          .then(function (r) {
+            if (!r || !r.ok) { okCount = 0; return; }
+            if (++okCount < 2) return;
+            clearInterval(timer);
+            // Ядро ответило. Страницу перезагрузит натив (watchCore → loadApp),
+            // а флаг __agyCoreRestart НЕ трогаем: по нему новая страница покажет
+            // вторую фазу экрана (60% → 100%) и уйдёт по сигналу готовности UI.
+            // Здесь специально не показываем 100% и «Готово» — иначе полоса
+            // откатывалась бы назад после перезагрузки.
+          })
+          .catch(function () { okCount = 0; });
+      }, 500);
+    })();
     restartTimer = setTimeout(function () { restarting = false; if (root && root.isConnected) render(); }, 15000);
   }
 
@@ -593,15 +634,15 @@
       if (i >= 0) state.connections[i] = editing; else state.connections.push(editing);
       if ((editing.selected || []).length) state.useProviders = true;
       save(); syncModels(); editing = null; fetchMsg = "";
-      if (state.useProviders) applyRestart();
+      if (state.useProviders) applyRestart(T("ваши модели", "your models"));
       render();
     } else if (act === "delete") {
       state.connections = state.connections.filter(function (c) { return c.id !== editing.id; });
       save(); syncModels(); editing = null; fetchMsg = "";
-      if (state.useProviders) applyRestart();
+      if (state.useProviders) applyRestart(T("ваши модели", "your models"));
       render();
     } else if (act === "restart") {
-      applyRestart(); render();
+      applyRestart(T("ваши модели", "your models")); render();
     }
   }
 
@@ -633,14 +674,16 @@
 
   window.__agyProviderIcon = function () {
     load();
-    return state.useProviders ? "dns" : "smart_toy";
+    /* "tune" (ползунки настроек) входит в бандленный набор Material Symbols
+       и идеально подходит под стилистику меню, заменяя пятилистник "hub". */
+    return state.useProviders ? "tune" : "smart_toy";
   };
 
   window.__agyProviderTooltip = function () {
     load();
     // Баг 2: короткие метки — длинные делали dropdown слишком широким
     if (state.useProviders) {
-      return T("Провайдеры", "Providers");
+      return T("Пользовательские", "Custom");
     }
     return T("Google Gemini", "Google Gemini");
   };
@@ -654,7 +697,7 @@
       return;
     }
 
-    // Баг 1 + 3: сохраняем маршрут и черновик текста ДО перезапуска
+    // Баг 1 + 3 + 6: сохраняем маршрут, черновик текста и файлы ДО перезапуска
     // WebView после restartCore() делает полный reload — localStorage переживает его
     try {
       var path = window.location.pathname + window.location.search + window.location.hash;
@@ -665,25 +708,29 @@
     try {
       var draftEl = document.querySelector("[data-testid='agent-input-box'] [contenteditable='true']");
       if (draftEl) {
-        var draftText = (draftEl.textContent || "").trim();
+        var draftText = ((draftEl.innerText !== undefined ? draftEl.innerText : draftEl.textContent) || "").trim();
         if (draftText) {
           localStorage.setItem("__agyDraftRestore", JSON.stringify({ text: draftText, ts: Date.now() }));
         }
+      }
+    } catch (_) {}
+    try {
+      var allInputs = Array.prototype.slice.call(document.querySelectorAll("input[type='file']"));
+      var compInput = allInputs.filter(function (el) {
+        return !el.getAttribute("data-testid") && !el.closest("[role='dialog'],[aria-modal='true']");
+      }).pop();
+      if (compInput && compInput.files && compInput.files.length && typeof window.__agyAppendFiles === "function") {
+        window.__agyAppendFiles(Array.prototype.slice.call(compInput.files));
       }
     } catch (_) {}
 
     state.useProviders = !state.useProviders;
     save();
     syncModels();
-    applyRestart();
+    applyRestart(state.useProviders
+      ? T("ваши модели", "your models")
+      : T("встроенные модели Google Gemini", "built-in Google Gemini models"));
     if (root && root.isConnected) render();
-    if (state.useProviders) {
-      showToast(T("Включён режим сторонних провайдеров. Ядро перезапускается…",
-                  "Providers mode enabled. Restarting core…"), false);
-    } else {
-      showToast(T("Включены стандартные модели Google. Ядро перезапускается…",
-                  "Standard Google models enabled. Restarting core…"), false);
-    }
   };
 
   window.__agyProvidersMount = function (el) {

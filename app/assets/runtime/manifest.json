@@ -10,6 +10,7 @@
     "bin/open": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/open_helper": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/rish": "7cbcf9a3b6c79575de2881c2d422902df103ab352d22a308cc887e74b41bb51d",
+    "bin/rish_shizuku.dex": "1953c1fd9708904f8fc1f67774843b4cc3d03e5f2a578ff4d654d0625456bc28",
     "bin/sensible-browser": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/x-www-browser": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
     "bin/xdg-open": "c606fed337afc16bd11047acf0aa8d0183e73a83c0bbd79f6f81cc7258537b8d",
@@ -28,11 +29,11 @@
     "lib/libpthread.so.0": "adf2a3b38694cdd6b8e6c08f56a64786420cb20d736ceece48c3871147357ff2",
     "lib/libresolv.so.2": "490093f15e8f6a5966e89f61c01887657ababeb154b755c48d91a6e2ab9888f2",
     "lib/librt.so.1": "a941a6c9eb45597c47597e7711e8cd24b039eb488f20337d2a96e35c22daf327",
-    "seed/AGENTS.md": "c93c8342587cf522a6eec701e1b71e370bd5bb1d35a73479869a63ffa0207c41",
+    "seed/AGENTS.md": "b50595fd0b9607c54bda14b7f7d363f564a8b9a5fb784a3d25bcefff626aae7e",
     "seed/antigravity_state.gemini.pbtxt": "2c32aa7eeb7ef52f434dcf89304941099772e4fadcbcbb345d820342fc290183",
     "seed/antigravity_state.pbtxt": "60473fc7675b596375a39e9657ac7304edc1ec645dcb2c7689262922c3d48297",
     "seed/jetski_state.pbtxt": "60473fc7675b596375a39e9657ac7304edc1ec645dcb2c7689262922c3d48297"
   },
-  "generated_at": "2026-10-22T09:00:19Z",
+  "generated_at": "2026-11-17T06:23:41Z",
   "schema": 1
 }

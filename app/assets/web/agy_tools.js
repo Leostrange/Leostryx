@@ -1381,7 +1381,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.1.11";
+    appVer.textContent = "3.1.12";
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1477,7 +1477,7 @@
     wrap.appendChild(c2);
 
     /* ── Card 3: Обновления + Changelog ── */
-    var CURRENT_VERSION = "3.1.11";
+    var CURRENT_VERSION = "3.1.12";
     /* ── Changelog: окно тянет текст живьём с GitHub Releases ── */
     var clOverlay = null;
     function closeChangelog() {

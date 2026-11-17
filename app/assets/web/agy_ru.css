@@ -560,47 +560,88 @@ html[data-base-ui-scroll-locked] {
   border-radius: 3px;
 }
 
-/* Attachments like Out27: a tile with the preview on top and a "×" strip
-   under it (instead of a 32px chip with a tiny corner badge). */
+/* Attachments like Out27: square 96x96 tiles for all files (photos, videos,
+   documents) with preview / icon badge on top (72px) and "×" strip (24px) below. */
 [data-testid="input-attachment"] {
+  display: flex !important;
   flex: 0 0 96px !important;
   flex-shrink: 0 !important;
   flex-direction: column !important;
   align-items: stretch !important;
+  justify-content: flex-start !important;
   width: 96px !important;
+  height: 96px !important;
+  min-width: 96px !important;
+  min-height: 96px !important;
   max-width: 96px !important;
+  max-height: 96px !important;
+  aspect-ratio: 1 / 1 !important;
   border-radius: 10px !important;
   overflow: hidden !important;
   vertical-align: top;
+  box-sizing: border-box !important;
 }
-[data-testid="input-attachment"] > :first-child { width: 100% !important; border-radius: 0 !important; }
+[data-testid="input-attachment"] > :first-child {
+  width: 100% !important;
+  height: 72px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  flex: 0 0 72px !important;
+}
 [data-testid="input-attachment"] img {
   width: 100% !important;
   height: 72px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
   border-radius: 0 !important;
   object-fit: cover !important;
+  display: block !important;
 }
 [data-testid="input-attachment"] > :first-child > div,
 [data-testid="input-attachment"] > div:first-child {
+  width: 100% !important;
   height: 72px !important;
-  padding: 0 6px !important;
-  justify-content: center;
-  flex-direction: column;
-  gap: 2px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
+  padding: 4px 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
 }
 [data-testid="input-attachment"] > :first-child span,
-[data-testid="input-attachment"] > div:first-child span { max-width: 84px !important; font-size: 10px !important; }
+[data-testid="input-attachment"] > div:first-child span {
+  max-width: 84px !important;
+  font-size: 10px !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
 [data-testid="input-attachment-remove"] {
   position: static !important;
   opacity: 1 !important;
   display: flex !important;
-  justify-content: center;
-  align-items: center;
+  justify-content: center !important;
+  align-items: center !important;
   width: 100% !important;
   height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  flex: 0 0 24px !important;
   border-radius: 0 !important;
-  border-top: 1px solid var(--border, rgba(127,127,127,.3));
+  border-top: 1px solid var(--border, rgba(127,127,127,.3)) !important;
   background: transparent !important;
+  box-sizing: border-box !important;
 }
 [data-testid="input-attachment-remove"] svg { width: 12px !important; height: 12px !important; }
 
@@ -1335,3 +1376,23 @@ html[data-base-ui-scroll-locked] {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Color picker popover & 2D gradient saturation/brightness field */
+[data-radix-popper-content-wrapper]:has(.h-32) > * {
+  background: var(--card, var(--background, #1e1e20)) !important;
+  background-color: var(--card, var(--background, #1e1e20)) !important;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25)) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 12px !important;
+}
+.h-32 > div:nth-child(1) {
+  background: linear-gradient(to right, #ffffff, rgba(255, 255, 255, 0)) !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+.h-32 > div:nth-child(2) {
+  background: linear-gradient(to bottom, transparent, #000000) !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+

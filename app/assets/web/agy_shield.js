@@ -313,6 +313,18 @@
   }, true);
   window.addEventListener("resize", function () { place(); });
 
+  /* Кнопка живёт в React-футере окна ввода, поэтому вставляем её только когда
+   * редактор НЕ в фокусе: вставка узла в перерисовываемую строку заставляет
+   * React пересобрать композер, фокус теряется и клавиатура закрывается
+   * (симметрично attachSubagentButton в agy_ru.js). */
+  function editorFocused() {
+    var ae = document.activeElement;
+    if (!ae || ae === document.body || !ae.closest) return false;
+    if (!ae.closest(BOX)) return false;
+    return !!(ae.isContentEditable || ae.tagName === "TEXTAREA" ||
+      ae.getAttribute("contenteditable") === "true");
+  }
+
   /* Button: first item of the right-hand group of the toolbar (next to mic). */
   function ensureButton() {
     // Footer row of the input box: [+ / model …] [mic, send]. The right group
@@ -323,6 +335,7 @@
     var group = footer.lastElementChild;
     if (!group || group.contains(plus)) return;
     if (group.querySelector(".agy-shield-btn")) return;
+    if (editorFocused()) return;             // во время ввода DOM не трогаем
     var b = document.createElement("button");
     b.type = "button";
     b.className = "agy-shield-btn";
@@ -340,4 +353,10 @@
     schedule();
   }
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start, { once: true });
+
+  // Редактор отпустил фокус — возвращаем кнопку сразу, не дожидаясь мутации.
+  document.addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest(BOX)) setTimeout(schedule, 0);
+  }, true);
 })();

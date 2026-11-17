@@ -30,10 +30,10 @@
 
   /* ------------------------------------------------------------- catalog */
   var PACKS = [
-    { id: "01_owl",       ru: "Сова",           en: "Owl" },
-    { id: "02_lynx",      ru: "Рысь",           en: "Lynx" },
-    { id: "03_lsx",       ru: "Монограмма LSX", en: "LSX monogram" },
-    { id: "04_angular_x", ru: "Угловой X",      en: "Angular X" }
+    { id: "01_owl",       ru: "Сова",     en: "Owl" },
+    { id: "02_lynx",      ru: "Рысь",     en: "Lynx" },
+    { id: "03_lsx",       ru: "Волк",     en: "Wolf" },
+    { id: "04_angular_x", ru: "Медведь",  en: "Bear" }
   ];
   var DEFAULT_PACK = "02_lynx";
 
@@ -343,8 +343,8 @@
     var c1 = makeCard();
     c1.appendChild(makeTitle(T("Логотип", "Logo")));
     c1.appendChild(makeNote(T(
-      "Сова, рысь, монограмма LSX или угловой X. Сразу меняет логотип в шапке, на экране входа, сплэш-скрине и иконку приложения на рабочем столе.",
-      "Owl, lynx, LSX monogram or angular X. Immediately updates the header logo, login screen, splash screen and home-screen app icon."
+      "Сова, рысь, волк или медведь. Сразу меняет логотип в шапке, на экране входа, сплэш-скрине и иконку приложения на рабочем столе.",
+      "Owl, lynx, wolf or bear. Immediately updates the header logo, login screen, splash screen and home-screen app icon."
     )));
 
     var grid = document.createElement("div");

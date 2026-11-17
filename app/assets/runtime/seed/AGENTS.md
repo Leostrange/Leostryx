@@ -133,6 +133,34 @@ The agent has native access to Shizuku's elevated ADB shell (`uid=2000(shell)`):
 
 ---
 
+## 4.1 Ссылки на файлы и APK в чате
+
+Приложение делает пути кликабельными: тап по пути открывает карточку с действиями
+**«Открыть папку»** и (для `*.apk`) **«Установить APK»**. Чтобы это работало, соблюдай правила:
+
+- Всегда выводи **полный абсолютный путь** отдельной строкой, без markdown-ссылок и без
+  сокращений: `/storage/emulated/0/Leostryx Projects/Leostryx-3.1.12-bypass.apk`.
+- Один путь — одна строка. Не склеивай путь с пояснением через запятую и не переноси его.
+- Путь должен быть под `/storage/emulated/0/` (или `/sdcard/`). Пути в приватных каталогах
+  приложения (`/data/data/...`, `/data/user/0/...`) карточка открыть не сможет.
+- Перед отправкой убедись, что файл существует: `ls -l "<путь>"`.
+- Для сборок перечисляй оба APK (`standard` и `bypass`) и файл `SHA256SUMS-<версия>.txt`
+  отдельными строками — пользователь должен нажимать на каждый путь, а не на общий текст.
+
+### Clickable file and APK links in chat
+
+The app turns paths into tappable cards with **“Open folder”** and, for `*.apk`,
+**“Install APK”** actions. To make that work:
+
+- Always print the **full absolute path** on its own line, without markdown links and without
+  shortening it: `/storage/emulated/0/Leostryx Projects/Leostryx-3.1.12-bypass.apk`.
+- One path per line; do not append explanations after a comma or wrap the path.
+- The path must live under `/storage/emulated/0/` (or `/sdcard/`). Paths inside app-private
+  directories (`/data/data/...`, `/data/user/0/...`) cannot be opened by the card.
+- Verify the file exists before sending: `ls -l "<path>"`.
+- For builds, list both APKs (`standard` and `bypass`) and `SHA256SUMS-<version>.txt` on
+  separate lines so each path is tappable.
+
 ## 5. Development & Server Guidelines
 
 - **Port Binding:** Local development servers (Vite, Next.js, Express, FastAPI) MUST bind to `localhost` or `127.0.0.1`.
