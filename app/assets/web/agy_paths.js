@@ -1,19 +1,22 @@
 /* Leostryx — кликабельные пути в чате.
  *
  * Агент часто пишет пути к файлам («/sdcard/Download/app.apk», ссылки вида
- * file:///storage/emulated/0/... или пути в code-блоках). По клику на такой путь
- * открываем карточку:
+ * [app.apk](file:///storage/emulated/0/...), кнопки-пилюли с data-uri или пути в code-блоках).
+ * По клику на такой путь открываем карточку:
  * - «Открыть папку» (DocumentsUI сразу в нужном каталоге через AgyTools.openPath);
  * - «Установить APK» (системный установщик через AgyTools.installApk);
  * - «Копировать».
  *
  * Поддерживает:
+ * - элементы React с data-uri / data-file-uri (кнопки inline-pill, чипы, карточки);
  * - прямые ссылки <a> с href="file://..." или href="/..." (с декодированием %20 и пробелов);
  * - блоки кода <code> с путями (включая пробелы в именах каталогов);
- * - элементы с data-path;
+ * - элементы с data-path / title;
  * - пути в тексте в кавычках, скобках, бэктиках или с расширениями (.apk, .zip и т.д.);
  * - симлинки (/sdcard/ -> /storage/emulated/0/);
- * - пути с пробелами («/storage/emulated/0/Leostryx Projects/...»).
+ * - пути с пробелами («/storage/emulated/0/Leostryx Projects/...»);
+ * - перехват событий на ранней фазе (capture) pointerdown, touchstart и click,
+ *   а также прямой хук __agyPaths.handleFileUri для защиты от всплытия окна артефактов.
  */
 (function () {
   "use strict";
@@ -75,29 +78,62 @@
   function clean(path) {
     if (!path) return "";
     var p = String(path).trim();
+
+    // Извлечение пути из markdown-ссылок: [label](file://...) или [label](/storage/...)
+    var md = p.match(/\((file:\/\/[^)]+|\/(?:sdcard|storage|data|root|mnt|system)[^)]+)\)/i);
+    if (md) p = md[1];
+
+    p = p.replace(/^[`"'«(\[{]+/, "").replace(/[`"'»)\].}]+$/, "");
+    p = p.replace(TRAILING, "");
+    // Удаляем zero-width / невидимые символы
+    p = p.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, "");
+    p = p.trim();
+
     if (/^file:\/\//i.test(p)) {
-      p = p.replace(/^file:\/\//i, "");
+      p = p.replace(/^file:\/\/(?:localhost)?\/?/i, "/");
+      p = p.split(/[?#]/)[0];
       try { p = decodeURIComponent(p); } catch (e) { try { p = decodeURI(p); } catch (e2) {} }
+    } else {
+      p = p.split(/[?#]/)[0];
     }
+
     if (/%[0-9a-fA-F]{2}/.test(p)) {
       try { p = decodeURIComponent(p); } catch (e) {}
     }
+
     p = p.replace(/^[`"'«(\[{]+/, "").replace(/[`"'»)\].}]+$/, "");
     p = p.replace(TRAILING, "");
-    // markdown-рендерер иногда вставляет zero-width/невидимые символы внутри
-    // пути — они ломают и регулярки, и открытие файла
-    p = p.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, "");
-    return p.trim();
+    p = p.trim();
+
+    // Гарантируем начальный слэш для известных корней файловой системы Android
+    if (/^(?:sdcard|storage|data|root|mnt|system)\b/i.test(p)) {
+      p = "/" + p;
+    }
+    return p;
   }
 
   function isApk(path) {
-    return /\.apk$/i.test(clean(path));
+    if (!path) return false;
+    var p = clean(path);
+    return /\.apk$/i.test(p);
   }
 
   function isLikelyPath(str) {
     if (!str) return false;
     var s = clean(str);
-    return /^\/(?:sdcard|storage|data|root|mnt|system)\b/i.test(s);
+    return /^\/(?:sdcard|storage|data|root|mnt|system)\b/i.test(s) || isApk(s);
+  }
+
+  function isInternalBrainArtifact(path) {
+    if (!path) return false;
+    var p = clean(path);
+    // APK никогда не является внутренним артефактом IDE
+    if (isApk(p)) return false;
+    // Внутренние артефакты диалога (отчёты, планы) живут в brain/ и должны открываться в просмотрщике IDE
+    if (/\/brain\/[^\/]+\/[^\/]+\.(?:md|json|txt|html)$/i.test(p) || /\/static\/artifacts\//i.test(p)) {
+      return true;
+    }
+    return false;
   }
 
   function normalizeSymlink(path) {
@@ -111,34 +147,54 @@
 
   function extractFromElement(el) {
     if (!el) return "";
-    // Check direct data-path
-    if (el.hasAttribute && el.hasAttribute("data-path")) {
-      var dp = el.getAttribute("data-path");
-      if (isLikelyPath(dp)) return clean(dp);
+    var target = el.nodeType === 3 ? el.parentElement : el;
+    if (!target) return "";
+
+    // 1. Поиск элементов с data-uri / data-file-uri / data-path (кнопки pill, чипы, карточки диффов)
+    var pill = target.closest ? target.closest("[data-uri], [data-file-uri], [data-path]") : null;
+    if (pill) {
+      var val = pill.getAttribute("data-uri") ||
+                pill.getAttribute("data-file-uri") ||
+                pill.getAttribute("data-path") || "";
+      var cVal = clean(val);
+      if (cVal && (isLikelyPath(cVal) || isApk(cVal))) return cVal;
     }
-    // Check closest a[href]
-    var a = el.closest ? el.closest("a[href]") : null;
+
+    // 2. Ближайшая ссылка a[href]
+    var a = target.closest ? target.closest("a[href]") : null;
     if (a) {
       var href = a.getAttribute("href") || "";
-      if (/^file:\/\//i.test(href)) {
-        return clean(href);
-      }
-      if (isLikelyPath(href)) {
-        return clean(href);
-      }
-      var aText = (a.textContent || "").trim();
-      if (isLikelyPath(aText)) {
-        return clean(aText);
-      }
+      var cHref = clean(href);
+      if (cHref && (isLikelyPath(cHref) || isApk(cHref))) return cHref;
+      var aText = clean(a.textContent || "");
+      if (aText && (isLikelyPath(aText) || isApk(aText))) return aText;
     }
-    // Check closest code
-    var code = el.closest ? el.closest("code") : null;
+
+    // 3. Ближайший элемент с title (часто хранит полный путь к файлу)
+    var titled = target.closest ? target.closest("[title]") : null;
+    if (titled) {
+      var t = titled.getAttribute("title") || "";
+      var cT = clean(t);
+      if (cT && (isLikelyPath(cT) || isApk(cT))) return cT;
+    }
+
+    // 4. Ближайший блок <code>
+    var code = target.closest ? target.closest("code") : null;
     if (code) {
-      var codeText = (code.textContent || "").trim();
-      if (isLikelyPath(codeText)) {
-        return clean(codeText);
-      }
+      var codeText = clean(code.textContent || "");
+      if (codeText && (isLikelyPath(codeText) || isApk(codeText))) return codeText;
     }
+
+    // 5. Ближайшая кнопка-пилюля или контекстный элемент
+    var mention = target.closest ? target.closest(".inline-pill, .context-scope-mention, [data-quotable-inline]") : null;
+    if (mention) {
+      var mUri = mention.getAttribute("data-uri") || mention.getAttribute("data-file-uri") || mention.getAttribute("title") || "";
+      var cmUri = clean(mUri);
+      if (cmUri && (isLikelyPath(cmUri) || isApk(cmUri))) return cmUri;
+      var mText = clean(mention.textContent || "");
+      if (mText && (isLikelyPath(mText) || isApk(mText))) return mText;
+    }
+
     return "";
   }
 
@@ -147,7 +203,7 @@
     var text = node.nodeValue || "";
     if (!text) return "";
 
-    // 1. Check if surrounded by quotes, backticks or brackets
+    // 1. Пути в кавычках, скобках или бэктиках
     var quoteRe = /[`"'«(\[{](\/(?:sdcard|storage|data|root|mnt|system)\/[^`"'»)\].\n\r]+)[`"'»)\].}]/gi;
     var m;
     while ((m = quoteRe.exec(text))) {
@@ -157,7 +213,7 @@
       }
     }
 
-    // 2. Check if it has a known file extension (allowing spaces in path!)
+    // 2. Пути с известным расширением файла (поддерживают пробелы в имени папок и файлов)
     var extRe = new RegExp("\\/(?:sdcard|storage|data|root|mnt|system)\\/[^\\n\\r\"';<>()[\\\\\\]{}*?]+?" + KNOWN_EXTS, "gi");
     while ((m = extRe.exec(text))) {
       var eStart = m.index, eEnd = m.index + m[0].length;
@@ -166,7 +222,16 @@
       }
     }
 
-    // 3. Fallback: space-delimited path
+    // 3. Отдельная строка с абсолютным путём (с пробелами)
+    var lineRe = /(?:^|[\n\r])\s*(\/(?:sdcard|storage|data|root|mnt|system)\/[^\n\r"';<>()[\]{}*?]+?)(?:\s*$|[\n\r])/gi;
+    while ((m = lineRe.exec(text))) {
+      var lStart = m.index, lEnd = m.index + m[0].length;
+      if (offset >= lStart && offset <= lEnd) {
+        return clean(m[1]);
+      }
+    }
+
+    // 4. Резерв: путь, ограниченный пробелами
     var wordRe = /\/(?:sdcard|storage|data|root|mnt|system)\/[^\s\n\r"';<>()[\]{}]+/gi;
     while ((m = wordRe.exec(text))) {
       var wStart = m.index, wEnd = m.index + m[0].length;
@@ -179,12 +244,12 @@
   }
 
   function pathAtPoint(x, y, target) {
-    // Priority 1: Check target element or element at point for <a>, <code>, [data-path]
+    // Приоритет 1: проверка целевого элемента или элемента под координатами
     var el = target || (document.elementFromPoint ? document.elementFromPoint(x, y) : null);
     var fromEl = extractFromElement(el);
     if (fromEl) return fromEl;
 
-    // Priority 2: Use caret position to inspect the text node
+    // Приоритет 2: каретка и текстовый узел под пальцем/курсором
     var node = null, offset = 0;
     try {
       if (document.caretRangeFromPoint) {
@@ -198,7 +263,6 @@
 
     if (node) {
       if (node.nodeType === 3) {
-        // Also check if text node's parent is an <a> or <code>
         if (node.parentElement) {
           var pEl = extractFromElement(node.parentElement);
           if (pEl) return pEl;
@@ -211,7 +275,7 @@
       }
     }
 
-    // Priority 3: Fallback check on document.elementFromPoint
+    // Приоритет 3: fallback на elementFromPoint
     if (document.elementFromPoint) {
       var el2 = document.elementFromPoint(x, y);
       if (el2 && el2 !== el) {
@@ -269,13 +333,23 @@
     var normPath = normalizeSymlink(rawPath);
     flash(T("Открываю папку в проводнике…", "Opening folder in file manager…"));
 
-    // 1. Попытка через нативный мост AgyTools
+    // 1. Попытка через нативный мост AgyTools (DocumentsUI без SecurityException)
     var b = bridge("openPath");
     if (b) {
-      try { b.openPath(normPath); } catch (_) { try { b.openPath(rawPath); } catch (__) {} }
+      try {
+        b.openPath(normPath);
+        closeSheet();
+        return;
+      } catch (_) {
+        try {
+          b.openPath(rawPath);
+          closeSheet();
+          return;
+        } catch (__) {}
+      }
     }
 
-    // 2. Гарантированный запуск DocumentsUI через termrun (am start)
+    // 2. Резервный запуск DocumentsUI через termrun (am start)
     var pyCmd = [
       'python3 -c "',
       'import os, urllib.parse, subprocess;',
@@ -350,7 +424,7 @@
     box.className = "agy-path-sheet";
     box.innerHTML =
       '<div class="agy-path-card">' +
-        '<div class="agy-path-label">' + (apk ? T("APK-файл", "APK file") : T("Путь", "Path")) + '</div>' +
+        '<div class="agy-path-label">' + (apk ? T("APK-файл", "APK file") : T("Путь к файлу", "File path")) + '</div>' +
         '<div class="agy-path-value" data-path></div>' +
         '<div class="agy-path-row">' +
           '<button class="agy-path-btn" data-act="open">' + T("Открыть папку", "Open folder") + '</button>' +
@@ -360,8 +434,8 @@
           '<button class="agy-path-btn agy-path-btn--ghost" data-act="close">' + T("Закрыть", "Close") + '</button>' +
         '</div>' +
         (apk ? '<div class="agy-path-hint">' +
-          T("Для установки система попросит разрешение «Установка неизвестных приложений» для Leostryx.",
-            "The system will ask for “Install unknown apps” permission for Leostryx.") + '</div>' : '') +
+          T("Для установки система может запросить разрешение «Установка неизвестных приложений» для Leostryx.",
+            "The system may ask for “Install unknown apps” permission for Leostryx.") + '</div>' : '') +
       '</div>';
 
     box.querySelector("[data-path]").textContent = cleaned;
@@ -388,53 +462,51 @@
 
   var lastClickAt = 0, lastMissLog = 0, pendingTap = 0;
 
-  function handleTap(x, y, target, source) {
+  function tryIntercept(e, source) {
     if (sheet) return false;
+    var target = e.target;
+    if (target && target.closest && target.closest(".agy-path-sheet")) return false;
+
+    var x = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    var y = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
     var path = pathAtPoint(x, y, target);
-    if (!path) {
-      if (Date.now() - lastMissLog > 1500) {
-        lastMissLog = Date.now();
-        try { console.info("[agy_paths] no path at " + source + " (" + x + "," + y + ")"); } catch (e) {}
-      }
+    if (!path) return false;
+
+    // Внутренние markdown-артефакты IDE не перехватываем (если это не APK)
+    if (isInternalBrainArtifact(path)) {
       return false;
     }
-    try { console.info("[agy_paths] open " + path + " via " + source); } catch (e) {}
-    openSheet(path);
-    return true;
-  }
-
-  document.addEventListener("click", function (e) {
-    lastClickAt = Date.now();
-    var x = e.clientX || 0;
-    var y = e.clientY || 0;
-    if (!handleTap(x, y, e.target, "click")) return;
 
     e.preventDefault();
     e.stopPropagation();
     if (typeof e.stopImmediatePropagation === "function") {
       e.stopImmediatePropagation();
     }
-  }, true);
+    lastClickAt = Date.now();
+    try { console.info("[agy_paths] intercepted via " + source + ": " + path); } catch (_) {}
+    openSheet(path);
+    return true;
+  }
 
-  // Перехватываем pointerdown для ссылок на файлы/папки/APK, чтобы внутренний просмотрщик файлов IDE
-  // (панель артефактов) не успевал перехватить нажатие и открыть превью вместо нашего модального окна.
+  // 1. Ранний перехват pointerdown в фазе capture (предотвращает срабатывание встроенных обработчиков IDE)
   document.addEventListener("pointerdown", function (e) {
-    var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
-    if (a) {
-      var path = extractFromElement(a);
-      if (path) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-        lastClickAt = Date.now();
-        openSheet(path);
-      }
-    }
+    if (e.button !== undefined && e.button > 0) return;
+    tryIntercept(e, "pointerdown");
   }, true);
 
-  // Часть интерфейса гасит click на pointerdown/pointerup (тач-навигация), из-за
-  // чего ссылки «не нажимаются». Поэтому ловим ещё и pointerup: если в течение
-  // 260 мс click так и не пришёл — обрабатываем тап сами.
+  // 2. Ранний перехват touchstart для мобильных тач-событий
+  document.addEventListener("touchstart", function (e) {
+    tryIntercept(e, "touchstart");
+  }, { capture: true, passive: false });
+
+  // 3. Основной перехват click в фазе capture
+  document.addEventListener("click", function (e) {
+    if (e.button !== undefined && e.button > 0) return;
+    lastClickAt = Date.now();
+    tryIntercept(e, "click");
+  }, true);
+
+  // 4. Резервный перехват pointerup на случай, если часть тач-контейнеров поглощает click
   document.addEventListener("pointerup", function (e) {
     if (sheet) return;
     if (e.button !== undefined && e.button > 0) return;
@@ -443,11 +515,14 @@
     clearTimeout(pendingTap);
     pendingTap = setTimeout(function () {
       if (Date.now() - lastClickAt < 400) return;
-      handleTap(x, y, target, "pointerup");
+      var path = pathAtPoint(x, y, target);
+      if (path && !isInternalBrainArtifact(path)) {
+        try { console.info("[agy_paths] open " + path + " via pointerup fallback"); } catch (_) {}
+        openSheet(path);
+      }
     }, 260);
   }, true);
 
-  // Диагностика в logcat (AGY_JS): видно, загрузился ли модуль и что он видит.
   try { console.info("[agy_paths] installed, hash=" + (location.hash || "")); } catch (e) {}
 
   window.addEventListener("keydown", function (e) {
@@ -461,5 +536,22 @@
     return typeof prevBack === "function" ? prevBack.apply(this, arguments) : false;
   };
 
-  window.__agyPaths = { __installed: true, openSheet: openSheet, pathAtPoint: pathAtPoint, close: closeSheet, clean: clean };
+  window.__agyPaths = {
+    __installed: true,
+    openSheet: openSheet,
+    pathAtPoint: pathAtPoint,
+    close: closeSheet,
+    clean: clean,
+    handleFileUri: function (uri) {
+      if (!uri) return false;
+      var p = clean(uri);
+      if (!p) return false;
+      if (isApk(p) || (isLikelyPath(p) && !isInternalBrainArtifact(p))) {
+        try { console.info("[agy_paths] handleFileUri caught: " + p); } catch (_) {}
+        openSheet(p);
+        return true;
+      }
+      return false;
+    }
+  };
 })();

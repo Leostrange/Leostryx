@@ -140,6 +140,19 @@ GUARD_SEND_NEW = (
     '"Your model does not support this media.'
 )
 
+# --- F: openFile hook for clickable paths (agy_paths) -----------------------
+# Prevent opening internal fileView/artifactView when user clicks on a file
+# path or APK; route to window.__agyPaths.handleFileUri instead.
+PATHS_MARK = "__agyPaths.handleFileUri"
+MY_OLD = 'r=c();try{v=uf(u.toString(),r?r:void 0)}catch{console.error("Failed to match URI authority:",\nu);return}l(v)?'
+MY_NEW = 'r=c();try{v=uf(u.toString(),r?r:void 0)}catch{console.error("Failed to match URI authority:",\nu);return}if(window.__agyPaths&&window.__agyPaths.handleFileUri&&window.__agyPaths.handleFileUri(v.toString()))return;l(v)?'
+
+FCC_OLD = 'function Fcc(a,b){return(c,e)=>{a?.openFile({fileUri:c,line:e})'
+FCC_NEW = 'function Fcc(a,b){return(c,e)=>{if(window.__agyPaths&&window.__agyPaths.handleFileUri&&window.__agyPaths.handleFileUri(c))return;a?.openFile({fileUri:c,line:e})'
+
+GCC_OLD = 'function Gcc(a,b){return(c,e)=>{a?.openArtifact({fileUri:c,cascadeId:e})'
+GCC_NEW = 'function Gcc(a,b){return(c,e)=>{if(window.__agyPaths&&window.__agyPaths.handleFileUri&&window.__agyPaths.handleFileUri(c))return;a?.openArtifact({fileUri:c,cascadeId:e})'
+
 UPSTREAM_MARK = 'var u5a=(a,b,c,e,f=10)=> {'
 
 s = open(PATH, encoding="utf-8").read()
@@ -175,6 +188,13 @@ else:
     s = sub_once(s, GUARD_TOAST_OLD, GUARD_TOAST_NEW, "E attach-time guard")
     s = sub_once(s, GUARD_SEND_OLD, GUARD_SEND_NEW, "E send-time guard")
 
+if PATHS_MARK in s:
+    print("Block F: already patched, skipping.")
+else:
+    s = sub_once(s, MY_OLD, MY_NEW, "F mY handleFileUri hook")
+    s = sub_once(s, FCC_OLD, FCC_NEW, "F Fcc handleFileUri hook")
+    s = sub_once(s, GCC_OLD, GCC_NEW, "F Gcc handleFileUri hook")
+
 new_len = len(s)
 if new_len == orig_len:
     print("Nothing to do.")
@@ -182,3 +202,4 @@ if new_len == orig_len:
 
 open(PATH, "w", encoding="utf-8", newline="").write(s)
 print(f"written: {orig_len} -> {new_len} bytes (delta {new_len - orig_len})")
+
