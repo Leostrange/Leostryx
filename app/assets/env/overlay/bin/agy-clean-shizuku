@@ -1,0 +1,89 @@
+#!/bin/bash
+# agy-clean-shizuku: Automatic cleaner for orphaned Shizuku UserServices
+
+# Check if rish is available
+if ! command -v rish >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Ensure Shizuku is running
+if ! rish -c "id" >/dev/null 2>&1; then
+    exit 0
+fi
+
+python3 - << 'EOF'
+import subprocess
+
+def parse_elapsed(s):
+    # Formats: "ss", "mm:ss", "hh:mm:ss", "d-hh:mm:ss"
+    days = 0
+    if '-' in s:
+        d_part, s = s.split('-', 1)
+        days = int(d_part)
+    parts = [int(p) for p in s.split(':')]
+    if len(parts) == 1:
+        sec = parts[0]
+    elif len(parts) == 2:
+        sec = parts[0] * 60 + parts[1]
+    elif len(parts) == 3:
+        sec = parts[0] * 3600 + parts[1] * 60 + parts[2]
+    else:
+        sec = 0
+    return days * 86400 + sec
+
+def get_processes():
+    try:
+        res = subprocess.run(['rish', '-c', 'ps -A -o UID,PID,PPID,ELAPSED,NAME'], capture_output=True, text=True, timeout=10)
+        lines = res.stdout.strip().split('\n')
+        procs = []
+        for line in lines[1:]:
+            parts = line.split()
+            if len(parts) >= 5:
+                procs.append({
+                    'uid': parts[0],
+                    'pid': int(parts[1]),
+                    'ppid': int(parts[2]),
+                    'elapsed': parse_elapsed(parts[3]),
+                    'name': parts[4]
+                })
+        return procs
+    except Exception as e:
+        return []
+
+procs = get_processes()
+if not procs:
+    exit(0)
+
+# Check main apps
+main_apps = {}
+for p in procs:
+    if p['name'] in ('dsh.android.client', 'dsh.android.client.SunsetDev'):
+        if p['uid'] not in ('2000', 'shell'):
+            main_apps[p['name']] = p['elapsed']
+
+pids_to_kill = []
+
+for p in procs:
+    if p['name'] == 'dsh.android.client:shizuku':
+        if 'dsh.android.client' not in main_apps:
+            pids_to_kill.append(p['pid'])
+        else:
+            # If main app is running, kill any shizuku started earlier than the app
+            if p['elapsed'] > main_apps['dsh.android.client'] + 60:
+                pids_to_kill.append(p['pid'])
+
+    elif p['name'] == 'dsh.android.client.SunsetDev:shizuku':
+        if 'dsh.android.client.SunsetDev' not in main_apps:
+            pids_to_kill.append(p['pid'])
+        else:
+            # If SunsetDev is running, kill any shizuku started earlier than the app
+            if p['elapsed'] > main_apps['dsh.android.client.SunsetDev'] + 60:
+                pids_to_kill.append(p['pid'])
+
+if pids_to_kill:
+    pid_str = " ".join(str(p) for p in pids_to_kill)
+    print(f"[agy-clean-shizuku] Terminated {len(pids_to_kill)} orphaned Shizuku process(es): {pid_str}")
+    subprocess.run(['rish', '-c', f'kill -9 {pid_str}'], capture_output=True)
+else:
+    print("[agy-clean-shizuku] Shizuku process table is clean (no orphaned processes).")
+EOF
