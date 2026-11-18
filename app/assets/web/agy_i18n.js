@@ -163,6 +163,21 @@
       if (normalized.startsWith("Run export PATH=")) {
         return leading + "Выполнить " + normalized.slice(4) + trailing;
       }
+      if (normalized.startsWith("You can prompt the model to try again")) {
+        return leading + "Вы можете попросить модель повторить попытку или начать новый диалог, если ошибка сохраняется." + trailing;
+      }
+      if (normalized.startsWith("This error is likely temporary")) {
+        return leading + "Скорее всего, ошибка временная. Попросите модель повторить через некоторое время." + trailing;
+      }
+      if (normalized === "troubleshooting guide") {
+        return leading + "руководство по устранению неполадок" + trailing;
+      }
+      if (normalized === "for more help." || normalized === "for more help") {
+        return leading + "для решения проблемы." + trailing;
+      }
+      if (normalized === "See our") {
+        return leading + "См." + trailing;
+      }
       if (normalized.startsWith("Prototype, build & run modern apps users love with Firebase")) {
         return leading + "Проектирование, создание и запуск современных приложений с серверными сервисами, AI и инструментами Firebase." + trailing;
       }

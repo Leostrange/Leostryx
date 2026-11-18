@@ -79,6 +79,18 @@ body:not(.dark) {
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
   --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 24%, transparent);
+  /* Плотная (но всё ещё прозрачная) поверхность: только для списков, у пунктов
+     которых есть описание — иначе страничный текст за стеклом читается как
+     часть списка. */
+  --agy-glass-surface-dense: color-mix(in srgb,
+    color-mix(in srgb, var(--background, #ffffff) 94%, var(--primary, #0b84ff)) 95%,
+    transparent);
+  /* Тень для плотных списков: ближний слой даёт чёткую границу по периметру,
+     дальний — глубину. Базовая --agy-glass-shadow для светлой темы слишком
+     мягкая (0.14), из-за неё список визуально сливался со страницей. */
+  --agy-glass-shadow-dense: 0 2px 8px rgba(0, 0, 0, 0.16),
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 16%, transparent);
   --popover: var(--agy-glass-surface);
 }
 
@@ -94,6 +106,10 @@ body.theme-dark {
   --agy-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.52), 0 0 0 1px color-mix(in srgb, var(--primary, #a3e635) 18%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #a3e635) 15%, transparent);
   --agy-glass-item-active: color-mix(in srgb, var(--primary, #a3e635) 26%, transparent);
+  --agy-glass-surface-dense: color-mix(in srgb, var(--background, #18181c) 96%, transparent);
+  --agy-glass-shadow-dense: 0 2px 10px rgba(0, 0, 0, 0.6),
+    0 10px 36px rgba(0, 0, 0, 0.45),
+    0 0 0 1px color-mix(in srgb, var(--primary, #a3e635) 20%, transparent);
   --popover: var(--agy-glass-surface);
 }
 
@@ -109,6 +125,12 @@ body.theme-light {
   --agy-glass-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
   --agy-glass-item-hover: color-mix(in srgb, var(--primary, #0b84ff) 14%, transparent);
   --agy-glass-item-active: color-mix(in srgb, var(--primary, #0b84ff) 24%, transparent);
+  --agy-glass-surface-dense: color-mix(in srgb,
+    color-mix(in srgb, var(--background, #ffffff) 94%, var(--primary, #0b84ff)) 95%,
+    transparent);
+  --agy-glass-shadow-dense: 0 2px 8px rgba(0, 0, 0, 0.16),
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--primary, #0b84ff) 16%, transparent);
   --popover: var(--agy-glass-surface);
 }
 
@@ -1396,3 +1418,54 @@ html[data-base-ui-scroll-locked] {
   pointer-events: none !important;
 }
 
+/* ---- Настройки › Общие: два списка с описаниями пунктов ---------------
+   Только эти два списка получают плотное стекло (--agy-glass-surface-dense):
+   1) «Профиль безопасности» (Security Preset)
+   2) «Политика выполнения JavaScript в браузере» (Browser JS Execution Policy)
+
+   CSS :has() срабатывает мгновенно в Chromium Blink (Android WebView 140+)
+   без задержек на JS или MutationObserver. Сохраняется фирменная прозрачность
+   «жидкого стекла» Leostryx (альфа 0.94–0.95 от цвета темы), при этом повышенная
+   плотность и контурная тень исключают смешивание текста страницы с пунктами меню.
+   Также поддерживается data-agy-dense="1" от agy_ru.js. */
+:is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"]):is(
+  :has([role="option"] .text-muted-foreground),
+  :has([role="option"] .text-xs),
+  :has([role="option"] div > span:nth-child(2)),
+  :has([role="option"] span:nth-child(2)),
+  [data-agy-dense="1"]
+) {
+  background: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #18181c) 95%, transparent)) !important;
+  background-color: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #18181c) 95%, transparent)) !important;
+  border: 1px solid var(--agy-glass-border, rgba(255, 255, 255, 0.22)) !important;
+  box-shadow: var(--agy-glass-shadow-dense, 0 14px 44px rgba(0, 0, 0, 0.75)) !important;
+  isolation: isolate !important;
+}
+
+html.light :is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"]):is(
+  :has([role="option"] .text-muted-foreground),
+  :has([role="option"] .text-xs),
+  :has([role="option"] div > span:nth-child(2)),
+  :has([role="option"] span:nth-child(2)),
+  [data-agy-dense="1"]
+),
+body.theme-light :is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"]):is(
+  :has([role="option"] .text-muted-foreground),
+  :has([role="option"] .text-xs),
+  :has([role="option"] div > span:nth-child(2)),
+  :has([role="option"] span:nth-child(2)),
+  [data-agy-dense="1"]
+),
+body.light :is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"]):is(
+  :has([role="option"] .text-muted-foreground),
+  :has([role="option"] .text-xs),
+  :has([role="option"] div > span:nth-child(2)),
+  :has([role="option"] span:nth-child(2)),
+  [data-agy-dense="1"]
+) {
+  background: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #ffffff) 94%, transparent)) !important;
+  background-color: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #ffffff) 94%, transparent)) !important;
+  border: 1px solid var(--agy-glass-border, rgba(0, 0, 0, 0.22)) !important;
+  box-shadow: var(--agy-glass-shadow-dense, 0 14px 44px rgba(0, 0, 0, 0.18)) !important;
+  isolation: isolate !important;
+}

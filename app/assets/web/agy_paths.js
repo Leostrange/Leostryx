@@ -302,27 +302,29 @@
     var normPath = normalizeSymlink(rawPath);
     flash(T("Запуск установки APK…", "Launching APK install…"));
 
-    // 1. Попытка через нативный мост AgyTools
+    // 1. Попытка через нативный мост AgyTools (системный PackageInstaller через FileProvider)
     var b = bridge("installApk");
     if (b) {
-      try { b.installApk(normPath); } catch (_) { try { b.installApk(rawPath); } catch (__) {} }
+      try {
+        b.installApk(normPath);
+        closeSheet();
+        return;
+      } catch (_) {
+        try {
+          b.installApk(rawPath);
+          closeSheet();
+          return;
+        } catch (__) {}
+      }
     }
 
-    // 2. Открытие папки с APK в системном проводнике DocumentsUI
+    // 2. Резервный запуск установки через rish (pm install)
     var pyCmd = [
       'python3 -c "',
-      'import os, urllib.parse, subprocess;',
+      'import subprocess;',
       'p = \'\'\'' + normPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'\'\';',
-      'folder = os.path.dirname(p) if os.path.isfile(p) else p;',
-      'folder = os.path.realpath(folder);',
-      'rel = folder;',
-      'if rel.startswith(\'/storage/emulated/0/\'): rel = rel[20:];',
-      'elif rel.startswith(\'/storage/emulated/0\'): rel = \'\';',
-      'doc_id = \'primary:\' + rel if rel else \'primary:\';',
-      'enc = urllib.parse.quote(doc_id);',
-      'cmd = \'am start -a android.intent.action.VIEW -d \"content://com.android.externalstorage.documents/document/\' + enc + \'\" -t \"vnd.android.document/directory\" -f 0x10000000\';',
-      'try: subprocess.run([\'rish\', \'-c\', cmd], timeout=5);',
-      'except Exception: subprocess.run([\'/system/bin/am\', \'start\', \'-a\', \'android.intent.action.VIEW\', \'-d\', \'content://com.android.externalstorage.documents/document/\' + enc, \'-t\', \'vnd.android.document/directory\', \'-f\', \'0x10000000\'], timeout=5);',
+      'try: subprocess.run([\'rish\', \'-c\', \'pm install -r \"\' + p + \'\" \'], timeout=15);',
+      'except Exception: pass;',
       '"'
     ].join("");
     runTerm(pyCmd);
@@ -414,21 +416,18 @@
     }
   }, true);
 
-  // Перехватываем pointerdown для ссылок на APK, чтобы внутренний просмотрщик файлов IDE
-  // не успевал перехватить нажатие и открыть превью вместо нашего модального окна установки.
+  // Перехватываем pointerdown для ссылок на файлы/папки/APK, чтобы внутренний просмотрщик файлов IDE
+  // (панель артефактов) не успевал перехватить нажатие и открыть превью вместо нашего модального окна.
   document.addEventListener("pointerdown", function (e) {
     var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
     if (a) {
-      var href = a.getAttribute("href") || "";
-      if (isApk(href) || isApk(a.textContent)) {
-        var path = extractFromElement(a);
-        if (path) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-          lastClickAt = Date.now();
-          openSheet(path);
-        }
+      var path = extractFromElement(a);
+      if (path) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+        lastClickAt = Date.now();
+        openSheet(path);
       }
     }
   }, true);

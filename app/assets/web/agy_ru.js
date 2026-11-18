@@ -173,6 +173,11 @@
     }
     var surface = "rgba(" + Math.round(sR) + ", " + Math.round(sG) + ", " +
       Math.round(sB) + ", " + alpha + ")";
+    /* Плотная поверхность для двух списков с описаниями (Настройки › Общие):
+       тот же оттенок темы, но 0.96 (тёмная) / 0.95 (светлая) вместо 0.88/0.82 — текст страницы за списком
+       больше не сливается с пунктами. Прозрачность сохранена. */
+    var surfaceDense = "rgba(" + Math.round(sR) + ", " + Math.round(sG) + ", " +
+      Math.round(sB) + ", " + (isDark ? 0.96 : 0.95) + ")";
 
     var border = "color-mix(in srgb, " + primary + " " + (isDark ? "26%" : "25%") + ", " + (isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.14)") + ")";
     var hover = "color-mix(in srgb, " + primary + " " + (isDark ? "15%" : "14%") + ", transparent)";
@@ -184,6 +189,7 @@
     [doc, body].forEach(function (el) {
       if (!el || !el.style) return;
       el.style.setProperty("--agy-glass-surface", surface, "important");
+      el.style.setProperty("--agy-glass-surface-dense", surfaceDense, "important");
       el.style.setProperty("--agy-glass-border", border, "important");
       el.style.setProperty("--agy-glass-item-hover", hover, "important");
       el.style.setProperty("--agy-glass-item-active", active, "important");
@@ -696,29 +702,96 @@
   document.addEventListener("pointerdown", function (e) {
     var t = e.target && e.target.closest ? e.target.closest("[role='combobox'],[aria-haspopup],button") : null;
     if (t && !t.closest("[data-select-popup]")) selTrigger = t;
+    if (!selLoop) requestAnimationFrame(selTick);
   }, true);
+  document.addEventListener("click", function () {
+    if (!selLoop) requestAnimationFrame(selTick);
+  }, true);
+  /* «Профиль безопасности» / «Security Preset» и «Политика выполнения
+     JavaScript в браузере» / «Browser JavaScript Execution Policy» — только эти
+     два списка получают плотное стекло (CSS: [data-select-popup][data-agy-dense]).
+     Триггер показывает ТЕКУЩЕЕ значение («Турборежим», «Не спрашивать»), но сам
+     селект помечает себя aria-labelledby="dropdown-label-… dropdown-value-…",
+     где первый id — <span> с заголовком строки настройки. Читаем заголовок
+     оттуда: это не зависит от языка, темы и вёрстки. */
+  var DENSE_LABEL = /(Профиль безопасности|Security Preset|Политика выполнения|Execution Polic)/i;
+  function denseLabelledBy(tr) {
+    var ids = ((tr.getAttribute && tr.getAttribute("aria-labelledby")) || "").split(/\s+/), txt = "";
+    for (var i = 0; i < ids.length; i++) {
+      var el = ids[i] && document.getElementById(ids[i]);
+      if (el) txt += " " + (el.textContent || "");
+    }
+    return DENSE_LABEL.test(txt);
+  }
+  /* Резерв, если aria-labelledby пропал: поднимаемся по строке настройки, пока
+     она содержит ровно один селект — за её пределы не выходим, иначе под
+     совпадение попали бы все списки страницы. */
+  function isDenseSelect(tr, p) {
+    if (!tr) return false;
+    if (denseLabelledBy(tr)) return true;
+    var n = tr, depth = 0;
+    while (n && n !== document.body && depth < 5) {
+      var tx = n.innerText || "";
+      if (tx.length < 400 && DENSE_LABEL.test(tx)) return true;
+      if (depth && n.querySelectorAll("[role='combobox'],button[aria-haspopup],button[aria-expanded]").length > 1) break;
+      n = n.parentElement;
+      depth++;
+    }
+    /* Резервные кандидаты (триггер мог быть определён по aria-controls или
+       aria-expanded) проверяем только по заголовку — без обхода вверх. */
+    var cands = [p.id && document.querySelector('[aria-controls="' + p.id + '"]'),
+                 document.querySelector('[role="combobox"][aria-expanded="true"], button[aria-expanded="true"]')];
+    for (var c = 0; c < cands.length; c++) {
+      if (cands[c] && cands[c] !== tr && denseLabelledBy(cands[c])) return true;
+    }
+    return false;
+  }
+
   function fitSelects() {
     var ps = document.querySelectorAll("[data-select-popup]");
     for (var i = 0; i < ps.length; i++) {
       var p = ps[i];
+      var opts = p.querySelectorAll("[role='option']");
+      var described = false;
+      for (var o = 0; o < opts.length; o++) {
+        var opt = opts[o];
+        if (opt.querySelector(".text-muted-foreground, .text-xs, [class*='text-muted']") ||
+            (opt.innerText || "").split("\n").filter(function (x) { return x.trim(); }).length > 1) {
+          described = true;
+          break;
+        }
+      }
+      if (!described) {
+        p.style.removeProperty("translate");
+        delete p.dataset.agyDx;
+        delete p.dataset.agyDense;
+        continue;
+      }
+      p.dataset.agyDense = "1";
+
+      /* Плотное стекло: берём --agy-glass-surface-dense, рассчитанную в
+         updateGlassTheme() (альфа 0.96 тёмная / 0.95 светлая). Прозрачность
+         фирменного «жидкого стекла» Leostryx сохраняется, но текст страницы
+         под списком больше не сливается с пунктами. */
+      var denseSurface = getComputedStyle(document.documentElement)
+        .getPropertyValue("--agy-glass-surface-dense").trim();
+      if (denseSurface) {
+        p.style.setProperty("background", denseSurface, "important");
+        p.style.setProperty("background-color", denseSurface, "important");
+      }
+      p.style.setProperty("isolation", "isolate", "important");
+
       var tr = (selTrigger && selTrigger.isConnected ? selTrigger : null) ||
                (p.id ? document.querySelector('[aria-controls="' + p.id + '"]') : null) ||
                (p.querySelector("[role='listbox']") && p.querySelector("[role='listbox']").id ?
                 document.querySelector('[aria-controls="' + p.querySelector("[role='listbox']").id + '"]') : null) ||
                document.querySelector('[role="combobox"][aria-expanded="true"], button[aria-expanded="true"]');
-      if (!tr) continue;
-      var opts = p.querySelectorAll("[role='option']");
-      var described = false;
-      for (var o = 0; o < opts.length; o++) {
-        var lines = (opts[o].innerText || "").split("\n").filter(function (x) { return x.trim(); });
-        if (lines.length > 1) { described = true; break; }
-      }
-      if (!described) {
-        p.style.removeProperty("translate");
-        delete p.dataset.agyDx;
-        continue;
-      }
-      var card = (tr.closest && (tr.closest(".rounded-xl, .divide-y, [class*='rounded-xl']") || tr.closest(".space-y-2"))) || tr.parentElement, vw = window.innerWidth;
+
+      var card = (tr && tr.closest && (tr.closest(".rounded-xl, .divide-y, [class*='rounded-xl']") || tr.closest(".space-y-2"))) ||
+                 (tr && tr.parentElement) ||
+                 document.querySelector(".space-y-2, [class*='rounded-xl']"),
+          vw = window.innerWidth;
+
       while (card && card !== document.body) {
         var cs = getComputedStyle(card), r = card.getBoundingClientRect();
         if (r.width >= vw * 0.7 && parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderTopLeftRadius) > 0) break;
