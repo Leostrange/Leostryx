@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.12)
-# Changelog — Leostryx (3.1.12)
+# Список изменений — Leostryx (3.1.13)
+# Changelog — Leostryx (3.1.13)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,40 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.13 — 2026-11-19 (Восстановление просмотра файлов в чате, карточка действий только для APK, локализация контекстного меню проектов)
+
+<!-- RU -->
+- **Восстановление встроенного просмотра файлов в чате (`agy_paths.js`):**
+  - Устранена регрессия, из-за которой при клике на любые файлы, просматриваемые агентом (исходный код, скрипты, markdown, JSON, логи), перехватывался клик и вызывалось модальное окно открытия папки вместо встроенного просмотрщика файлов чата/IDE.
+  - Всплывающее окно действий с кнопками «Открыть папку» и «Установить APK» теперь строго ограничено файлами пакетов Android (`.apk`).
+  - Все остальные типы файлов (`.py`, `.ts`, `.js`, `.json`, `.md`, `.txt`, `.java`, `.xml` и др.) беспрепятственно открываются для просмотра во встроенном просмотрщике файлов Leostryx.
+- **Полная русская локализация контекстного меню проектов и диалога удаления (`agy_i18n.js`):**
+  - В контекстном меню проекта (кнопка трёх точек): «Copy Project Name» переведено как «Копировать название проекта», «Delete Project» — как «Удалить проект».
+  - В контекстном меню рабочего пространства: «Copy Workspace Name» переведено как «Копировать название рабочего пространства», «Delete Workspace» — как «Удалить рабочее пространство».
+  - В модальном окне подтверждения удаления проекта переведены заголовок («Удалить проект»), текст подтверждения («Вы уверены, что хотите удалить проект <имя>?»), описание последствий («Это навсегда удалит проект и все диалоги в нём.»), а также реализовано корректное склонение числительных для активных и архивированных диалогов («1 активный диалог», «2 активных диалога», «5 активных диалогов»).
+- **Локализация и очистка подписи завершения задачи (`agy_fun_notify.js`):**
+  - Локализован `alt`-текст для праздничных GIF-анимаций завершения задач («Задача выполнена!» / «Task done!»).
+  - Устранено дублирование текста, обеспечено строгое разделение по языку интерфейса.
+- **Версия 3.1.13** (`versionCode` 39) в манифесте и веб-интерфейсе (`AndroidManifest.xml`, `rebuild.py`, `agy_tools.js`, `agy_loading.js`, `index.html`).
+<!-- /RU -->
+
+<!-- EN -->
+- **Restoration of in-chat file viewer (`agy_paths.js`):**
+  - Fixed a regression where clicking any file inspected by the agent in chat (source code, scripts, markdown, JSON, logs) erroneously triggered the folder opening modal instead of the built-in IDE/chat file viewer.
+  - The path action sheet ("Open folder" and "Install APK") is now strictly limited to Android package files (`.apk`).
+  - All other file types (`.py`, `.ts`, `.js`, `.json`, `.md`, `.txt`, `.java`, `.xml`, etc.) pass directly to the standard Leostryx file viewer and editor.
+- **Full Russian localization for project context menu and delete confirmation (`agy_i18n.js`):**
+  - Project kebab menu: "Copy Project Name" is translated to "Копировать название проекта", "Delete Project" to "Удалить проект".
+  - Workspace kebab menu: "Copy Workspace Name" is translated to "Копировать название рабочего пространства", "Delete Workspace" to "Удалить рабочее пространство".
+  - Delete project confirmation dialog: translated the header ("Удалить проект"), confirmation prompt ("Вы уверены, что хотите удалить проект <name>?"), description, and added proper Russian plural forms for active and archived conversation counts.
+- **Task completion captions and gif alt text localization (`agy_fun_notify.js`):**
+  - Localized `alt` text for celebration completion gifs using bilingual `T("Задача выполнена!", "Task done!")`.
+  - Guaranteed single-language rendering without duplicated text.
+- **Version bump (`AndroidManifest.xml`, `rebuild.py`, `agy_tools.js`, `agy_loading.js`, `index.html`):**
+  - `versionCode 39`, `versionName 3.1.13`.
+  - Cache-busters bumped to 3.1.13 across all web scripts and stylesheets.
+<!-- /EN -->
 
 ## v3.1.12 — 2026-11-16 (Переключение ядра без потери чата, стабильная клавиатура, короткий тултип, обрезка имени модели, логотип на сплэше, квадратные вложения)
 
@@ -73,10 +107,6 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
 - **Полная локализация системного баннера ошибки агента в чате (`main.js`, `agy_i18n.js`):** Ранее блок «Агент остановлен из-за ошибки» содержал непереведённый английский текст («You can prompt the model to try again or start a new conversation if the error persists. See our troubleshooting guide for more help.»). Сообщение полностью переведено на русский язык на уровне бандла и словаря i18n («Вы можете попросить модель повторить попытку или начать новый диалог, если ошибка сохраняется. Руководство по устранению неполадок для решения проблемы.»).
 - **Автоматический сторож от утечек памяти Shizuku (`agy-clean-shizuku`):** В системный overlay окружения (`$PREFIX/bin/agy-clean-shizuku`) добавлен автоматический клинер зависших процессов `dsh.android.client:shizuku`. Скрипт анализирует время жизни процессов и принудительно зачищает старые orphaned-процессы Shizuku от неактивных приложений, предотвращая переполнение оперативной памяти и zRAM (swap). Задача интегрирована в фоновый планировщик `agy-daemon` с ежечасным запуском.
 - **Иконка видео в истории сообщений чата (`agy_media.js`, `agy_ru.css`):** Исправлено исчезновение иконки видео после отправки сообщения в чат. Ранее `agy_media.js` декорировал только поле ввода (`[data-testid="input-attachment"]`), а в истории сообщений чата Android WebView пытался отобразить медиа-URL видео через тег `<img>`, вызывая ошибку декодирования и отображая битую картинку с текстом «User uploaded media». В `agy_media.js` и `agy_ru.css` добавлено гарантированное скрытие невалидного `<img>` и отрисовка аккуратного брендированного медиа-бейджа 64×64 с иконкой видеокамеры и форматом (MP4, MOV, WEBM и др.). Клик по бейджу в сообщении бесшовно открывает полноэкранный видеоплеер Leostryx.
-- **Исправление клика по файлам в чате (`agy_paths.js`):** Ранее логика перехвата путей блокировала открытие файлов в штатном просмотрщике чата/IDE — при клике на любые просматриваемые агентом файлы (исходный код, логи, markdown, JSON) ошибочно всплывало модальное окно открытия папки. Теперь перехват карточки с действиями «Открыть папку» и «Установить APK» строго ограничен файлами пакетов Android (`.apk`). Все остальные файлы (`.py`, `.ts`, `.md`, `.txt`, `.json` и др.) беспрепятственно открываются для просмотра во встроенном просмотрщике файлов и редакторе Leostryx.
-- **Локализация контекстного меню проекта и диалога удаления (`agy_i18n.js`):** Устранён недоперевод на русский язык в интерфейсе управления проектами:
-  - Меню трёх точек у проекта: «Copy Project Name» переведено как «Копировать название проекта», «Delete Project» — как «Удалить проект» (а также варианты для рабочих пространств «Копировать название рабочего пространства» / «Удалить рабочее пространство»).
-  - Диалог подтверждения удаления: заголовок «Delete Project» переведён как «Удалить проект», текст предупреждения «Are you sure you want to delete the project test?» — как «Вы уверены, что хотите удалить проект test?», а также добавлены корректные склонения для счётчиков связанных диалогов («1 активный диалог», «Это навсегда удалит ... в нём.»).
 - **Брендинг в системных уведомлениях (`executor.py`, `agy-notify`, `agy-daemon`):** В системных уведомлениях фонового демона заголовок изменён с «Демон Antigravity» на «Демон Leostryx» (в том числе при выполнении задач «Выполняется задача: ...»). В `agy-notify` значение заголовка по умолчанию переведено на `Leostryx`, а в `agy-daemon` обновлены текстовые заголовки и справка параметров CLI.
 - **Версия 3.1.12** (`versionCode` 38) в манифесте.
 <!-- /RU -->
