@@ -34,13 +34,19 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Починено действие «Установить APK»: корректная инициализация системного установщика через `AppFileProvider` и параллельная прямая установка через Shizuku (`rish -c "pm install -r <apk>"`).
 - **Компактная локализация и вёрстка списка действий и команд (`agy_i18n.js`, `agy_ru.css`):**
   - Меню вызова команд по кнопке `+` › «Действия» (слеш-команды): добавлены недостающие переводы промптов MCP Exa (`mcp:exa:web_search_help` — «Поиск в вебе через Exa», `mcp:exa:agent_research_help` — «Исследование в вебе через Exa»).
-  - Описания всех действий и слеш-команд переведены в ёмкие однострочные формулировки (`schedule`: «Запуск по расписанию или таймеру», `teamwork-preview`: «Команда автономных агентов», `learn`: «Сохранение навыков и правил», `goal`: «Автономная работа до достижения цели», `browser`: «Веб-агент для браузера», `grill-me`: «Интервью для согласования плана», `btw`: «Быстрый вопрос без прерывания чата»), что полностью устранило обрезку многоточиями (`...`) на экранах смартфонов.
+  - Описания всех действий и встроенных навыков (`agy-customizations`, `android-cli`, `antigravity-guide`, `chrome-extensions`, `generative_ui`, `modern-web-guidance`, `automation`, `migrate-workflows`, `permissioned-github`, `plugin`, `ui-plugin-navigation`, `schedule`, `teamwork-preview`, `learn`, `goal`, `browser`, `grill-me`, `btw` и др.) сокращены до предельно ёмких формулировок (15–25 символов), что полностью исключило их обрезку многоточиями (`...`) на экранах смартфонов.
+  - Скрыты избыточные правые метки категорий (`[data-testid="menu-option-trailing-label"]`), отнимавшие до 30% ширины строки в меню команд.
+  - Приоритет ультракомпактных переводов перенесён в самое начало функции локализации `translateExact`, исключая подстановку устаревших длинных строк из словаря.
   - Адаптивные стили `#typeahead-menu`, `[data-testid="menu-option-label"]` и `[data-testid="menu-option-description"]` с эффектом матового стекла и автоматической подгонкой ширины под экран мобильного устройства.
+- **Непрозрачные выпадающие списки по ширине кнопок в Настройки › Провайдеры (`agy_providers.js`, `agy_ru.css`):**
+  - Устранена прозрачность выпадающих меню «Порог сжатия» и «Окно свежих»: списки получили сплошной 100% непрозрачный фон (`#18181b` в тёмной теме, `#f4f4f5` в светлой теме) — нижележащий текст настроек больше не просвечивает.
+  - Ширина выпадающих списков строго привязана к ширине кнопок (`width: 100% !important; min-width: 100% !important; max-width: 100% !important; left: 0; right: 0;`), устранив вылезание меню влево поверх поясняющего текста.
+  - Пояснение `(рекомендуется)` вынесено в компактную подстрочную плашку `.agy-pv-opt-sub`.
 - **Версия 3.1.14** (`versionCode` 40) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Контрольные суммы сборки (SHA-256):**
-  - `Leostryx-3.1.14-standard.apk`: `1ec76f3eaab7d0bc350c349370166004b0d5f54beca2d306bd34400d29e9de85`
-  - `Leostryx-3.1.14-bypass.apk`: `257586c588f9cf572bfd666be910103108655a6d2848683ad88bbdaba716f100`
-  - `Leostryx-repo.zip`: `f4361cdd4528e6d5647ad0b8b6c16145acbbb7c6f709caf51ea1c90ad50f0522`
+  - `Leostryx-3.1.14-standard.apk`: `0445d366d36faaa0e256ad0bf586026bb3ff7439509fab7c9627902a22cdfeac`
+  - `Leostryx-3.1.14-bypass.apk`: `e25350e22f9d3302b0f814f2f86e6c31d6b03156571e2e08c2292384140a03bc`
+  - `Leostryx-repo.zip`: `f50146ac6098b5ef35a2a3b3df0c6dd4b65a5ba6685bca2056affe228665a768`
 <!-- /RU -->
 
 <!-- EN -->
@@ -66,13 +72,19 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Fixed "Install APK": reliable system package installer trigger via `AppFileProvider` and direct elevated install via Shizuku (`rish -c "pm install -r <apk>"`).
 - **Compact localization and layout for actions and slash commands (`agy_i18n.js`, `agy_ru.css`):**
   - Actions menu triggered by `+` › "Actions" (slash commands): localized missing Exa MCP prompts (`mcp:exa:web_search_help` -> "Поиск в вебе через Exa", `mcp:exa:agent_research_help` -> "Исследование в вебе через Exa").
-  - Formatted all action descriptions into concise single-line phrases (`schedule`, `teamwork-preview`, `learn`, `goal`, `browser`, `grill-me`, `btw`), preventing truncation with ellipses (`...`) on mobile displays.
-  - Responsive frosted glass styling for `#typeahead-menu`, `[data-testid="menu-option-label"]`, and `[data-testid="menu-option-description"]` bounded to mobile screen width.
+  - Formatted all action descriptions and built-in skill entries (`agy-customizations`, `android-cli`, `antigravity-guide`, `chrome-extensions`, `generative_ui`, `modern-web-guidance`, `automation`, `plugin`, `schedule`, `teamwork-preview`, `learn`, `goal`, `browser`, `grill-me`, `btw`) into concise single-line phrases (15–25 characters), preventing truncation with ellipses (`...`) on mobile displays.
+  - Hidden secondary trailing category labels (`[data-testid="menu-option-trailing-label"]`) that previously consumed up to 30% of the typeahead row width.
+  - Relocated compact localization rules to the top of `translateExact` to guarantee instant precedence over dictionary lookups.
+  - Responsive styling for `#typeahead-menu`, `[data-testid="menu-option-label"]`, and `[data-testid="menu-option-description"]` bounded to mobile screen width.
+- **Opaque dropdown menus matched to button width in Settings › Providers (`agy_providers.js`, `agy_ru.css`):**
+  - Removed transparency from "Compaction Threshold" and "Recent Window" dropdown menus: menus now render with a 100% solid background (`#18181b` dark / `#f4f4f5` light), preventing underlying settings text from showing through.
+  - Locked dropdown width strictly to the trigger button width (`width: 100% !important; min-width: 100% !important; max-width: 100% !important; left: 0; right: 0;`), preventing menus from overflowing awkwardly over explanatory text.
+  - Restructured `(recommended)` hints into clean subtitle badges (`.agy-pv-opt-sub`).
 - **Version 3.1.14** (`versionCode` 40) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Build checksums (SHA-256):**
-  - `Leostryx-3.1.14-standard.apk`: `1ec76f3eaab7d0bc350c349370166004b0d5f54beca2d306bd34400d29e9de85`
-  - `Leostryx-3.1.14-bypass.apk`: `257586c588f9cf572bfd666be910103108655a6d2848683ad88bbdaba716f100`
-  - `Leostryx-repo.zip`: `f4361cdd4528e6d5647ad0b8b6c16145acbbb7c6f709caf51ea1c90ad50f0522`
+  - `Leostryx-3.1.14-standard.apk`: `0445d366d36faaa0e256ad0bf586026bb3ff7439509fab7c9627902a22cdfeac`
+  - `Leostryx-3.1.14-bypass.apk`: `e25350e22f9d3302b0f814f2f86e6c31d6b03156571e2e08c2292384140a03bc`
+  - `Leostryx-repo.zip`: `f50146ac6098b5ef35a2a3b3df0c6dd4b65a5ba6685bca2056affe228665a768`
 <!-- /EN -->
 
 ## v3.1.13 — 2026-11-19 (Восстановление просмотра файлов в чате, карточка действий только для APK, локализация контекстного меню проектов)

@@ -431,32 +431,38 @@
     var compOn = state.compactHistory !== false;
     var THRESH_OPTIONS = [
       { val: 12, ru: "12 сообщений", en: "12 messages" },
-      { val: 16, ru: "16 сообщений (рекомендуется)", en: "16 messages (recommended)" },
+      { val: 16, ru: "16 сообщений", en: "16 messages", subRu: "рекомендуется", subEn: "recommended" },
       { val: 24, ru: "24 сообщения", en: "24 messages" },
       { val: 32, ru: "32 сообщения", en: "32 messages" }
     ];
     var RECENT_OPTIONS = [
       { val: 4, ru: "4 сообщения", en: "4 messages" },
       { val: 6, ru: "6 сообщений", en: "6 messages" },
-      { val: 8, ru: "8 сообщений (рекомендуется)", en: "8 messages (recommended)" },
+      { val: 8, ru: "8 сообщений", en: "8 messages", subRu: "рекомендуется", subEn: "recommended" },
       { val: 10, ru: "10 сообщений", en: "10 messages" },
       { val: 12, ru: "12 сообщений", en: "12 messages" }
     ];
 
-    var threshList = '<div class="agy-compact-ddlist-title">' + esc(T("Порог сжатия", "Compaction threshold")) + '</div>' +
+    var threshList = '<div class="agy-compact-ddlist-title">' + esc(T("Порог сжатия", "Threshold")) + '</div>' +
       THRESH_OPTIONS.map(function (opt) {
         var isSel = state.compactThreshold === opt.val;
         return '<div class="agy-pv-opt' + (isSel ? " sel" : "") + '" data-thresh-pick="' + opt.val + '">' +
-          '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+          '<div class="agy-pv-opt-txt">' +
+            '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+            (opt.subRu ? '<small class="agy-pv-opt-sub">' + esc(T(opt.subRu, opt.subEn)) + '</small>' : '') +
+          '</div>' +
           (isSel ? '<span class="agy-pv-ok">✓</span>' : "") +
           '</div>';
       }).join("");
 
-    var recentList = '<div class="agy-compact-ddlist-title">' + esc(T("Окно свежих реплик", "Recent messages window")) + '</div>' +
+    var recentList = '<div class="agy-compact-ddlist-title">' + esc(T("Окно свежих", "Recent window")) + '</div>' +
       RECENT_OPTIONS.map(function (opt) {
         var isSel = state.compactKeepRecent === opt.val;
         return '<div class="agy-pv-opt' + (isSel ? " sel" : "") + '" data-recent-pick="' + opt.val + '">' +
-          '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+          '<div class="agy-pv-opt-txt">' +
+            '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+            (opt.subRu ? '<small class="agy-pv-opt-sub">' + esc(T(opt.subRu, opt.subEn)) + '</small>' : '') +
+          '</div>' +
           (isSel ? '<span class="agy-pv-ok">✓</span>' : "") +
           '</div>';
       }).join("");

@@ -43,6 +43,69 @@
     const core = value.slice(leading.length, value.length - trailing.length);
     if (!core) return value;
     const normalized = core.replace(/\s+/g, " ");
+    if (effective === "ru") {
+      // Навыки, действия и команды (Slash Commands & Skills) — ультракомпактные пояснения (приоритет над таблицей):
+      if (normalized.startsWith("How to manage and create plugins")) {
+        return leading + "Управление плагинами" + trailing;
+      }
+      if (normalized.startsWith("Interactive guide to design and create a scheduled background automation")) {
+        return leading + "Фоновая автоматизация" + trailing;
+      }
+      if (normalized.startsWith("Automatically migrate legacy workflows to modern skills")) {
+        return leading + "Миграция workflows" + trailing;
+      }
+      if (normalized.startsWith("Guidelines for interacting with GitHub and request permissions")) {
+        return leading + "Интеграция с GitHub" + trailing;
+      }
+      if (normalized.startsWith("Provides instructions for installing and using the") || normalized.includes("android CLI")) {
+        return leading + "Команды Android CLI" + trailing;
+      }
+      if (normalized.startsWith("Build and publish Chrome Extensions")) {
+        return leading + "Расширения Chrome" + trailing;
+      }
+      if (normalized.startsWith("Search tool for modern web development best practices")) {
+        return leading + "Веб-стандарты и вёрстка" + trailing;
+      }
+      if (normalized.startsWith("How to render rich interactive HTML widgets inline in the chat") || normalized.startsWith("How to render rich interactive")) {
+        return leading + "Интерактивные виджеты" + trailing;
+      }
+      if (normalized.startsWith("Comprehensive guide and reference for the Antigravity Customization System")) {
+        return leading + "Навыки, правила и MCP" + trailing;
+      }
+      if (normalized.startsWith("Provides a comprehensive guide, quick reference, and sitemap")) {
+        return leading + "Справка и горячие клавиши" + trailing;
+      }
+      if (normalized.startsWith("Discover UI plugin panels relevant to the current task")) {
+        return leading + "Панели UI-плагинов" + trailing;
+      }
+      if (normalized.startsWith("Ask a quick question without interrupting the main conversation")) {
+        return leading + "Быстрый вопрос без прерывания чата" + trailing;
+      }
+      if (normalized.startsWith("Get help structuring a multi-step") || normalized.startsWith("Get help structuring")) {
+        return leading + "Исследование в вебе через Exa" + trailing;
+      }
+      if (normalized.startsWith("Get help with web search using Exa")) {
+        return leading + "Поиск в вебе через Exa" + trailing;
+      }
+      if (normalized.startsWith("Run until the specified goal is completely finished")) {
+        return leading + "Автономная работа до достижения цели" + trailing;
+      }
+      if (normalized.startsWith("Run an instruction on a recurring schedule or as a one-time timer")) {
+        return leading + "Запуск по расписанию или таймеру" + trailing;
+      }
+      if (normalized.startsWith("Invoke a browser agent for web tasks")) {
+        return leading + "Веб-агент для браузера" + trailing;
+      }
+      if (normalized.startsWith("Interview me to align on a plan")) {
+        return leading + "Интервью для согласования плана" + trailing;
+      }
+      if (normalized.startsWith("Invoke a team of agents to autonomously tackle large projects")) {
+        return leading + "Команда автономных агентов" + trailing;
+      }
+      if (normalized.startsWith("Reflect on recent successes or corrections to capture reusable skills")) {
+        return leading + "Сохранение навыков и правил" + trailing;
+      }
+    }
     const table = effective === "ru" ? RU : REVERSE;
     if (table[core]) return leading + table[core] + trailing;
     if (table[normalized]) return leading + table[normalized] + trailing;
@@ -239,67 +302,7 @@
       if (normalized.startsWith("# Antigravity Android Agent Rules & Environment Guidelines")) {
         return leading + "# Правила агента Antigravity для Android и требования к среде ## 0. Язык пользователя (высший приоритет) — эта сборка Android…" + trailing;
       }
-      // Навыки, действия и команды (Slash Commands & Skills) — компактные пояснения:
-      if (normalized.startsWith("How to manage and create plugins")) {
-        return leading + "Управление и создание плагинов (навыки, правила, MCP)" + trailing;
-      }
-      if (normalized.startsWith("Interactive guide to design and create a scheduled background automation")) {
-        return leading + "Создание задач по расписанию и фоновой автоматизации" + trailing;
-      }
-      if (normalized.startsWith("Automatically migrate legacy workflows to modern skills")) {
-        return leading + "Миграция старых workflows в современные навыки" + trailing;
-      }
-      if (normalized.startsWith("Guidelines for interacting with GitHub and request permissions")) {
-        return leading + "Инструкции для работы с GitHub и запроса прав" + trailing;
-      }
-      if (normalized.startsWith("Provides instructions for installing and using the") || normalized.includes("android CLI")) {
-        return leading + "Сборка, запуск и отладка через Android CLI" + trailing;
-      }
-      if (normalized.startsWith("Build and publish Chrome Extensions")) {
-        return leading + "Создание и публикация расширений Chrome (Manifest V3)" + trailing;
-      }
-      if (normalized.startsWith("Search tool for modern web development best practices")) {
-        return leading + "Стандарты современной веб-разработки (HTML/CSS/JS)" + trailing;
-      }
-      if (normalized.startsWith("How to render rich interactive HTML widgets inline in the chat")) {
-        return leading + "Отрисовка интерактивных HTML-виджетов и графиков в чате" + trailing;
-      }
-      if (normalized.startsWith("Comprehensive guide and reference for the Antigravity Customization System")) {
-        return leading + "Руководство по системе кастомизации (навыки, правила, MCP)" + trailing;
-      }
-      if (normalized.startsWith("Provides a comprehensive guide, quick reference, and sitemap")) {
-        return leading + "Справка по командам, горячим клавишам и инструментам" + trailing;
-      }
-      if (normalized.startsWith("Ask a quick question without interrupting the main conversation")) {
-        return leading + "Быстрый вопрос без прерывания чата" + trailing;
-      }
-      if (normalized.startsWith("Get help structuring a multi-step") || normalized.startsWith("Get help structuring")) {
-        return leading + "Исследование в вебе через Exa" + trailing;
-      }
-      if (normalized.startsWith("Get help with web search using Exa")) {
-        return leading + "Поиск в вебе через Exa" + trailing;
-      }
-      if (normalized.startsWith("Run until the specified goal is completely finished")) {
-        return leading + "Автономная работа до достижения цели" + trailing;
-      }
-      if (normalized.startsWith("Run an instruction on a recurring schedule or as a one-time timer")) {
-        return leading + "Запуск по расписанию или таймеру" + trailing;
-      }
-      if (normalized.startsWith("Invoke a browser agent for web tasks")) {
-        return leading + "Веб-агент для браузера" + trailing;
-      }
-      if (normalized.startsWith("Interview me to align on a plan")) {
-        return leading + "Интервью для согласования плана" + trailing;
-      }
-      if (normalized.startsWith("Invoke a team of agents to autonomously tackle large projects")) {
-        return leading + "Команда автономных агентов" + trailing;
-      }
-      if (normalized.startsWith("Reflect on recent successes or corrections to capture reusable skills")) {
-        return leading + "Сохранение навыков и правил" + trailing;
-      }
-      if (normalized.startsWith("Discover UI plugin panels relevant to the current task")) {
-        return leading + "Быстрый переход к панелям плагинов интерфейса" + trailing;
-      }
+
       if (normalized.startsWith("Queries the UniBind database for experimentally validated transcription factor")) {
         return leading + "Поиск участков связывания факторов транскрипции в UniBind" + trailing;
       }
