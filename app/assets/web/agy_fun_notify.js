@@ -158,7 +158,7 @@
       "background:rgba(0,0,0,.6);opacity:0;transition:opacity .25s ease;backdrop-filter:blur(2px);");
     var img = document.createElement("img");
     img.src = blobSrc || gifSrc();
-    img.alt = "Task done!";
+    img.alt = T("Задача выполнена!", "Task done!");
     img.setAttribute("style",
       "max-width:76vw;max-height:60vh;border-radius:18px;box-shadow:0 12px 48px rgba(0,0,0,.8);" +
       "transform:scale(.85);transition:transform .25s cubic-bezier(.2,1.4,.4,1);background:#1a1a1a;");
@@ -269,7 +269,7 @@
 
     var img = document.createElement("img");
     img.src = dataUrl;
-    img.alt = "Task done!";
+    img.alt = T("Задача выполнена!", "Task done!");
     img.setAttribute("style",
       "max-width:260px;max-height:190px;border-radius:12px;object-fit:cover;display:block;background:#18181b;");
 

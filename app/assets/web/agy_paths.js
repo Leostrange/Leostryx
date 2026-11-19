@@ -115,13 +115,12 @@
   function isApk(path) {
     if (!path) return false;
     var p = clean(path);
-    return /\.apk$/i.test(p);
+    return /\.apk($|[?#])/i.test(p);
   }
 
   function isLikelyPath(str) {
     if (!str) return false;
-    var s = clean(str);
-    return /^\/(?:sdcard|storage|data|root|mnt|system)\b/i.test(s) || isApk(s);
+    return isApk(str);
   }
 
   function isInternalBrainArtifact(path) {
@@ -150,14 +149,18 @@
     var target = el.nodeType === 3 ? el.parentElement : el;
     if (!target) return "";
 
-    // 1. Поиск элементов с data-uri / data-file-uri / data-path (кнопки pill, чипы, карточки диффов)
+    // Всплывающее окно предназначено ТОЛЬКО для APK-файлов (открытие папки с APK и установка APK).
+    // Все остальные файлы (исходники, логи, тексты, markdown) должны открываться
+    // во встроенном просмотрщике файлов / IDE, как обычно.
+
+    // 1. Поиск элементов с data-uri / data-file-uri / data-path
     var pill = target.closest ? target.closest("[data-uri], [data-file-uri], [data-path]") : null;
     if (pill) {
       var val = pill.getAttribute("data-uri") ||
                 pill.getAttribute("data-file-uri") ||
                 pill.getAttribute("data-path") || "";
       var cVal = clean(val);
-      if (cVal && (isLikelyPath(cVal) || isApk(cVal))) return cVal;
+      if (cVal && isApk(cVal)) return cVal;
     }
 
     // 2. Ближайшая ссылка a[href]
@@ -165,9 +168,9 @@
     if (a) {
       var href = a.getAttribute("href") || "";
       var cHref = clean(href);
-      if (cHref && (isLikelyPath(cHref) || isApk(cHref))) return cHref;
+      if (cHref && isApk(cHref)) return cHref;
       var aText = clean(a.textContent || "");
-      if (aText && (isLikelyPath(aText) || isApk(aText))) return aText;
+      if (aText && isApk(aText)) return aText;
     }
 
     // 3. Ближайший элемент с title (часто хранит полный путь к файлу)
@@ -175,14 +178,14 @@
     if (titled) {
       var t = titled.getAttribute("title") || "";
       var cT = clean(t);
-      if (cT && (isLikelyPath(cT) || isApk(cT))) return cT;
+      if (cT && isApk(cT)) return cT;
     }
 
     // 4. Ближайший блок <code>
     var code = target.closest ? target.closest("code") : null;
     if (code) {
       var codeText = clean(code.textContent || "");
-      if (codeText && (isLikelyPath(codeText) || isApk(codeText))) return codeText;
+      if (codeText && isApk(codeText)) return codeText;
     }
 
     // 5. Ближайшая кнопка-пилюля или контекстный элемент
@@ -190,9 +193,9 @@
     if (mention) {
       var mUri = mention.getAttribute("data-uri") || mention.getAttribute("data-file-uri") || mention.getAttribute("title") || "";
       var cmUri = clean(mUri);
-      if (cmUri && (isLikelyPath(cmUri) || isApk(cmUri))) return cmUri;
+      if (cmUri && isApk(cmUri)) return cmUri;
       var mText = clean(mention.textContent || "");
-      if (mText && (isLikelyPath(mText) || isApk(mText))) return mText;
+      if (mText && isApk(mText)) return mText;
     }
 
     return "";
@@ -201,10 +204,10 @@
   function extractFromTextNode(node, offset) {
     if (!node || node.nodeType !== 3) return "";
     var text = node.nodeValue || "";
-    if (!text) return "";
+    if (!text || !/\.apk\b/i.test(text)) return "";
 
-    // 1. Пути в кавычках, скобках или бэктиках
-    var quoteRe = /[`"'«(\[{](\/(?:sdcard|storage|data|root|mnt|system)\/[^`"'»)\].\n\r]+)[`"'»)\].}]/gi;
+    // 1. Пути к APK в кавычках, скобках или бэктиках
+    var quoteRe = /[`"'«(\[{](\/(?:sdcard|storage|data|root|mnt|system)\/[^`"'»)\].\n\r]+?\.apk)[`"'»)\].}]/gi;
     var m;
     while ((m = quoteRe.exec(text))) {
       var qStart = m.index, qEnd = m.index + m[0].length;
@@ -213,29 +216,11 @@
       }
     }
 
-    // 2. Пути с известным расширением файла (поддерживают пробелы в имени папок и файлов)
-    var extRe = new RegExp("\\/(?:sdcard|storage|data|root|mnt|system)\\/[^\\n\\r\"';<>()[\\\\\\]{}*?]+?" + KNOWN_EXTS, "gi");
-    while ((m = extRe.exec(text))) {
-      var eStart = m.index, eEnd = m.index + m[0].length;
-      if (offset >= eStart && offset <= eEnd) {
-        return clean(m[0]);
-      }
-    }
-
-    // 3. Отдельная строка с абсолютным путём (с пробелами)
-    var lineRe = /(?:^|[\n\r])\s*(\/(?:sdcard|storage|data|root|mnt|system)\/[^\n\r"';<>()[\]{}*?]+?)(?:\s*$|[\n\r])/gi;
-    while ((m = lineRe.exec(text))) {
-      var lStart = m.index, lEnd = m.index + m[0].length;
-      if (offset >= lStart && offset <= lEnd) {
-        return clean(m[1]);
-      }
-    }
-
-    // 4. Резерв: путь, ограниченный пробелами
-    var wordRe = /\/(?:sdcard|storage|data|root|mnt|system)\/[^\s\n\r"';<>()[\]{}]+/gi;
-    while ((m = wordRe.exec(text))) {
-      var wStart = m.index, wEnd = m.index + m[0].length;
-      if (offset >= wStart && offset <= wEnd) {
+    // 2. Любой абсолютный путь к APK
+    var apkRe = /\/(?:sdcard|storage|data|root|mnt|system)\/[^\n\r"';<>()[\]{}*?]+?\.apk\b/gi;
+    while ((m = apkRe.exec(text))) {
+      var aStart = m.index, aEnd = m.index + m[0].length;
+      if (offset >= aStart && offset <= aEnd) {
         return clean(m[0]);
       }
     }
@@ -470,12 +455,7 @@
     var x = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
     var y = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
     var path = pathAtPoint(x, y, target);
-    if (!path) return false;
-
-    // Внутренние markdown-артефакты IDE не перехватываем (если это не APK)
-    if (isInternalBrainArtifact(path)) {
-      return false;
-    }
+    if (!path || !isApk(path)) return false;
 
     e.preventDefault();
     e.stopPropagation();
@@ -483,12 +463,12 @@
       e.stopImmediatePropagation();
     }
     lastClickAt = Date.now();
-    try { console.info("[agy_paths] intercepted via " + source + ": " + path); } catch (_) {}
+    try { console.info("[agy_paths] intercepted APK via " + source + ": " + path); } catch (_) {}
     openSheet(path);
     return true;
   }
 
-  // 1. Ранний перехват pointerdown в фазе capture (предотвращает срабатывание встроенных обработчиков IDE)
+  // 1. Ранний перехват pointerdown в фазе capture (предотвращает срабатывание встроенных обработчиков IDE для APK)
   document.addEventListener("pointerdown", function (e) {
     if (e.button !== undefined && e.button > 0) return;
     tryIntercept(e, "pointerdown");
@@ -516,8 +496,8 @@
     pendingTap = setTimeout(function () {
       if (Date.now() - lastClickAt < 400) return;
       var path = pathAtPoint(x, y, target);
-      if (path && !isInternalBrainArtifact(path)) {
-        try { console.info("[agy_paths] open " + path + " via pointerup fallback"); } catch (_) {}
+      if (path && isApk(path)) {
+        try { console.info("[agy_paths] open APK " + path + " via pointerup fallback"); } catch (_) {}
         openSheet(path);
       }
     }, 260);
@@ -546,8 +526,11 @@
       if (!uri) return false;
       var p = clean(uri);
       if (!p) return false;
-      if (isApk(p) || (isLikelyPath(p) && !isInternalBrainArtifact(p))) {
-        try { console.info("[agy_paths] handleFileUri caught: " + p); } catch (_) {}
+      // Всплывающее окно карточки предназначено ТОЛЬКО для APK-файлов (открытие папки и установка).
+      // Любые другие файлы (исходники, логи, тексты, markdown) отдаём штатному
+      // просмотрщику файлов IDE (openFile / openArtifact).
+      if (isApk(p)) {
+        try { console.info("[agy_paths] handleFileUri caught APK: " + p); } catch (_) {}
         openSheet(p);
         return true;
       }
