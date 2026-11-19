@@ -203,6 +203,7 @@
   };
 
   var root = null, editing = null, fetchTimer = 0, fetchJob = null, fetchMsg = "", typeOpen = false;
+  var threshOpen = false, recentOpen = false;
   var fetchListType = null, fetchFallbackTried = false;
 
   /* ---- sync selected provider models into the model selector (BYOM) ---- */
@@ -428,29 +429,71 @@
     }
 
     var compOn = state.compactHistory !== false;
-    h += '<div class="agy-pv-card" style="margin-top:12px;margin-bottom:12px;padding:12px 14px;">' +
-      '<div style="font-weight:600;font-size:14px;margin-bottom:4px;">' + esc(T("Оптимизация контекста чата", "Chat Context Optimization")) + '</div>' +
-      '<label class="agy-pv-switch" style="border:none;padding:0;margin:4px 0 8px 0;">' +
-      '<span>' + esc(T("Авто-сжатие длинных диалогов", "Auto-compact long chats")) +
-      '<small>' + esc(T("Сворачивает старые сообщения и тяжелые логи инструментов в компактное резюме, передавая модели только свежие реплики. Экономит до 90% лимита токенов и защищает от сбоев.", "Summarizes older messages and heavy tool logs into a concise checkpoint, passing only recent turns to the model. Saves up to 90% token quota and prevents context limit crashes.")) + '</small></span>' +
-      '<input type="checkbox" data-compact="1"' + (compOn ? " checked" : "") + '></label>';
+    var THRESH_OPTIONS = [
+      { val: 12, ru: "12 сообщений", en: "12 messages" },
+      { val: 16, ru: "16 сообщений (рекомендуется)", en: "16 messages (recommended)" },
+      { val: 24, ru: "24 сообщения", en: "24 messages" },
+      { val: 32, ru: "32 сообщения", en: "32 messages" }
+    ];
+    var RECENT_OPTIONS = [
+      { val: 4, ru: "4 сообщения", en: "4 messages" },
+      { val: 6, ru: "6 сообщений", en: "6 messages" },
+      { val: 8, ru: "8 сообщений (рекомендуется)", en: "8 messages (recommended)" },
+      { val: 10, ru: "10 сообщений", en: "10 messages" },
+      { val: 12, ru: "12 сообщений", en: "12 messages" }
+    ];
 
-    if (compOn) {
-      var threshOpts = [12, 16, 24, 32].map(function (v) {
-        return '<option value="' + v + '"' + (state.compactThreshold === v ? " selected" : "") + '>' + v + ' ' + esc(T("сообщений", "messages")) + (v === 16 ? esc(T(" (рекомендуется)", " (recommended)")) : "") + '</option>';
-      }).join("");
-      var recentOpts = [4, 6, 8, 10, 12].map(function (v) {
-        return '<option value="' + v + '"' + (state.compactKeepRecent === v ? " selected" : "") + '>' + v + ' ' + esc(T("сообщений", "messages")) + (v === 8 ? esc(T(" (рекомендуется)", " (recommended)")) : "") + '</option>';
+    var threshList = '<div class="agy-compact-ddlist-title">' + esc(T("Порог сжатия", "Compaction threshold")) + '</div>' +
+      THRESH_OPTIONS.map(function (opt) {
+        var isSel = state.compactThreshold === opt.val;
+        return '<div class="agy-pv-opt' + (isSel ? " sel" : "") + '" data-thresh-pick="' + opt.val + '">' +
+          '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+          (isSel ? '<span class="agy-pv-ok">✓</span>' : "") +
+          '</div>';
       }).join("");
 
-      h += '<div class="agy-pv-row" style="gap:10px;margin-top:6px;align-items:center;">' +
-        '<label class="agy-pv-field" style="flex:1;margin:0;"><span>' + esc(T("Порог сжатия истории", "Compaction threshold")) + '</span>' +
-        '<select data-compact-thresh="1">' + threshOpts + '</select></label>' +
-        '<label class="agy-pv-field" style="flex:1;margin:0;"><span>' + esc(T("Окно свежих реплик", "Recent messages window")) + '</span>' +
-        '<select data-compact-recent="1">' + recentOpts + '</select></label>' +
-        '</div>';
-    }
-    h += '</div>';
+    var recentList = '<div class="agy-compact-ddlist-title">' + esc(T("Окно свежих реплик", "Recent messages window")) + '</div>' +
+      RECENT_OPTIONS.map(function (opt) {
+        var isSel = state.compactKeepRecent === opt.val;
+        return '<div class="agy-pv-opt' + (isSel ? " sel" : "") + '" data-recent-pick="' + opt.val + '">' +
+          '<span>' + esc(T(opt.ru, opt.en)) + '</span>' +
+          (isSel ? '<span class="agy-pv-ok">✓</span>' : "") +
+          '</div>';
+      }).join("");
+
+    h += '<div class="agy-pv-card agy-pv-compactor-card">' +
+      '<div class="agy-pv-compactor-header">' +
+        '<div class="agy-pv-name">' + esc(T("Оптимизация контекста чата", "Chat Context Optimization")) + '</div>' +
+        '<label class="agy-pv-compactor-toggle">' +
+          '<span class="agy-pv-compactor-toggle-lbl">' + esc(compOn ? T("Вкл", "On") : T("Выкл", "Off")) + '</span>' +
+          '<input type="checkbox" data-compact="1"' + (compOn ? " checked" : "") + '>' +
+        '</label>' +
+      '</div>' +
+      '<div class="agy-pv-compactor-body">' +
+        '<div class="agy-pv-meta agy-pv-compactor-text">' +
+          esc(T("Авто-сжатие диалогов сворачивает старые сообщения и тяжелые логи инструментов в компактное резюме, передавая модели только свежие реплики. Экономит до 90% лимита токенов и защищает от сбоев.",
+                "Auto-compaction summarizes older messages and heavy tool logs into a concise checkpoint, passing only recent turns to the model. Saves up to 90% token quota and prevents context limit crashes.")) +
+        '</div>' +
+        (compOn ? (
+          '<div class="agy-compact-btns">' +
+            '<div class="agy-compact-dd' + (threshOpen ? " open" : "") + '">' +
+              '<button type="button" class="agy-pv-btn sec agy-compact-btn" data-toggle-thresh="1" title="' + esc(T("Порог сжатия истории", "Compaction threshold")) + '">' +
+                '<span>' + esc(T("Порог: ", "Threshold: ")) + '<b>' + state.compactThreshold + '</b></span>' +
+                '<span class="agy-pv-ddcar">▾</span>' +
+              '</button>' +
+              (threshOpen ? '<div class="agy-pv-ddlist agy-compact-ddlist">' + threshList + '</div>' : "") +
+            '</div>' +
+            '<div class="agy-compact-dd' + (recentOpen ? " open" : "") + '">' +
+              '<button type="button" class="agy-pv-btn sec agy-compact-btn" data-toggle-recent="1" title="' + esc(T("Окно свежих реплик", "Recent messages window")) + '">' +
+                '<span>' + esc(T("Окно: ", "Window: ")) + '<b>' + state.compactKeepRecent + '</b></span>' +
+                '<span class="agy-pv-ddcar">▾</span>' +
+              '</button>' +
+              (recentOpen ? '<div class="agy-pv-ddlist agy-compact-ddlist">' + recentList + '</div>' : "") +
+            '</div>' +
+          '</div>'
+        ) : "") +
+      '</div>' +
+    '</div>';
 
     if (!state.connections.length) h += '<div class="agy-pv-empty">' + esc(T("Подключений пока нет.", "No connections yet.")) + "</div>";
     state.connections.forEach(function (c) {
@@ -571,14 +614,8 @@
     }
     if (el.matches && el.matches("input[data-compact]")) {
       state.compactHistory = el.checked;
-      save(); render(); return;
-    }
-    if (el.matches && el.matches("select[data-compact-thresh]")) {
-      state.compactThreshold = parseInt(el.value, 10) || 16;
-      save(); render(); return;
-    }
-    if (el.matches && el.matches("select[data-compact-recent]")) {
-      state.compactKeepRecent = parseInt(el.value, 10) || 8;
+      threshOpen = false;
+      recentOpen = false;
       save(); render(); return;
     }
     if (el.matches && el.matches("input[data-model]")) {
@@ -633,10 +670,53 @@
     }
   }
   function onClick(e) {
+    // Custom compactor dropdown picks
+    var tpick = e.target.closest ? e.target.closest("[data-thresh-pick]") : null;
+    if (tpick) {
+      state.compactThreshold = parseInt(tpick.getAttribute("data-thresh-pick"), 10) || 16;
+      threshOpen = false;
+      save();
+      render();
+      return;
+    }
+    var rpick = e.target.closest ? e.target.closest("[data-recent-pick]") : null;
+    if (rpick) {
+      state.compactKeepRecent = parseInt(rpick.getAttribute("data-recent-pick"), 10) || 8;
+      recentOpen = false;
+      save();
+      render();
+      return;
+    }
+
     // Custom API-type dropdown (option rows are <div>, not buttons).
     var tp = e.target.closest ? e.target.closest("[data-typepick]") : null;
     if (tp && editing) { readForm(); editing.type = tp.getAttribute("data-typepick"); typeOpen = false; render(); return; }
-    var b = e.target.closest("button"); if (!b) return;
+
+    var b = e.target.closest("button");
+    if (!b) {
+      if (threshOpen || recentOpen) {
+        threshOpen = false;
+        recentOpen = false;
+        render();
+      }
+      return;
+    }
+    if (b.getAttribute("data-toggle-thresh")) {
+      threshOpen = !threshOpen;
+      recentOpen = false;
+      render();
+      return;
+    }
+    if (b.getAttribute("data-toggle-recent")) {
+      recentOpen = !recentOpen;
+      threshOpen = false;
+      render();
+      return;
+    }
+    if (threshOpen || recentOpen) {
+      threshOpen = false;
+      recentOpen = false;
+    }
     if (b.getAttribute("data-typetoggle")) { readForm(); typeOpen = !typeOpen; render(); return; }
     if (b.getAttribute("data-add")) { editing = { id: uid(), type: "openai", __new: true, selected: [] }; fetchMsg = ""; typeOpen = false; render(); return; }
     var dm = b.getAttribute("data-delmodel");
@@ -786,6 +866,18 @@
     el.appendChild(root);
     load();
     editing = null; fetchMsg = "";
+    if (!window.__agyProvidersDocClickBound) {
+      window.__agyProvidersDocClickBound = true;
+      document.addEventListener("click", function (e) {
+        if (!root || !root.isConnected) return;
+        if (!threshOpen && !recentOpen && !typeOpen) return;
+        if (e.target && e.target.closest && e.target.closest(".agy-compact-dd, .agy-pv-dd")) return;
+        threshOpen = false;
+        recentOpen = false;
+        typeOpen = false;
+        render();
+      });
+    }
     setTimeout(function () { syncModels(); }, 0);
     render();
   };

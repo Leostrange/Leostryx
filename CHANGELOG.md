@@ -21,11 +21,13 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
 - **Защита от сбоев и переполнения контекстного окна:**
   - Устранены критические ошибки `400 Context length exceeded` и `429 Rate limit / TPM exceeded`, ломавшие сессии при длительной работе над задачей.
   - Добавлен встроенный санитайзер для отсечения случайных аномально длинных выводов инструментов (>8000 символов).
-- **Интерфейс управления в Настройки › Провайдеры (`agy_providers.js`):**
-  - Добавлен блок «Оптимизация контекста чата».
-  - Переключатель «Авто-сжатие длинных диалогов» (включено по умолчанию).
+- **Интерфейс управления в Настройки › Провайдеры (`agy_providers.js`, `agy_ru.css`):**
+  - Добавлен блок «Оптимизация контекста чата» в едином стиле настроек: заголовок блока сверху, переключатель вкл/выкл справа, описание диалогом по всей ширине.
+  - Нативные теги `<select>`, приводившие к открытию системных окон `AlertDialog` на весь экран, заменены на встроенные выпадающие списки (дропдаун-кнопки «Порог: 16 ▾» и «Окно: 8 ▾»).
+  - Стилизованные всплывающие списки с эффектом матового стекла (glass surface), галочками выбранных значений (`✓`) и закрытием по внешнему клику.
   - Настройка порога сжатия истории (12, 16, 24, 32 сообщения).
   - Настройка окна свежих реплик (4, 6, 8, 10, 12 сообщений).
+  - Полная двуязычная локализация (русский и английский языки).
 - **Версия 3.1.14** (`versionCode` 40) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 <!-- /RU -->
 
@@ -39,11 +41,13 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
 - **Context overflow prevention & session stability:**
   - Prevents chats from breaking due to `400 Context length exceeded` or `429 Rate limit / TPM exceeded` errors in long development tasks.
   - Added tool output sanitizer protecting against unexpectedly huge command outputs (>8000 characters).
-- **User controls in Settings › Providers (`agy_providers.js`):**
-  - New "Chat Context Optimization" configuration block.
-  - Master toggle: "Auto-compact long chats" (enabled by default).
+- **User controls in Settings › Providers (`agy_providers.js`, `agy_ru.css`):**
+  - Redesigned "Chat Context Optimization" settings block: top header, inline toggle, and full-width description text.
+  - Replaced native HTML `<select>` elements (which spawned full-screen system `AlertDialog` popups) with custom inline dropdown buttons ("Threshold: 16 ▾" and "Window: 8 ▾").
+  - Frosted glass dropdown popovers with checkmarks (`✓`) and outside click dismissal, adhering to the Leostryx UI design.
   - Configurable compaction threshold (12, 16, 24, 32 messages).
   - Configurable recent messages window (4, 6, 8, 10, 12 messages).
+  - Full bilingual localization (Russian and English).
 - **Version 3.1.14** (`versionCode` 40) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 <!-- /EN -->
 
