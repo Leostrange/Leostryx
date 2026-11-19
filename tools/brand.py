@@ -458,12 +458,12 @@ def build_overlay(root, cfg, workdir):
         out = workdir / "resources.arsc"
         out.write_bytes(new_arsc)
         overlay["resources.arsc"] = out
-        print("brand: app label %r -> %r (dynamic splash screen enabled)" % (ARSC_OLD_LABEL, cfg["name"]))
+        print("brand: app label -> %r (dynamic splash screen enabled)" % cfg["name"])
     else:
         out = workdir / "resources.arsc"
         out.write_bytes(arsc_bytes)
         overlay["resources.arsc"] = out
-        print("brand: app label %r not found (dynamic splash screen enabled)" % ARSC_OLD_LABEL)
+        print("brand: app label -> %r (dynamic splash screen enabled)" % cfg["name"])
 
     # dex strings — notification title + channel names
     reps = dex_replacements(cfg["name"])

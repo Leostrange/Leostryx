@@ -154,6 +154,25 @@
   var UPD_READY_KEY = "agy.upd.ready";
   var UPD_READY_TTL_MS = 6 * 60 * 60 * 1000;
   var UPD_DEFAULT_APK = "/storage/emulated/0/Download/update-temp.apk";
+  var APP_VERSION = "3.1.14";
+
+  function getAppVersion() {
+    return (window.__agyAppVersion || APP_VERSION).replace(/^v/, "");
+  }
+
+  function parseVer(v) {
+    return String(v || "").replace(/^v/, "").split(".").map(function (n) { return parseInt(n, 10) || 0; });
+  }
+
+  function isNewer(remote, current) {
+    var r = parseVer(remote), c = parseVer(current);
+    for (var i = 0; i < Math.max(r.length, c.length); i++) {
+      var rv = r[i] || 0, cv = c[i] || 0;
+      if (rv > cv) return true;
+      if (rv < cv) return false;
+    }
+    return false;
+  }
 
   function shade() {
     var s = window.AgyShade;
@@ -187,6 +206,12 @@
     try { v = JSON.parse(localStorage.getItem(UPD_READY_KEY) || "null"); } catch (e) {}
     try { localStorage.removeItem(UPD_READY_KEY); } catch (e) {}
     if (!v || !v.ts || (Date.now() - v.ts) > UPD_READY_TTL_MS) return null;
+    var cur = getAppVersion();
+    // Если версия загруженного обновления не новее текущей — не показываем окно
+    if (v.version && !isNewer(v.version, cur)) {
+      shadeCancel(UPD_READY_TAG);
+      return null;
+    }
     return v;
   }
 
@@ -1381,7 +1406,7 @@
     appName.textContent = "Leostryx";
     var appVer = document.createElement("div");
     appVer.style.cssText = "font-size:12px;color:#888;margin-top:2px";
-    appVer.textContent = "3.1.13";
+    appVer.textContent = getAppVersion();
     appInfo.appendChild(appName);
     appInfo.appendChild(appVer);
     appRow.appendChild(appInfo);
@@ -1477,7 +1502,7 @@
     wrap.appendChild(c2);
 
     /* ── Card 3: Обновления + Changelog ── */
-    var CURRENT_VERSION = "3.1.13";
+    var CURRENT_VERSION = getAppVersion();
     /* ── Changelog: окно тянет текст живьём с GitHub Releases ── */
     var clOverlay = null;
     function closeChangelog() {
@@ -1792,7 +1817,7 @@
           if (m && m[1] && !m[1].startsWith("ERR")) {
             var tag = m[1], apkUrl = m[3];
             var cleanTag = tag.replace(/^v/, "");
-            if (cleanTag === CURRENT_VERSION) {
+            if (!isNewer(cleanTag, CURRENT_VERSION)) {
               updStatus.textContent = T("Установлена актуальная версия (" + CURRENT_VERSION + ").", "The latest version is installed (" + CURRENT_VERSION + ").");
               btnUpd.textContent = T("Проверить обновления", "Check for updates");
               updState = "check";

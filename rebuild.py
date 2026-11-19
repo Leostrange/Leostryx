@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Сборка Antigravity-BP 3.1.11 (standard / bypass) из полного дерева.
+"""Сборка Leostryx 3.1.14 (standard / bypass) из полного дерева.
 
 Источники:
   app/                      — распакованное дерево standard-APK (без META-INF)

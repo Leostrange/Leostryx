@@ -437,7 +437,7 @@
         '<span class="agy-load__target"></span></div>' +
         '<div class="agy-load__tip"><b>' + T("Совет", "Tip") + '</b><span></span></div>' +
         '<div class="agy-load__foot"><span>' + T("Перезапуск ядра", "Core restart") + '</span>' +
-        '<span>' + T("Версия", "Version") + ' ' + (window.__agyAppVersion || "3.1.13") + '</span></div>' +
+        '<span>' + T("Версия", "Version") + ' ' + (window.__agyAppVersion || "3.1.14") + '</span></div>' +
       '</div>';
     return box;
   }
