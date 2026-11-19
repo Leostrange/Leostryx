@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.14)
-# Changelog — Leostryx (3.1.14)
+# Список изменений — Leostryx (3.1.15)
+# Changelog — Leostryx (3.1.15)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,76 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.15 — 2026-11-19 (Автоопределение характеристик моделей, круг контекста в чате, исправление отправки standard)
+
+<!-- RU -->
+- **Интеллектуальное автоопределение характеристик моделей (`agy_providers.js`):**
+  - Реализован обширный встроенный справочник спецификаций и возможностей моделей (`window.AgyModelCatalog`), устраняющий пробелы («неизвестно» / «нет данных») в Настройки › Провайдеры › «Добавленные модели».
+  - Поддержка семейств моделей ведущих провайдеров:
+    - **Anthropic Claude:** `claude-sonnet-5-5`, `claude-3-5-*`, `claude-3-7-*`, `claude-3-opus` — контекст 200k (1M для 1m-версий), текст/изображения, reasoning (medium), вызов инструментов, спецификация Anthropic Claude.
+    - **Moonshot Kimi:** `kimi-k3.1-pro`, `kimi-k2.5`, `kimi-k2`, `moonshot-v1-*` — контекст 256k (128k/32k/8k), текст/изображения, reasoning (medium), вызов инструментов, спецификация Moonshot Kimi.
+    - **Google Gemini:** `gemini-4-hydrogen`, `gemini-2.5-pro`, `gemini-2.0-flash`, `gemini-1.5-*` — контекст 1M/2M, нативная полная мультимодальность (текст, изображения, аудио, видео), reasoning, вызов инструментов, спецификация Google Gemini.
+    - **OpenAI:** `o1`, `o3-mini`, `o4`, `gpt-4o`, `gpt-4.5`, `chatgpt-4o` — контекст 128k/200k, рассуждения (reasoning), зрение, вызов инструментов.
+    - **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1) — контекст 64k/128k, рассуждения для R1, вызов инструментов.
+    - **Alibaba Qwen:** `qwen-2.5`, `qwq-32b`, `qwen-vl` — контекст 128k/1M, мультимодальность для VL, reasoning для QwQ.
+    - **Zhipu GLM, Meta Llama, Mistral, xAI Grok, MiniMax, Xiaomi MiMo** и эвристическое распознавание суффиксов (`-128k`, `-256k`, `-1m`, `-vl`, `-thinking`, `-reasoner`).
+  - Интеллектуальный парсер моделей (`parseModels`) для OpenAI-совместимых провайдеров: извлечение `context_length`, `architecture.input_modalities`, `supported_parameters`, `capabilities`.
+  - Бесшовное обогащение существующих моделей (`effectiveInfo`) без затирания ручных настроек пользователя.
+  - Отображение длины контекста в карточках моделей и бейджах формы добавления (`200k`, `256k`, `1000k` и т.д.).
+- **Круг контекста в панели ввода чата (`agy_shield.js`, `agy_ru.css`):**
+  - Добавлена кнопка-индикатор контекста (`.agy-ctx-circle-btn`) с круговой векторной иконкой контекстного окна, расположенная рядом с щитом безопасности.
+  - По нажатию на круг открывается всплывающая карточка в стиле матового стекла (Frosted Glass) с актуальными данными:
+    - Активная модель и имя провайдера.
+    - Точный размер контекстного окна в форматированном виде (например, `200 000 токенов`, `1 048 576 токенов`).
+    - Поддерживаемые входные модальности (текст, изображения, аудио, видео).
+    - Возможности модели (рассуждения / reasoning, вызов инструментов / tools).
+    - Источник спецификации и доступные уровни усилий рассуждения.
+    - Текущий статус модуля автосжатия контекста Leostryx (порог срабатывания, скользящее окно, количество сообщений в чате).
+    - Быстрый переход в настройки провайдеров и моделей в 1 клик.
+- **Исправление неработающей кнопки отправки в Standard-версии (`generated/main.js`):**
+  - Устранена критическая проблема в `DYb`, из-за которой кнопка отправки сообщения (`data-testid="send-button"`) и клавиша Enter на клавиатуре оказывались заблокированными (`disabled: true`, `cursor-not-allowed`) в стандартной версии APK без авторизации в Google или при отсутствии квоты Language Server (`hasQuotaOrCredits === false`, `isSignedIn === false`, `cascadeModelConfigData === undefined`).
+  - Условие разблокировки кнопки отправки и обработчика Enter приведено к безотказной логике: кнопка активна всегда при наличии введённого текста сообщения (`!r && !k && b;`), обеспечивая стабильную работу сторонних провайдеров в Standard-версии без региональных привязок.
+- **Версия 3.1.15** (`versionCode` 41) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Контрольные суммы сборки (SHA-256):**
+  - `Leostryx-3.1.15-standard.apk`: `1933fe859fadaeb66b1cd5acdf0a08b891df531516b2a4d6b878f4c4750f9222`
+  - `Leostryx-3.1.15-bypass.apk`: `8e9eda9046d38c5496b60213cda5d7368a1b2b56aca65f0d7b7788ff4de71d15`
+  - `Leostryx-repo.zip`: `c7738be4ffffc18a19323fb95d263d940fff538c12583ff3d0f959c557819bac`
+<!-- /RU -->
+
+<!-- EN -->
+- **Intelligent model capabilities autodetection (`agy_providers.js`):**
+  - Implemented an extensive built-in catalog of model specifications and capabilities (`window.AgyModelCatalog`), eliminating empty/unknown metadata fields in Settings › Providers › "Added models".
+  - Out-of-the-box support for industry-leading model families:
+    - **Anthropic Claude:** `claude-sonnet-5-5`, `claude-3-5-*`, `claude-3-7-*`, `claude-3-opus` — 200k context (1M for 1m variants), text/image, reasoning (medium), tool calling, Anthropic Claude specifications.
+    - **Moonshot Kimi:** `kimi-k3.1-pro`, `kimi-k2.5`, `kimi-k2`, `moonshot-v1-*` — 256k context (128k/32k/8k), text/image, reasoning (medium), tool calling, Moonshot Kimi specifications.
+    - **Google Gemini:** `gemini-4-hydrogen`, `gemini-2.5-pro`, `gemini-2.0-flash`, `gemini-1.5-*` — 1M/2M context, native multimodal (text, images, audio, video), reasoning, tool calling, Google Gemini specifications.
+    - **OpenAI:** `o1`, `o3-mini`, `o4`, `gpt-4o`, `gpt-4.5`, `chatgpt-4o` — 128k/200k context, reasoning, vision, tool calling.
+    - **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1) — 64k/128k context, reasoning for R1, tool calling.
+    - **Alibaba Qwen:** `qwen-2.5`, `qwq-32b`, `qwen-vl` — 128k/1M context, multimodal for VL, reasoning for QwQ.
+    - **Zhipu GLM, Meta Llama, Mistral, xAI Grok, MiniMax, Xiaomi MiMo** and heuristic detection for context/capability suffixes (`-128k`, `-256k`, `-1m`, `-vl`, `-thinking`, `-reasoner`).
+  - Enhanced model parser (`parseModels`) for OpenAI-compatible providers: extracts `context_length`, `architecture.input_modalities`, `supported_parameters`, `capabilities`.
+  - Non-destructive dynamic enrichment of active models (`effectiveInfo`) preserving user chip overrides.
+  - Context size badges displayed on model cards and add-model forms (`200k`, `256k`, `1000k`, etc.).
+- **Context Circle button in chat input toolbar (`agy_shield.js`, `agy_ru.css`):**
+  - Added a dedicated circular context indicator button (`.agy-ctx-circle-btn`) next to the security shield in the input footer.
+  - Tapping the circle opens a Frosted Glass popup displaying live model and context diagnostics:
+    - Active model name and provider source.
+    - Formatted context window length (e.g., `200 000 tokens`, `1 048 576 tokens`).
+    - Input modalities (text, images, audio, video).
+    - Capabilities (reasoning, tools).
+    - Data specification source and reasoning effort settings.
+    - Active Leostryx auto-compaction diagnostics (threshold, sliding window, live turn count).
+    - Direct 1-tap link to Providers & Models settings.
+- **Fixed permanently disabled Send button in Standard variant (`generated/main.js`):**
+  - Resolved a critical lockup in `DYb` where `data-testid="send-button"` and keyboard Enter were locked (`disabled: true`, `cursor-not-allowed`) in the standard APK when unauthenticated or lacking Google Language Server quota (`hasQuotaOrCredits === false`, `isSignedIn === false`, `cascadeModelConfigData === undefined`).
+  - Switched send button enablement to dependable logic: sends whenever user input is non-empty (`!r && !k && b;`), enabling custom third-party providers in the standard build without regional or account dependencies.
+- **Version 3.1.15** (`versionCode` 41) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Build checksums (SHA-256):**
+  - `Leostryx-3.1.15-standard.apk`: `1933fe859fadaeb66b1cd5acdf0a08b891df531516b2a4d6b878f4c4750f9222`
+  - `Leostryx-3.1.15-bypass.apk`: `8e9eda9046d38c5496b60213cda5d7368a1b2b56aca65f0d7b7788ff4de71d15`
+  - `Leostryx-repo.zip`: `c7738be4ffffc18a19323fb95d263d940fff538c12583ff3d0f959c557819bac`
+<!-- /EN -->
 
 ## v3.1.14 — 2026-11-19 (Авто-сжатие контекста длинных диалогов, оптимизация токенов и защита от переполнения)
 

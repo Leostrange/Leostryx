@@ -86,12 +86,12 @@
 
 ---
 
-## 📥 Скачать сборки (v3.1.14)
+## 📥 Скачать сборки (v3.1.15)
 
 | Вариант | Назначение | Пакет | SHA-256 контрольная сумма |
 |---|---|---|---|
-| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.14-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `0445d366d36faaa0e256ad0bf586026bb3ff7439509fab7c9627902a22cdfeac` |
-| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.14-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `e25350e22f9d3302b0f814f2f86e6c31d6b03156571e2e08c2292384140a03bc` |
+| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.15-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15) | `1933fe859fadaeb66b1cd5acdf0a08b891df531516b2a4d6b878f4c4750f9222` |
+| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.15-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15) | `8e9eda9046d38c5496b60213cda5d7368a1b2b56aca65f0d7b7788ff4de71d15` |
 
 > [!TIP]
 > **Чем отличается Bypass?**
@@ -104,10 +104,10 @@
 > [!WARNING]
 > **Обновление поверх старых версий:** Сборки ветки 3.x (`com.agyru.t2`) обновляются поверх предыдущих версий 3.x штатно без потери данных. Если у вас была установлена устаревшая сборка 2.x, потребуется чистая переустановка из-за несовместимости ключей подписи.
 
-1. Скачайте нужный APK из [релиза v3.1.14](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14).
+1. Скачайте нужный APK из [релиза v3.1.15](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15).
 2. Сверьте контрольную сумму через SHA-256:
    ```bash
-   sha256sum Leostryx-3.1.14-*.apk
+   sha256sum Leostryx-3.1.15-*.apk
    ```
 3. Установите APK на устройство и запустите приложение.
 

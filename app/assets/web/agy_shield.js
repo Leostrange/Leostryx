@@ -298,6 +298,13 @@
     syncFromBridge();
   }
 
+  var CTX_SVG = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="9" stroke-dasharray="38 18" stroke-width="2"/>' +
+    '<circle cx="12" cy="12" r="3.5" fill="currentColor"/>' +
+    '</svg>';
+
+  var ctxPop = null;
+
   function close() {
     if (unsub) { unsub(); unsub = null; }
     if (pop) { pop.remove(); pop = null; }
@@ -306,12 +313,178 @@
   }
   window.__agyShieldClose = function () { if (!pop) return false; close(); return true; };
 
+  function closeCtx() {
+    if (ctxPop) { ctxPop.remove(); ctxPop = null; }
+    var b = document.querySelector(".agy-ctx-circle-btn");
+    if (b) b.setAttribute("aria-expanded", "false");
+  }
+  window.__agyContextClose = function () { if (!ctxPop) return false; closeCtx(); return true; };
+
+  function getActiveModel() {
+    var trigger = document.querySelector(BOX + " [data-testid='model-selector-trigger'] > span:first-child");
+    if (trigger && trigger.textContent && trigger.textContent.trim()) {
+      return trigger.textContent.trim();
+    }
+    try {
+      var last = localStorage.getItem("agyLastCustomModel");
+      if (last) return last;
+    } catch (e) {}
+    return "gemini-2.5-flash";
+  }
+
+  function getModelProvider(id) {
+    try {
+      var raw = localStorage.getItem("agyProviders");
+      if (raw) {
+        var st = JSON.parse(raw);
+        for (var i = 0; i < (st.connections || []).length; i++) {
+          var c = st.connections[i];
+          if ((c.selected || []).indexOf(id) >= 0 || (c.models || []).indexOf(id) >= 0) {
+            return {
+              name: c.name || (c.type === "openai" ? "OpenAI-совместимый" : c.type === "anthropic" ? "Claude (Anthropic)" : "Gemini"),
+              baseUrl: c.baseUrl || ""
+            };
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function getCompactorStats() {
+    var enabled = true, threshold = 16, keepRecent = 8;
+    try {
+      var raw = localStorage.getItem("agyGatewaySettings");
+      if (raw) {
+        var g = JSON.parse(raw);
+        if (g.compactEnabled === false) enabled = false;
+        if (Number(g.compactThreshold) > 0) threshold = Number(g.compactThreshold);
+        if (Number(g.compactKeepRecent) > 0) keepRecent = Number(g.compactKeepRecent);
+      }
+    } catch (e) {}
+    var msgs = document.querySelectorAll("[data-testid='chat-message'], [class*='conversation-message'], [class*='message-turn'], [data-testid='turn-container']").length;
+    return { enabled: enabled, threshold: threshold, keepRecent: keepRecent, count: msgs };
+  }
+
+  function placeCtx() {
+    if (!ctxPop) return;
+    var box = document.querySelector(BOX); if (!box) return;
+    var r = box.getBoundingClientRect();
+    var vw = window.innerWidth || document.documentElement.clientWidth;
+    var w = Math.min(350, vw - 16);
+    var left = Math.max(8, Math.min(r.right - w - 8, vw - w - 8));
+    ctxPop.style.setProperty("width", Math.round(w) + "px", "important");
+    ctxPop.style.setProperty("max-width", Math.round(w) + "px", "important");
+    ctxPop.style.setProperty("min-width", Math.round(w) + "px", "important");
+    ctxPop.style.setProperty("left", Math.round(left) + "px", "important");
+    ctxPop.style.setProperty("right", "auto", "important");
+    ctxPop.style.setProperty("bottom", Math.round(window.innerHeight - r.top + 6) + "px", "important");
+    ctxPop.style.setProperty("max-height", Math.max(200, Math.round(r.top - 64)) + "px", "important");
+  }
+
+  function renderCtx() {
+    if (!ctxPop) return;
+    var modelName = getActiveModel();
+    var prov = getModelProvider(modelName);
+    var catalogFn = window.AgyModelCatalog;
+    var info = catalogFn ? catalogFn(prov ? prov.baseUrl : "", modelName) : null;
+    var cmp = getCompactorStats();
+
+    function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function value(x) { return x === null || x === undefined ? T("неизвестно", "unknown") : x ? T("да", "yes") : T("нет", "no"); }
+    var modes = info && Array.isArray(info.inputModes) ? info.inputModes : [];
+    function mode(m) { return value(modes.length ? modes.indexOf(m) >= 0 : null); }
+
+    var ctxFormatted = (info && info.ctx > 0) ? Number(info.ctx).toLocaleString() + " " + T("токенов", "tokens") : T("128 000 токенов (базовый)", "128,000 tokens (default)");
+    var srcMap = {
+      "xiaomi-docs": T("официальная документация Xiaomi", "official Xiaomi documentation"),
+      "anthropic-spec": T("спецификация Anthropic Claude", "Anthropic Claude specification"),
+      "google-spec": T("спецификация Google Gemini", "Google Gemini specification"),
+      "moonshot-spec": T("спецификация Moonshot Kimi", "Moonshot Kimi specification"),
+      "openai-spec": T("спецификация OpenAI", "OpenAI specification"),
+      "deepseek-spec": T("спецификация DeepSeek", "DeepSeek specification"),
+      "qwen-spec": T("спецификация Alibaba Qwen", "Alibaba Qwen specification"),
+      "glm-spec": T("спецификация Zhipu GLM", "Zhipu GLM specification"),
+      "meta-spec": T("спецификация Meta Llama", "Meta Llama specification"),
+      "mistral-spec": T("спецификация Mistral AI", "Mistral AI specification"),
+      "xai-spec": T("спецификация xAI Grok", "xAI Grok specification"),
+      "minimax-spec": T("спецификация MiniMax", "MiniMax specification"),
+      "provider-api": T("ответ API провайдера", "provider API response"),
+      "auto-detected": T("каталог характеристик моделей", "model capability catalog")
+    };
+    var src = (info && srcMap[info.source]) || (info && info.source) || T("каталог характеристик моделей", "model capability catalog");
+
+    var h = '<div class="agy-ctx-head">' +
+      '<div class="agy-ctx-title-wrap">' +
+        '<span class="agy-ctx-dot">●</span>' +
+        '<span class="agy-ctx-title" title="' + esc(modelName) + '">' + esc(modelName) + '</span>' +
+      '</div>' +
+      '<button type="button" class="agy-ctx-close" data-act="close" title="' + esc(T("Закрыть", "Close")) + '">✕</button>' +
+    '</div>' +
+    '<div class="agy-ctx-tags">' +
+      '<span class="agy-ctx-tag">' + esc(prov ? prov.name : T("Модель", "Model")) + '</span>' +
+      '<span class="agy-ctx-tag green">' + esc(ctxFormatted) + '</span>' +
+    '</div>' +
+    '<div class="agy-ctx-rows">' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Контекст:", "Context:")) + '</span><span class="agy-ctx-val">' + esc(ctxFormatted) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Вложения:", "Attachments:")) + '</span><span class="agy-ctx-val">' +
+        esc(T("Картинки ", "Images ") + mode("image") + ' · ' + T("Аудио ", "Audio ") + mode("audio") + ' · ' + T("Видео ", "Video ") + mode("video")) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Функции:", "Capabilities:")) + '</span><span class="agy-ctx-val">' +
+        esc("Reasoning " + value(info ? info.reasoning : null) + ' · ' + T("Инструменты ", "Tools ") + value(info ? info.tools : true)) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Источник:", "Source:")) + '</span><span class="agy-ctx-val">' + esc(src) + '</span></div>' +
+      (info && info.effort ? '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Мышление:", "Effort:")) + '</span><span class="agy-ctx-val">' + esc(info.effort + (Array.isArray(info.efforts) && info.efforts.length ? ' (' + info.efforts.join(", ") + ')' : '')) + '</span></div>' : '') +
+    '</div>' +
+    '<div class="agy-ctx-compactor-box">' +
+      '<div class="agy-ctx-c-title">' +
+        '<span>' + esc(T("Авто-сжатие контекста:", "Context Compaction:")) + '</span>' +
+        '<span style="color:' + (cmp.enabled ? '#a3e635' : '#ef4444') + ';font-weight:600;">' + esc(cmp.enabled ? T("Активно", "Active") : T("Выключено", "Disabled")) + '</span>' +
+      '</div>' +
+      '<div style="opacity:.8;margin-top:2px;">' +
+        esc(T("Порог: ", "Threshold: ") + cmp.threshold + ' · ' + T("Окно свежих: ", "Window: ") + cmp.keepRecent + (cmp.count > 0 ? ' · ' + T("В диалоге: ", "In chat: ") + cmp.count : '')) +
+      '</div>' +
+    '</div>' +
+    '<button type="button" class="agy-ctx-btn" data-act="providers">' + esc(T("Настройки провайдеров и моделей →", "Providers & model settings →")) + '</button>';
+
+    ctxPop.innerHTML = h;
+    placeCtx();
+  }
+
+  function toggleContext(btn) {
+    if (ctxPop) { closeCtx(); return; }
+    if (pop) close();
+    ctxPop = document.createElement("div");
+    ctxPop.id = "agy-ctx-popup";
+    ctxPop.setAttribute("data-agy-no-translate", "");
+    ctxPop.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+    ctxPop.addEventListener("click", function (e) {
+      var actEl = e.target.closest("[data-act]");
+      if (!actEl) return;
+      var act = actEl.getAttribute("data-act");
+      if (act === "close") { closeCtx(); }
+      else if (act === "providers") {
+        closeCtx();
+        if (window.AgyProviders && typeof window.AgyProviders.open === "function") {
+          window.AgyProviders.open();
+        } else {
+          var sBtn = document.querySelector("[data-testid='settings-button'], [aria-label*='Settings'], [aria-label*='Настройки']");
+          if (sBtn) sBtn.click();
+        }
+      }
+    });
+    document.body.appendChild(ctxPop);
+    btn.setAttribute("aria-expanded", "true");
+    renderCtx();
+  }
+
   document.addEventListener("pointerdown", function (e) {
-    if (!pop) return;
-    if (e.target.closest && (e.target.closest("#agy-shield") || e.target.closest(".agy-shield-btn"))) return;
-    close();
+    if (pop && !e.target.closest("#agy-shield") && !e.target.closest(".agy-shield-btn")) {
+      close();
+    }
+    if (ctxPop && !e.target.closest("#agy-ctx-popup") && !e.target.closest(".agy-ctx-circle-btn")) {
+      closeCtx();
+    }
   }, true);
-  window.addEventListener("resize", function () { place(); });
+  window.addEventListener("resize", function () { if (pop) place(); if (ctxPop) placeCtx(); });
 
   /* Кнопка живёт в React-футере окна ввода, поэтому вставляем её только когда
    * редактор НЕ в фокусе: вставка узла в перерисовываемую строку заставляет
@@ -325,29 +498,46 @@
       ae.getAttribute("contenteditable") === "true");
   }
 
-  /* Button: first item of the right-hand group of the toolbar (next to mic). */
+  /* Buttons: toolbar group next to mic: [shield] [context circle] */
   function ensureButton() {
-    // Footer row of the input box: [+ / model …] [mic, send]. The right group
-    // is the last child of the "@container/input-footer" row.
     var plus = document.querySelector(BOX + " button[aria-label='Add context'], " + BOX + " button[aria-label='Добавить контекст']");
     var footer = plus && plus.closest("[class*='input-footer']");
-    if (!footer) { if (pop && !document.querySelector(BOX)) close(); return; }
+    if (!footer) { if (pop && !document.querySelector(BOX)) close(); if (ctxPop && !document.querySelector(BOX)) closeCtx(); return; }
     var group = footer.lastElementChild;
     if (!group || group.contains(plus)) return;
-    if (group.querySelector(".agy-shield-btn")) return;
-    if (editorFocused()) return;             // во время ввода DOM не трогаем
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = "agy-shield-btn";
-    b.setAttribute("aria-label", T("Безопасность", "Security"));
-    b.setAttribute("aria-expanded", "false");
-    b.innerHTML = SVG;
-    b.addEventListener("pointerdown", function (e) { e.preventDefault(); });
-    b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); open(b); });
-    group.insertBefore(b, group.firstChild);
+    if (editorFocused()) return;
+
+    var shieldBtn = group.querySelector(".agy-shield-btn");
+    var ctxBtn = group.querySelector(".agy-ctx-circle-btn");
+
+    if (!shieldBtn) {
+      shieldBtn = document.createElement("button");
+      shieldBtn.type = "button";
+      shieldBtn.className = "agy-shield-btn";
+      shieldBtn.setAttribute("aria-label", T("Безопасность", "Security"));
+      shieldBtn.setAttribute("title", T("Безопасность и политики", "Security & policies"));
+      shieldBtn.setAttribute("aria-expanded", "false");
+      shieldBtn.innerHTML = SVG;
+      shieldBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+      shieldBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); if (ctxPop) closeCtx(); open(shieldBtn); });
+      group.insertBefore(shieldBtn, group.firstChild);
+    }
+
+    if (!ctxBtn) {
+      ctxBtn = document.createElement("button");
+      ctxBtn.type = "button";
+      ctxBtn.className = "agy-ctx-circle-btn";
+      ctxBtn.setAttribute("aria-label", T("Контекст и данные модели", "Model context & capabilities"));
+      ctxBtn.setAttribute("title", T("Контекст и данные модели", "Model context & capabilities"));
+      ctxBtn.setAttribute("aria-expanded", "false");
+      ctxBtn.innerHTML = CTX_SVG;
+      ctxBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+      ctxBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); toggleContext(ctxBtn); });
+      group.insertBefore(ctxBtn, shieldBtn.nextSibling);
+    }
   }
   var raf = 0;
-  function schedule() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; ensureButton(); if (pop) place(); }); }
+  function schedule() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; ensureButton(); if (pop) place(); if (ctxPop) placeCtx(); }); }
   function start() {
     new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     schedule();

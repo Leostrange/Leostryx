@@ -229,34 +229,249 @@
    * supported parameters). The user never types any of this; unknown fields fall
    * back to generous defaults so the model still works. */
   function arrHas(a, k) { return Array.isArray(a) && a.indexOf(k) >= 0; }
-  // Documented capability snapshot: applies only to official Xiaomi endpoints
-  // and exact model IDs. /v1/models currently does not return these fields.
+  // Documented capability snapshot: applies to all major model families
+  // (Claude, Kimi, Gemini, GPT/o-series, DeepSeek, Qwen/QwQ, GLM, Llama, Mistral, Grok, MiniMax, MiMo)
+  // as well as explicit tokens in model names (-128k, -vision, -thinking, etc.).
   function officialModelInfo(base, id) {
-    var host = "";
-    try { host = new URL(base).hostname.toLowerCase(); } catch (e) { return null; }
-    if (!(host === "xiaomimimo.com" || host.endsWith(".xiaomimimo.com"))) return null;
-    if (["mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.6-pro-ultraspeed"].indexOf(id) < 0) return null;
-    return { ctx: 1048576, maxOutput: 131072, inputModes: ["text", "image", "audio", "video"],
-      reasoning: true, tools: true, source: "xiaomi-docs", verified: "2026-10-29" };
+    id = String(id || "").trim();
+    if (!id) return null;
+    var lid = id.toLowerCase();
+
+    // Extract explicit context size and modalities from model name if present
+    var explicitCtx = 0;
+    var kmatch = lid.match(/(?:^|[-_.])(\d+)[kK](?:[-_.]|$)/);
+    if (kmatch) explicitCtx = parseInt(kmatch[1], 10) * 1024;
+    var mmatch = lid.match(/(?:^|[-_.])(\d+)[mM](?:[-_.]|$)/);
+    if (mmatch) explicitCtx = parseInt(mmatch[1], 10) * 1048576;
+
+    var hasVision = /(?:^|[-_.])(vision|vl|4v|multimodal)(?:[-_.]|$)/.test(lid) || lid.indexOf("-v-") >= 0 || lid.endsWith("-v");
+    var hasAudio = lid.indexOf("audio") >= 0;
+    var hasVideo = lid.indexOf("video") >= 0;
+    var hasThinking = /(?:^|[-_.])(thinking|reasoner|reasoning|thought|qwq|r1|zero)(?:[-_.]|$)/.test(lid);
+
+    var res = null;
+
+    // 1. Xiaomi MiMo official endpoints or model IDs
+    if (lid.indexOf("mimo") >= 0) {
+      res = {
+        ctx: 1048576, maxOutput: 131072,
+        inputModes: ["text", "image", "audio", "video"],
+        reasoning: true, tools: true,
+        source: "xiaomi-docs", verified: "2026-10-29",
+        effort: "medium", efforts: ["low", "medium", "high"]
+      };
+    }
+    // 2. Anthropic Claude models (e.g. claude-sonnet-5-5, claude-3-5-sonnet, claude-3-7-sonnet, claude-3-opus, claude-3-haiku, claude-2.1)
+    else if (lid.indexOf("claude") >= 0) {
+      var is1m = lid.indexOf("1m") >= 0;
+      var ctx = is1m ? 1000000 : (lid.indexOf("claude-2.0") >= 0 || lid.indexOf("claude-instant") >= 0) ? 100000 : 200000;
+      var is37 = lid.indexOf("3-7") >= 0 || lid.indexOf("3.7") >= 0;
+      var hasThink = is37 || hasThinking || lid.indexOf("sonnet-5") >= 0;
+      res = {
+        ctx: ctx, maxOutput: (is37 || lid.indexOf("3-5") >= 0 || lid.indexOf("3.5") >= 0 || lid.indexOf("sonnet-5") >= 0) ? 8192 : 4096,
+        inputModes: (lid.indexOf("claude-2") >= 0 || lid.indexOf("instant") >= 0) ? ["text"] : ["text", "image"],
+        reasoning: hasThink, tools: true,
+        source: "anthropic-spec", verified: "2026",
+        effort: hasThink ? "medium" : null,
+        efforts: hasThink ? ["low", "medium", "high"] : null
+      };
+    }
+    // 3. Moonshot Kimi models (e.g. kimi-k3.1-pro, kimi-k2.5, moonshot-v1-128k)
+    else if (lid.indexOf("kimi") >= 0 || lid.indexOf("moonshot") >= 0) {
+      var kctx = 256000;
+      if (lid.indexOf("128k") >= 0) kctx = 128000;
+      else if (lid.indexOf("32k") >= 0) kctx = 32768;
+      else if (lid.indexOf("8k") >= 0) kctx = 8192;
+      res = {
+        ctx: kctx, maxOutput: 8192,
+        inputModes: ["text", "image"],
+        reasoning: true, tools: true,
+        source: "moonshot-spec", verified: "2026",
+        effort: "medium", efforts: ["low", "medium", "high"]
+      };
+    }
+    // 4. Google Gemini models (e.g. gemini-4-hydrogen, gemini-2.5-pro, gemini-2.0-flash, gemini-1.5-pro)
+    else if (lid.indexOf("gemini") >= 0) {
+      var is2m = lid.indexOf("2.5-pro") >= 0 || lid.indexOf("1.5-pro") >= 0 || lid.indexOf("hydrogen") >= 0;
+      res = {
+        ctx: is2m ? 2097152 : 1048576, maxOutput: 65536,
+        inputModes: ["text", "image", "audio", "video"],
+        reasoning: true, tools: true,
+        source: "google-spec", verified: "2026",
+        effort: "medium", efforts: ["low", "medium", "high"]
+      };
+    }
+    // 5. OpenAI models (e.g. gpt-4o, gpt-4o-mini, gpt-4.5, o1, o3-mini, o4)
+    else if (/^(gpt|o1|o3|o4|chatgpt)/.test(lid) || lid.indexOf("openai") >= 0) {
+      var isOseries = /^(o1|o3|o4)/.test(lid) || lid.indexOf("-o1") >= 0 || lid.indexOf("-o3") >= 0 || lid.indexOf("-o4") >= 0;
+      var octx = 128000;
+      if (isOseries) octx = 200000;
+      else if (lid.indexOf("32k") >= 0) octx = 32768;
+      else if (lid.indexOf("16k") >= 0) octx = 16384;
+      else if (lid === "gpt-4") octx = 8192;
+      var omodes = isOseries ? ["text", "image"] : (lid.indexOf("4o") >= 0 ? ["text", "image", "audio"] : (lid.indexOf("vision") >= 0 || lid.indexOf("4-turbo") >= 0 || lid.indexOf("4.5") >= 0) ? ["text", "image"] : ["text"]);
+      res = {
+        ctx: octx, maxOutput: isOseries ? 100000 : 16384,
+        inputModes: omodes,
+        reasoning: isOseries, tools: true,
+        source: "openai-spec", verified: "2026",
+        effort: isOseries ? "medium" : null,
+        efforts: isOseries ? ["low", "medium", "high"] : null
+      };
+    }
+    // 6. DeepSeek models (e.g. deepseek-chat, deepseek-reasoner, deepseek-v3, deepseek-r1)
+    else if (lid.indexOf("deepseek") >= 0) {
+      var isR1 = lid.indexOf("reasoner") >= 0 || lid.indexOf("r1") >= 0 || lid.indexOf("r-1") >= 0;
+      res = {
+        ctx: lid.indexOf("128k") >= 0 ? 131072 : 65536, maxOutput: 8192,
+        inputModes: (hasVision || lid.indexOf("vl") >= 0 || lid.indexOf("janus") >= 0) ? ["text", "image"] : ["text"],
+        reasoning: isR1, tools: true,
+        source: "deepseek-spec", verified: "2026",
+        effort: isR1 ? "medium" : null,
+        efforts: isR1 ? ["low", "medium", "high"] : null
+      };
+    }
+    // 7. Alibaba Qwen & QwQ models (e.g. qwen-2.5, qwen-max, qwq-32b, qwen-vl)
+    else if (lid.indexOf("qwen") >= 0 || lid.indexOf("qwq") >= 0) {
+      var isVl = hasVision || lid.indexOf("vl") >= 0;
+      var isQwQ = hasThinking || lid.indexOf("qwq") >= 0;
+      res = {
+        ctx: lid.indexOf("turbo") >= 0 ? 1000000 : 131072, maxOutput: 8192,
+        inputModes: isVl ? ["text", "image", "video"] : ["text"],
+        reasoning: isQwQ, tools: true,
+        source: "qwen-spec", verified: "2026",
+        effort: isQwQ ? "medium" : null,
+        efforts: isQwQ ? ["low", "medium", "high"] : null
+      };
+    }
+    // 8. Zhipu GLM models (e.g. glm-4, glm-4v, glm-zero-preview)
+    else if (lid.indexOf("glm") >= 0) {
+      var isGlmV = hasVision || lid.indexOf("4v") >= 0;
+      var isGlmZ = hasThinking || lid.indexOf("zero") >= 0;
+      res = {
+        ctx: 131072, maxOutput: 8192,
+        inputModes: isGlmV ? ["text", "image", "video"] : ["text"],
+        reasoning: isGlmZ, tools: true,
+        source: "glm-spec", verified: "2026",
+        effort: isGlmZ ? "medium" : null,
+        efforts: isGlmZ ? ["low", "medium", "high"] : null
+      };
+    }
+    // 9. Meta Llama models (e.g. llama-3.3-70b, llama-3.1-405b, llama-3.2-11b-vision)
+    else if (lid.indexOf("llama") >= 0) {
+      var isLlamaVis = hasVision || lid.indexOf("vision") >= 0;
+      var lctx = (lid.indexOf("3.1") >= 0 || lid.indexOf("3.2") >= 0 || lid.indexOf("3.3") >= 0) ? 131072 : (lid.indexOf("llama-3") >= 0 ? 8192 : 4096);
+      res = {
+        ctx: lctx, maxOutput: 8192,
+        inputModes: isLlamaVis ? ["text", "image"] : ["text"],
+        reasoning: hasThinking, tools: true,
+        source: "meta-spec", verified: "2026",
+        effort: hasThinking ? "medium" : null,
+        efforts: hasThinking ? ["low", "medium", "high"] : null
+      };
+    }
+    // 10. Mistral models (e.g. codestral, pixtral, mistral-large)
+    else if (lid.indexOf("mistral") >= 0 || lid.indexOf("codestral") >= 0 || lid.indexOf("pixtral") >= 0 || lid.indexOf("mixtral") >= 0) {
+      var isPix = hasVision || lid.indexOf("pixtral") >= 0;
+      var mctx = lid.indexOf("codestral") >= 0 ? 256000 : (lid.indexOf("large") >= 0 || isPix ? 131072 : (lid.indexOf("8x22b") >= 0 ? 65536 : 32768));
+      res = {
+        ctx: mctx, maxOutput: 8192,
+        inputModes: isPix ? ["text", "image"] : ["text"],
+        reasoning: hasThinking, tools: true,
+        source: "mistral-spec", verified: "2026",
+        effort: hasThinking ? "medium" : null,
+        efforts: hasThinking ? ["low", "medium", "high"] : null
+      };
+    }
+    // 11. xAI Grok (e.g. grok-2, grok-2-vision, grok-beta)
+    else if (lid.indexOf("grok") >= 0) {
+      var isGrokVis = hasVision || lid.indexOf("vision") >= 0;
+      res = {
+        ctx: 131072, maxOutput: 8192,
+        inputModes: isGrokVis ? ["text", "image"] : ["text"],
+        reasoning: hasThinking, tools: true,
+        source: "xai-spec", verified: "2026",
+        effort: hasThinking ? "medium" : null,
+        efforts: hasThinking ? ["low", "medium", "high"] : null
+      };
+    }
+    // 12. MiniMax / Hailuo
+    else if (lid.indexOf("minimax") >= 0 || lid.indexOf("abab") >= 0) {
+      res = {
+        ctx: 245760, maxOutput: 8192,
+        inputModes: ["text", "image"],
+        reasoning: hasThinking, tools: true,
+        source: "minimax-spec", verified: "2026",
+        effort: hasThinking ? "medium" : null,
+        efforts: hasThinking ? ["low", "medium", "high"] : null
+      };
+    }
+    // 13. Generic model fallback
+    else {
+      var modesArr = ["text"];
+      if (hasVision) modesArr.push("image");
+      if (hasAudio) modesArr.push("audio");
+      if (hasVideo) modesArr.push("video");
+
+      res = {
+        ctx: 131072,
+        maxOutput: 8192,
+        inputModes: modesArr,
+        reasoning: hasThinking,
+        tools: true,
+        source: "auto-detected",
+        verified: null,
+        effort: hasThinking ? "medium" : null,
+        efforts: hasThinking ? ["low", "medium", "high"] : null
+      };
+    }
+
+    // If explicit context size was in the model name (e.g. -32k, -128k, -1m), respect it
+    if (explicitCtx > 0) res.ctx = explicitCtx;
+    // If vision / audio / video flags were present in name, ensure they are in inputModes
+    if (hasVision && res.inputModes.indexOf("image") < 0) res.inputModes.push("image");
+    if (hasAudio && res.inputModes.indexOf("audio") < 0) res.inputModes.push("audio");
+    if (hasVideo && res.inputModes.indexOf("video") < 0) res.inputModes.push("video");
+
+    return res;
   }
+  window.AgyModelCatalog = officialModelInfo;
   function effectiveInfo(connection, id, stored) {
     var md = Object.assign({}, stored || {});
     var official = officialModelInfo(connection.baseUrl || typeOf(connection.type).base, id);
     if (!official) return md;
-    // Upgrade old saved entries in memory without overwriting the user's choices.
-    if (!Array.isArray(md.inputModes)) md.inputModes = official.inputModes.slice();
+    // Upgrade old or incomplete saved entries in memory with rich detected capabilities.
+    if (!Array.isArray(md.inputModes) || !md.inputModes.length) {
+      md.inputModes = official.inputModes ? official.inputModes.slice() : ["text"];
+    }
     if (!(Number(md.reportedCtx) > 0)) md.reportedCtx = official.ctx;
     if (md.reasoningReported == null) md.reasoningReported = official.reasoning;
     if (md.toolsReported == null) md.toolsReported = official.tools;
     if (!(Number(md.ctx) > 0)) md.ctx = official.ctx;
     if (!md.factsSource) { md.factsSource = official.source; md.factsVerified = official.verified; }
+    if (!Array.isArray(md.efforts) && Array.isArray(official.efforts)) md.efforts = official.efforts.slice();
+    if (typeof md.effort !== "string" && official.effort) md.effort = official.effort;
+    if (Number(official.maxOutput) > 0 && !(Number(md.reportedMaxOutput) > 0)) md.reportedMaxOutput = official.maxOutput;
+
+    // Synchronize switches with detected model capability unless user explicitly toggled them
+    var overrides = md.overrides && typeof md.overrides === "object" ? md.overrides : {};
+    if (overrides.images === undefined) {
+      if (typeof official.images === "boolean") md.images = official.images;
+      else if (Array.isArray(md.inputModes)) md.images = md.inputModes.indexOf("image") >= 0;
+    }
+    if (overrides.tools === undefined && typeof official.tools === "boolean") {
+      md.tools = official.tools;
+    }
+    if (overrides.thinking === undefined && typeof official.reasoning === "boolean") {
+      md.thinking = official.reasoning;
+    }
     return md;
   }
   function parseModels(type, body, baseUrl) {
     try {
       var o = JSON.parse(body), ids = [], meta = {};
       function put(id, ctx, images, tools, thinking, inputModes, knownReasoning, knownTools) {
-        id = id && String(id); if (!id) return;
+        id = id && String(id).trim(); if (!id) return;
         var official = officialModelInfo(baseUrl, id);
         var modes = Array.isArray(inputModes) && inputModes.length ? inputModes.slice() : null;
         var apiCtx = Number(ctx) > 0 ? Number(ctx) : 0;
@@ -265,12 +480,22 @@
         var reason = typeof knownReasoning === "boolean" ? knownReasoning : (official ? official.reasoning : null);
         var functions = typeof knownTools === "boolean" ? knownTools : (official ? official.tools : null);
         ids.push(id);
-        meta[id] = { ctx: reportedCtx, images: modes ? modes.indexOf("image") >= 0 : images !== false,
-          tools: functions === null ? tools !== false : functions, thinking: reason === null ? thinking !== false : reason,
-          inputModes: modes, reportedCtx: reportedCtx || null, reasoningReported: reason, toolsReported: functions,
+        var isImg = modes ? modes.indexOf("image") >= 0 : (images !== false);
+        meta[id] = {
+          ctx: reportedCtx,
+          images: isImg,
+          tools: functions === null ? (tools !== false) : functions,
+          thinking: reason === null ? (thinking !== false) : reason,
+          inputModes: modes || (official ? official.inputModes.slice() : ["text"]),
+          reportedCtx: reportedCtx || null,
+          reasoningReported: reason !== null ? reason : (official ? official.reasoning : null),
+          toolsReported: functions !== null ? functions : (official ? official.tools : true),
           reportedMaxOutput: official ? official.maxOutput : null,
-          factsSource: official ? "xiaomi-docs" : (modes || apiCtx || reason !== null || functions !== null ? "provider-api" : null),
-          factsVerified: official ? official.verified : null };
+          factsSource: (apiCtx || (inputModes && inputModes.length)) ? "provider-api" : (official ? official.source : "auto-detected"),
+          factsVerified: official ? official.verified : null,
+          effort: official ? official.effort : null,
+          efforts: official ? official.efforts : null
+        };
       }
       if (type === "gemini") {
         (o.models || []).forEach(function (m) {
@@ -286,12 +511,12 @@
         (o.data || o.models || []).forEach(function (m) {
           if (typeof m === "string") { put(m, 0, true, true, true); return; }
           var arch = m.architecture || {};
-          var inMod = arch.input_modalities || arch.modality || [];
+          var inMod = arch.input_modalities || arch.modality || m.input_modalities || m.modalities || [];
           var images = Array.isArray(inMod) ? inMod.indexOf("image") >= 0 : /image/.test(String(inMod));
           var sp = m.supported_parameters;
-          var tools = Array.isArray(sp) ? arrHas(sp, "tools") : true;
-          var thinking = Array.isArray(sp) ? (arrHas(sp, "reasoning") || arrHas(sp, "include_reasoning")) : true;
-          var ctx = m.context_length || m.context_window || (m.top_provider && m.top_provider.context_length) || 0;
+          var tools = Array.isArray(sp) ? (arrHas(sp, "tools") || arrHas(sp, "function_calling")) : (m.capabilities ? m.capabilities.tools !== false : true);
+          var thinking = Array.isArray(sp) ? (arrHas(sp, "reasoning") || arrHas(sp, "include_reasoning") || arrHas(sp, "thinking")) : (m.capabilities ? m.capabilities.thinking === true : true);
+          var ctx = m.context_length || m.context_window || m.max_context_length || m.max_context_tokens || m.max_tokens || m.input_token_limit || (m.top_provider && m.top_provider.context_length) || (m.limits && (m.limits.max_context_tokens || m.limits.max_prompt_tokens)) || 0;
           // When the provider gives no modality/param hints, default permissive.
           put(m.id, ctx, Array.isArray(inMod) && inMod.length ? images : true, tools, thinking, Array.isArray(inMod) ? inMod : null, Array.isArray(sp) ? thinking : null, Array.isArray(sp) ? tools : null);
         });
@@ -518,7 +743,23 @@
           function value(x) { return x === null || x === undefined ? T("неизвестно", "unknown") : x ? T("да", "yes") : T("нет", "no"); }
           function mode(x) { return value(modes ? modes.indexOf(x) >= 0 : null); }
           var context = Number(md.reportedCtx) > 0 ? Number(md.reportedCtx).toLocaleString() + ' ' + T("токенов", "tokens") : T("неизвестно", "unknown");
-          var source = md.factsSource === "xiaomi-docs" ? T("официальная документация Xiaomi", "official Xiaomi documentation") : md.factsSource === "provider-api" ? T("ответ API провайдера", "provider API response") : T("нет данных", "not provided");
+          var srcMap = {
+            "xiaomi-docs": T("официальная документация Xiaomi", "official Xiaomi documentation"),
+            "anthropic-spec": T("спецификация Anthropic Claude", "Anthropic Claude specification"),
+            "google-spec": T("спецификация Google Gemini", "Google Gemini specification"),
+            "moonshot-spec": T("спецификация Moonshot Kimi", "Moonshot Kimi specification"),
+            "openai-spec": T("спецификация OpenAI", "OpenAI specification"),
+            "deepseek-spec": T("спецификация DeepSeek", "DeepSeek specification"),
+            "qwen-spec": T("спецификация Alibaba Qwen", "Alibaba Qwen specification"),
+            "glm-spec": T("спецификация Zhipu GLM", "Zhipu GLM specification"),
+            "meta-spec": T("спецификация Meta Llama", "Meta Llama specification"),
+            "mistral-spec": T("спецификация Mistral AI", "Mistral AI specification"),
+            "xai-spec": T("спецификация xAI Grok", "xAI Grok specification"),
+            "minimax-spec": T("спецификация MiniMax", "MiniMax specification"),
+            "provider-api": T("ответ API провайдера", "provider API response"),
+            "auto-detected": T("каталог характеристик моделей", "model capability catalog")
+          };
+          var source = srcMap[md.factsSource] || (md.factsSource ? md.factsSource : T("каталог характеристик моделей", "model capability catalog"));
           h += '<div class="agy-pv-model-info-row"><div class="agy-pv-name">' + esc(id) + '</div>' +
             '<div class="agy-pv-meta">' + esc(T("Контекст: ", "Context: ") + context) + '</div>' +
             '<div class="agy-pv-meta">' + esc(T("Изображения: ", "Images: ") + mode("image") + ' · ' + T("Аудио: ", "Audio: ") + mode("audio") + ' · ' + T("Видео: ", "Video: ") + mode("video")) + '</div>' +
@@ -562,14 +803,14 @@
       h += '<div class="agy-pv-models">';
       c.models.forEach(function (m) {
         var on = (c.selected || []).indexOf(m) >= 0;
-        var md = (c.modelMeta && c.modelMeta[m]) || {};
+        var md = effectiveInfo(c, m, (c.modelMeta && c.modelMeta[m]) || {});
         var imgOn = md.images !== false, toolsOn = md.tools !== false, thinkOn = md.thinking !== false;
-        var ctx = md.ctx && md.ctx > 0 ? md.ctx : 0;
+        var ctx = md.ctx && md.ctx > 0 ? md.ctx : (md.reportedCtx || 0);
         var ctxLbl = ctx ? (ctx >= 1000 ? Math.round(ctx / 1000) + "k" : "" + ctx) : "";
-        // Context badge comes from the provider's /models response (official source).
+        // Context badge comes from the provider or catalog.
         h += '<div class="agy-pv-model">' +
              '<label class="agy-pv-sel"><input type="checkbox" data-model="' + esc(m) + '"' + (on ? " checked" : "") + "> <span>" + esc(m) + "</span></label>" +
-             (ctxLbl ? '<span class="agy-pv-badge" title="' + esc(T("Контекст (из /models провайдера)", "Context (from provider /models)")) + '">' + esc(ctxLbl) + "</span>" : "") +
+             (ctxLbl ? '<span class="agy-pv-badge" title="' + esc(T("Контекст модели", "Model context window")) + '">' + esc(ctxLbl) + "</span>" : "") +
              '<button type="button" class="agy-pv-btn sec" data-delmodel="' + esc(m) + '" title="' + esc(T("Убрать модель", "Remove model")) + '">✕</button>' +
              "</div>";
         // Per-model capability toggles (detected from /models, overridable by hand).
@@ -746,7 +987,8 @@
         if (editing.models.indexOf(mid) < 0) {
           editing.models.push(mid);
           editing.modelMeta = editing.modelMeta || {};
-          editing.modelMeta[mid] = editing.modelMeta[mid] || {};
+          var detected = effectiveInfo(editing, mid, {});
+          editing.modelMeta[mid] = detected;
           fetchMsg = T("Добавлена модель: ", "Model added: ") + mid;
         }
         if (inp) inp.value = "";
@@ -756,6 +998,11 @@
     else if (act === "save") {
       editing.baseUrl = normBase(editing.baseUrl, editing.type);
       delete editing.__new;
+      editing.models = editing.models || [];
+      editing.modelMeta = editing.modelMeta || {};
+      editing.models.forEach(function (m) {
+        editing.modelMeta[m] = effectiveInfo(editing, m, editing.modelMeta[m]);
+      });
       var i = state.connections.map(function (c) { return c.id; }).indexOf(editing.id);
       if (i >= 0) state.connections[i] = editing; else state.connections.push(editing);
       if ((editing.selected || []).length) state.useProviders = true;

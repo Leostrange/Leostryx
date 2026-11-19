@@ -54,7 +54,7 @@ def run_curl(args):
 
 def main():
     if len(sys.argv) < 2:
-        version = "3.1.14"
+        version = "3.1.15"
     else:
         version = sys.argv[1].lstrip("v")
 
@@ -68,7 +68,7 @@ def main():
 
     print(f"Preparing GitHub release for {tag} ({repo})...")
     body = extract_changelog(version)
-    title = f"Leostryx {version} — авто-сжатие контекста длинных диалогов, экономия токенов"
+    title = f"Leostryx {version} — автоопределение данных моделей, круг контекста в чате, фикс отправки standard"
 
     # Check if release exists
     check_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"

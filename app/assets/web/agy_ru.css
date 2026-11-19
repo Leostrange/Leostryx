@@ -330,6 +330,7 @@ html[data-base-ui-scroll-locked] {
 
 /* Shield and Subagents popovers — styled with glass but aligned to context window width */
 #agy-shield,
+#agy-ctx-popup,
 #agy-subagents-popover {
   background: var(--agy-glass-surface) !important;
   background-color: var(--agy-glass-surface) !important;
@@ -390,6 +391,7 @@ html[data-base-ui-scroll-locked] {
   [data-testid="bottom-sheet"],
   [data-testid="model-selector-panel"],
   #agy-shield,
+  #agy-ctx-popup,
   #agy-subagents-popover,
   #typeahead-menu,
   #agy-font-dropdown
@@ -802,6 +804,89 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
 #agy-shield .agy-sh-ol { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 #agy-shield .agy-sh-od { color: var(--muted-foreground, #888); font-size: 11.5px; white-space: normal; }
 #agy-shield .agy-sh-empty { padding: 10px; color: var(--muted-foreground, #888); }
+
+/* Context Circle Button & Popup (agy_shield.js) */
+.agy-ctx-circle-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9999px;
+  background: transparent; color: var(--secondary-foreground, currentColor); cursor: pointer; flex-shrink: 0;
+  transition: background .15s, transform .15s;
+}
+.agy-ctx-circle-btn:hover { background: rgba(127,127,127,.14); }
+.agy-ctx-circle-btn[aria-expanded="true"] { background: rgba(127,127,127,.22); }
+
+#agy-ctx-popup {
+  position: fixed; z-index: 6100; overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 12px; border-radius: 14px;
+  border: 1px solid var(--agy-glass-border) !important;
+  background: var(--agy-glass-surface) !important;
+  color: var(--foreground);
+  box-shadow: var(--agy-glass-shadow) !important;
+  font-size: 13px; line-height: 1.35;
+  box-sizing: border-box;
+}
+.agy-ctx-card {
+  display: flex; flex-direction: column; gap: 10px; width: 100%;
+}
+.agy-ctx-head {
+  display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground, #888) 12%, transparent);
+}
+.agy-ctx-title {
+  font-size: 14px; font-weight: 600; color: var(--foreground);
+  word-break: break-all;
+}
+.agy-ctx-tags {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.agy-ctx-tag {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 500;
+  background: color-mix(in srgb, var(--foreground, #888) 10%, transparent);
+  color: var(--muted-foreground, #888);
+}
+.agy-ctx-tag.green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  font-weight: 600;
+}
+.agy-ctx-rows {
+  display: flex; flex-direction: column; gap: 5px; font-size: 12px;
+}
+.agy-ctx-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.agy-ctx-lbl {
+  color: var(--muted-foreground, #888); flex-shrink: 0;
+}
+.agy-ctx-val {
+  color: var(--foreground); text-align: right; word-break: break-word; font-weight: 500;
+}
+.agy-ctx-compactor-box {
+  background: color-mix(in srgb, var(--foreground, #888) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--foreground, #888) 15%, transparent);
+  border-radius: 8px; padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.agy-ctx-comp-title {
+  font-size: 11.5px; font-weight: 600; color: var(--foreground);
+}
+.agy-ctx-comp-desc {
+  font-size: 11px; color: var(--muted-foreground, #888); line-height: 1.35;
+}
+.agy-ctx-foot {
+  display: flex; justify-content: flex-end; padding-top: 4px;
+}
+.agy-ctx-btn {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  font-size: 11.5px; font-weight: 500; color: var(--primary, #3b82f6);
+  padding: 4px 8px; border-radius: 6px;
+  transition: background .15s;
+}
+.agy-ctx-btn:hover {
+  background: color-mix(in srgb, var(--primary, #3b82f6) 12%, transparent);
+}
+
 
 /* Settings › Tools (agy_tools.js) */
 .agy-tools { padding: 12px 16px 24px; color: var(--foreground); font-size: 13px; }
