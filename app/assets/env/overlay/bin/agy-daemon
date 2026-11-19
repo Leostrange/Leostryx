@@ -199,7 +199,7 @@ def cmd_status(args):
     tasks = load_tasks()
     active_count = sum(1 for t in tasks if t.get("enabled", True))
     print("--------------------------------------------------")
-    print(" Antigravity Autonomous Background Daemon (v2)")
+    print(" Leostryx Autonomous Background Daemon (v2)")
     print("--------------------------------------------------")
     if pid:
         print(f"Status:       RUNNING (PID: {pid})")
@@ -469,7 +469,7 @@ def cmd_clear(args):
 # CLI Entrypoint
 # -----------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Antigravity Autonomous Background Daemon & Task Manager")
+    parser = argparse.ArgumentParser(description="Leostryx Autonomous Background Daemon & Task Manager")
     subparsers = parser.add_subparsers(dest="subcommand")
 
     # Service lifecycle
@@ -496,7 +496,7 @@ def main():
     p_add.add_argument("--battery-below", help="Trigger when battery percentage falls below value")
     p_add.add_argument("--webhook-port", help="Start HTTP webhook receiver on port")
     p_add.add_argument("--webhook-token", help="Optional webhook token (generated when omitted)")
-    p_add.add_argument("--wake-app", action="store_true", help="Bring Antigravity UI to front when task finishes")
+    p_add.add_argument("--wake-app", action="store_true", help="Bring Leostryx UI to front when task finishes")
     p_add.add_argument("--json", action="store_true", help="Output result as JSON")
 
     p_list = subparsers.add_parser("list", help="List scheduled tasks (shortcut)")
@@ -529,7 +529,7 @@ def main():
     pt_add.add_argument("--battery-below", help="Trigger when battery percentage falls below value")
     pt_add.add_argument("--webhook-port", help="Start HTTP webhook receiver on port")
     pt_add.add_argument("--webhook-token", help="Optional webhook token (generated when omitted)")
-    pt_add.add_argument("--wake-app", action="store_true", help="Bring Antigravity UI to front when task finishes")
+    pt_add.add_argument("--wake-app", action="store_true", help="Bring Leostryx UI to front when task finishes")
     pt_add.add_argument("--json", action="store_true", help="Output result as JSON")
 
     pt_list = task_subs.add_parser("list", help="List tasks")

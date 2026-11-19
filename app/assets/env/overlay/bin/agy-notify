@@ -47,7 +47,7 @@ Common options:
 CMD="${1:-post}"
 shift || true
 
-TITLE="Antigravity"
+TITLE="Leostryx"
 SUBTITLE=""
 MESSAGE=""
 TAG="agy_$(date +%s)"
@@ -124,7 +124,7 @@ export AGY_LANG
 if [ "$CMD" = "post" ]; then
     if [ -z "$MESSAGE" ] && [ -n "$TITLE" ]; then
         MESSAGE="$TITLE"
-        TITLE="Antigravity"
+        TITLE="Leostryx"
     fi
 
     BODY_TEXT="$MESSAGE"

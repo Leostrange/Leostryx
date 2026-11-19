@@ -278,7 +278,7 @@ def _run_task_worker(task):
             "started_at": start_t,
             "run_pid": os.getpid(),
         }})
-        notify(L("Демон Antigravity", "Antigravity Daemon"),
+        notify(L("Демон Leostryx", "Leostryx Daemon"),
                L(f"Выполняется задача: {name}", f"Running task: {name}"),
                tag=f"task_{task_id}")
 

@@ -2,7 +2,7 @@
   "bootstrapSha256": "6958054de70ed135c7d946a50dc98e91f7ef1e441abfaf7b824c08d11fbc2080",
   "bootstrapSymlinkCount": 427,
   "bundleId": "f6fc96b40451ea0d5a0c9d4aee3dc92a777fdf1a137fae1e7540b9cb12579759",
-  "overlaySha256": "7fba079c2c4a1cc1f2d3dbd26099c0ba876a15b339170422e089dc66a096d64f",
+  "overlaySha256": "8b90359572667872c5a2d5ea8d3792f1eae2db906605cfac75fbaacb366dbb4f",
   "pkgSha256": "aa512f21ceae7697e26ba8fe7c8623e1ad0ebec4d586707669b645ca1257c511",
   "schema": 1,
   "seedPackages": [

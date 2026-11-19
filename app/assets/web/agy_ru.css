@@ -1469,3 +1469,65 @@ body.light :is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"
   box-shadow: var(--agy-glass-shadow-dense, 0 14px 44px rgba(0, 0, 0, 0.18)) !important;
   isolation: isolate !important;
 }
+
+/* Leostryx: Video attachment badges & suppression of broken <img> in chat history */
+[data-testid="input-attachment"] img[alt*="video" i],
+[data-testid="input-attachment"] img[alt*="Video" i],
+[data-testid="input-attachment-open"][aria-label*="video" i] img,
+button[aria-label*="video" i] img,
+button[aria-label*="Video" i] img,
+button[aria-label*=".mp4" i] img,
+button[aria-label*=".mov" i] img,
+button[aria-label*=".webm" i] img,
+button[aria-label*=".mkv" i] img,
+img[src^="data:video/"],
+img[src*="data:video/"] {
+  display: none !important;
+}
+button[aria-label*="video" i] > span.text-center,
+button[aria-label*="Video" i] > span.text-center {
+  display: none !important;
+}
+.agy-media-badge {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  box-sizing: border-box !important;
+  padding: 0 4px !important;
+  background: color-mix(in srgb, var(--primary, #007acc) 14%, rgba(0,0,0,0.28)) !important;
+  color: var(--primary, #38bdf8) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: .05em !important;
+  user-select: none !important;
+}
+[data-testid="input-attachment"] .agy-media-badge {
+  width: 100% !important;
+  height: 72px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
+  flex: 0 0 72px !important;
+  border-radius: 0 !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+button .agy-media-badge,
+.agy-media-badge--msg {
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  min-height: 64px !important;
+  max-width: 64px !important;
+  max-height: 64px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  pointer-events: none !important;
+}
+.agy-media-badge svg {
+  width: 24px !important;
+  height: 24px !important;
+  flex-shrink: 0 !important;
+}
+
