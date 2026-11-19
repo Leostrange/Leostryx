@@ -54,7 +54,7 @@ def run_curl(args):
 
 def main():
     if len(sys.argv) < 2:
-        version = "3.1.13"
+        version = "3.1.14"
     else:
         version = sys.argv[1].lstrip("v")
 
@@ -68,7 +68,7 @@ def main():
 
     print(f"Preparing GitHub release for {tag} ({repo})...")
     body = extract_changelog(version)
-    title = f"Leostryx {version} — просмотр файлов в чате, карточка только для APK, локализация меню проектов"
+    title = f"Leostryx {version} — авто-сжатие контекста длинных диалогов, экономия токенов"
 
     # Check if release exists
     check_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
@@ -80,6 +80,9 @@ def main():
         upload_url = data["upload_url"].split("{")[0]
         html_url = data.get("html_url", "")
         print(f"Release {tag} already exists (id={release_id}): {html_url}")
+        update_url = f"https://api.github.com/repos/{repo}/releases/{release_id}"
+        payload = json.dumps({"name": title, "body": body})
+        run_curl(headers + ["-X", "PATCH", "-d", payload, update_url])
     else:
         # Create release
         create_url = f"https://api.github.com/repos/{repo}/releases"
@@ -117,8 +120,13 @@ def main():
 
         name = file_path.name
         if name in existing_assets:
-            print(f"Asset {name} already uploaded (asset_id={existing_assets[name]}), skipping.")
-            continue
+            if "--replace" in sys.argv:
+                print(f"Deleting existing asset {name} (id={existing_assets[name]})...")
+                del_url = f"https://api.github.com/repos/{repo}/releases/assets/{existing_assets[name]}"
+                run_curl(headers + ["-X", "DELETE", del_url])
+            else:
+                print(f"Asset {name} already uploaded (asset_id={existing_assets[name]}), skipping.")
+                continue
 
         size_mb = file_path.stat().st_size / (1024 * 1024)
         print(f"Uploading {name} ({size_mb:.1f} MB)...")

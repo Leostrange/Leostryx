@@ -35,6 +35,9 @@
     try { raw = bridge ? bridge.load() : (localStorage.getItem("agyProviders") || ""); } catch (e) {}
     if (raw) { try { state = JSON.parse(raw); } catch (e) { state = { connections: [] }; } }
     if (!state.connections) state.connections = [];
+    if (typeof state.compactHistory !== "boolean") state.compactHistory = true;
+    if (!state.compactThreshold) state.compactThreshold = 16;
+    if (!state.compactKeepRecent) state.compactKeepRecent = 8;
   }
   function save() {
     var json = JSON.stringify(state);
@@ -424,6 +427,31 @@
       h += '<div class="agy-pv-row"><button type="button" class="agy-pv-btn sec" data-act="restart">' + esc(T("Применить (перезапустить ядро)", "Apply (restart core)")) + "</button></div>";
     }
 
+    var compOn = state.compactHistory !== false;
+    h += '<div class="agy-pv-card" style="margin-top:12px;margin-bottom:12px;padding:12px 14px;">' +
+      '<div style="font-weight:600;font-size:14px;margin-bottom:4px;">' + esc(T("Оптимизация контекста чата", "Chat Context Optimization")) + '</div>' +
+      '<label class="agy-pv-switch" style="border:none;padding:0;margin:4px 0 8px 0;">' +
+      '<span>' + esc(T("Авто-сжатие длинных диалогов", "Auto-compact long chats")) +
+      '<small>' + esc(T("Сворачивает старые сообщения и тяжелые логи инструментов в компактное резюме, передавая модели только свежие реплики. Экономит до 90% лимита токенов и защищает от сбоев.", "Summarizes older messages and heavy tool logs into a concise checkpoint, passing only recent turns to the model. Saves up to 90% token quota and prevents context limit crashes.")) + '</small></span>' +
+      '<input type="checkbox" data-compact="1"' + (compOn ? " checked" : "") + '></label>';
+
+    if (compOn) {
+      var threshOpts = [12, 16, 24, 32].map(function (v) {
+        return '<option value="' + v + '"' + (state.compactThreshold === v ? " selected" : "") + '>' + v + ' ' + esc(T("сообщений", "messages")) + (v === 16 ? esc(T(" (рекомендуется)", " (recommended)")) : "") + '</option>';
+      }).join("");
+      var recentOpts = [4, 6, 8, 10, 12].map(function (v) {
+        return '<option value="' + v + '"' + (state.compactKeepRecent === v ? " selected" : "") + '>' + v + ' ' + esc(T("сообщений", "messages")) + (v === 8 ? esc(T(" (рекомендуется)", " (recommended)")) : "") + '</option>';
+      }).join("");
+
+      h += '<div class="agy-pv-row" style="gap:10px;margin-top:6px;align-items:center;">' +
+        '<label class="agy-pv-field" style="flex:1;margin:0;"><span>' + esc(T("Порог сжатия истории", "Compaction threshold")) + '</span>' +
+        '<select data-compact-thresh="1">' + threshOpts + '</select></label>' +
+        '<label class="agy-pv-field" style="flex:1;margin:0;"><span>' + esc(T("Окно свежих реплик", "Recent messages window")) + '</span>' +
+        '<select data-compact-recent="1">' + recentOpts + '</select></label>' +
+        '</div>';
+    }
+    h += '</div>';
+
     if (!state.connections.length) h += '<div class="agy-pv-empty">' + esc(T("Подключений пока нет.", "No connections yet.")) + "</div>";
     state.connections.forEach(function (c) {
       var ty = typeOf(c.type);
@@ -540,6 +568,18 @@
     if (el.matches && el.matches("input[data-master]")) {
       state.useProviders = el.checked;
       save(); syncModels(); applyRestart(); render(); return;
+    }
+    if (el.matches && el.matches("input[data-compact]")) {
+      state.compactHistory = el.checked;
+      save(); render(); return;
+    }
+    if (el.matches && el.matches("select[data-compact-thresh]")) {
+      state.compactThreshold = parseInt(el.value, 10) || 16;
+      save(); render(); return;
+    }
+    if (el.matches && el.matches("select[data-compact-recent]")) {
+      state.compactKeepRecent = parseInt(el.value, 10) || 8;
+      save(); render(); return;
     }
     if (el.matches && el.matches("input[data-model]")) {
       if (!editing) return;

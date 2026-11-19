@@ -1,20 +1,20 @@
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.13-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.14-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-8.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
 </p>
 
-<p align="center"><b>Leostryx для Android — русская сборка среды разработки с ИИ-агентом Antigravity (v3.1.13).</b><br/>
-Полная русификация, поддержка любых ИИ-провайдеров (OpenAI, Claude, DeepSeek, Gemini), щит безопасности агента, каталог субагентов, интерактивные уведомления в шторке с прямым ответом, встроенный видеоплеер, оптимизация памяти, кастомизация маскотов (Волк, Медведь, Рысь, Сова) и Flutter SDK.</p>
+<p align="center"><b>Leostryx для Android — русская сборка среды разработки с ИИ-агентом Antigravity (v3.1.14).</b><br/>
+Полная русификация, поддержка любых ИИ-провайдеров (OpenAI, Claude, DeepSeek, Gemini), авто-сжатие контекста длинных диалогов, щит безопасности агента, каталог субагентов, интерактивные уведомления в шторке с прямым ответом, встроенный видеоплеер, оптимизация памяти, кастомизация маскотов (Волк, Медведь, Рысь, Сова) и Flutter SDK.</p>
 
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> · Сборка <a href="https://github.com/Leostrange">@Leostrange</a></sub></p>
 
 <p align="center">
-  <a href="#-скачать-сборки-v3113"><b>📥 Скачать APK</b></a> &nbsp;·&nbsp;
+  <a href="#-скачать-сборки-v3114"><b>📥 Скачать APK</b></a> &nbsp;·&nbsp;
   <a href="#-интерфейс-и-скриншоты">📱 Скриншоты</a> &nbsp;·&nbsp;
   <a href="#-ключевые-возможности">✨ Возможности</a> &nbsp;·&nbsp;
   <a href="#-установка">⚙️ Установка</a> &nbsp;·&nbsp;
@@ -24,7 +24,7 @@
 </p>
 
 > [!NOTE]
-> **3.1.13 — актуальный стабильный релиз.** Готовые подписанные APK `Leostryx-3.1.13-standard.apk` и `Leostryx-3.1.13-bypass.apk` собраны и проверены, контрольные суммы зафиксированы в [`SHA256SUMS-3.1.13.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.13/SHA256SUMS-3.1.13.txt).
+> **3.1.14 — актуальный стабильный релиз.** Готовые подписанные APK `Leostryx-3.1.14-standard.apk` и `Leostryx-3.1.14-bypass.apk` собраны и проверены, контрольные суммы зафиксированы в [`SHA256SUMS-3.1.14.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.14/SHA256SUMS-3.1.14.txt).
 
 ---
 
@@ -86,12 +86,12 @@
 
 ---
 
-## 📥 Скачать сборки (v3.1.13)
+## 📥 Скачать сборки (v3.1.14)
 
 | Вариант | Назначение | Пакет | SHA-256 контрольная сумма |
 |---|---|---|---|
-| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `176e5c5ac37a8461661811a95a5337d3129a21bb9b3f18351677840b148aef5a` |
-| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `9363cf980aaf88adb07b54512cbf4776e5977e72af6060eb0ffb1e597a5d6193` |
+| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.14-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `3aaf9bf2b969f8f672fad8b3f2403931b4901bca2bed3264c2fc1b7821eb3e21` |
+| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.14-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `d6a0e051f2ef1e356b8bb6da9563a4acd74d0630299eef4d2eb04f809571f0d4` |
 
 > [!TIP]
 > **Чем отличается Bypass?**
@@ -104,10 +104,10 @@
 > [!WARNING]
 > **Обновление поверх старых версий:** Сборки ветки 3.x (`com.agyru.t2`) обновляются поверх предыдущих версий 3.x штатно без потери данных. Если у вас была установлена устаревшая сборка 2.x, потребуется чистая переустановка из-за несовместимости ключей подписи.
 
-1. Скачайте нужный APK из [релиза v3.1.13](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13).
+1. Скачайте нужный APK из [релиза v3.1.14](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14).
 2. Сверьте контрольную сумму через SHA-256:
    ```bash
-   sha256sum Leostryx-3.1.13-*.apk
+   sha256sum Leostryx-3.1.14-*.apk
    ```
 3. Установите APK на устройство и запустите приложение.
 

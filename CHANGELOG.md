@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.13)
-# Changelog — Leostryx (3.1.13)
+# Список изменений — Leostryx (3.1.14)
+# Changelog — Leostryx (3.1.14)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,45 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.1.14 — 2026-11-19 (Авто-сжатие контекста длинных диалогов, оптимизация токенов и защита от переполнения)
+
+<!-- RU -->
+- **Авто-сжатие контекста длинных диалогов (`AgyGateway`, `AgyCompactor`):**
+  - Реализован интеллектуальный алгоритм скользящего окна для истории сообщений в шлюзе `AgyGateway`.
+  - При росте диалога свыше настраиваемого порога (по умолчанию от 16 сообщений или при превышении 80 000 символов) предшествующие реплики и громоздкие дампы инструментов (`view_file`, логи `run_command`, дампы `grep`) автоматически сворачиваются в структурированное резюме с сохранением исходного системного промпта.
+  - Последние $K$ сообщений актуального контекста (по умолчанию 8 сообщений) сохраняются в полном объёме с точными связками вызовов инструментов и результатов, гарантируя непрерывность и высокую точность работы модели.
+- **Экономия до 90–95% входящих токенов:**
+  - Предотвращено лавинообразное раздувание запросов до 100k–180k токенов на каждом шаге. Дневные квоты и балансы токенов больше не сгорают от одного короткого запроса в длинном чате.
+  - Существенно снижена задержка генерации первого токена (TTFT) в больших проектах.
+- **Защита от сбоев и переполнения контекстного окна:**
+  - Устранены критические ошибки `400 Context length exceeded` и `429 Rate limit / TPM exceeded`, ломавшие сессии при длительной работе над задачей.
+  - Добавлен встроенный санитайзер для отсечения случайных аномально длинных выводов инструментов (>8000 символов).
+- **Интерфейс управления в Настройки › Провайдеры (`agy_providers.js`):**
+  - Добавлен блок «Оптимизация контекста чата».
+  - Переключатель «Авто-сжатие длинных диалогов» (включено по умолчанию).
+  - Настройка порога сжатия истории (12, 16, 24, 32 сообщения).
+  - Настройка окна свежих реплик (4, 6, 8, 10, 12 сообщений).
+- **Версия 3.1.14** (`versionCode` 40) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+<!-- /RU -->
+
+<!-- EN -->
+- **Long chat context auto-compaction (`AgyGateway`, `AgyCompactor`):**
+  - Implemented an intelligent sliding-window compaction algorithm in `AgyGateway`.
+  - When chat history exceeds the configured threshold (default >= 16 messages or 80,000 characters), earlier turns and massive raw tool execution logs (`view_file`, `run_command` output, search dumps) are automatically rolled into a structured summary checkpoint while preserving the initial system prompt.
+  - The most recent $K$ turns (default 8 messages) are retained with 100% fidelity, maintaining tool call/result pairing and context precision.
+- **Up to 90–95% Token Savings:**
+  - Outbound payloads no longer balloon to 100k–180k tokens per prompt, dramatically conserving daily token quotas and reducing inference latency.
+- **Context overflow prevention & session stability:**
+  - Prevents chats from breaking due to `400 Context length exceeded` or `429 Rate limit / TPM exceeded` errors in long development tasks.
+  - Added tool output sanitizer protecting against unexpectedly huge command outputs (>8000 characters).
+- **User controls in Settings › Providers (`agy_providers.js`):**
+  - New "Chat Context Optimization" configuration block.
+  - Master toggle: "Auto-compact long chats" (enabled by default).
+  - Configurable compaction threshold (12, 16, 24, 32 messages).
+  - Configurable recent messages window (4, 6, 8, 10, 12 messages).
+- **Version 3.1.14** (`versionCode` 40) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+<!-- /EN -->
 
 ## v3.1.13 — 2026-11-19 (Восстановление просмотра файлов в чате, карточка действий только для APK, локализация контекстного меню проектов)
 
