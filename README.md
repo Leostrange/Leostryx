@@ -90,8 +90,8 @@
 
 | Вариант | Назначение | Пакет | SHA-256 контрольная сумма |
 |---|---|---|---|
-| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `223a740e4f908aef14ed536fcd571db9970e9f1f85f7a59b2cefe90ef4fdb298` |
-| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `390d0e6150cd31416e58449afb75d3a43f9948af60bb8dc0ad2bb2c4a99cd860` |
+| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `176e5c5ac37a8461661811a95a5337d3129a21bb9b3f18351677840b148aef5a` |
+| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) | `9363cf980aaf88adb07b54512cbf4776e5977e72af6060eb0ffb1e597a5d6193` |
 
 > [!TIP]
 > **Чем отличается Bypass?**
@@ -195,8 +195,8 @@ unzip -p dist/signed/bypass.apk   assets/runtime/bin/liblanguage_server.so | sha
 - **Built-in Toolchains:** Flutter SDK with automatic Bionic patching (`agy-fix-flutter`), multi-version Gradle & AGP toolchains, and MCP/UTCP support.
 
 ### Download Releases (v3.1.13)
-- **Standard Edition:** [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `223a740e4f908aef14ed536fcd571db9970e9f1f85f7a59b2cefe90ef4fdb298`
-- **Bypass Edition:** [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `390d0e6150cd31416e58449afb75d3a43f9948af60bb8dc0ad2bb2c4a99cd860`
+- **Standard Edition:** [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `176e5c5ac37a8461661811a95a5337d3129a21bb9b3f18351677840b148aef5a`
+- **Bypass Edition:** [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `9363cf980aaf88adb07b54512cbf4776e5977e72af6060eb0ffb1e597a5d6193`
 
 Full changelog is available in [CHANGELOG.md](CHANGELOG.md).
 <!-- /EN -->

@@ -15,6 +15,10 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Устранена регрессия, из-за которой при клике на любые файлы, просматриваемые агентом (исходный код, скрипты, markdown, JSON, логи), перехватывался клик и вызывалось модальное окно открытия папки вместо встроенного просмотрщика файлов чата/IDE.
   - Всплывающее окно действий с кнопками «Открыть папку» и «Установить APK» теперь строго ограничено файлами пакетов Android (`.apk`).
   - Все остальные типы файлов (`.py`, `.ts`, `.js`, `.json`, `.md`, `.txt`, `.java`, `.xml` и др.) беспрепятственно открываются для просмотра во встроенном просмотрщике файлов Leostryx.
+- **Изоляция всплывающего окна действий и запрет открытия APK в артефактах (`agy_paths.js`, `main.js`):**
+  - Всплывающее окно карточки действий с APK теперь открывается строго при клике внутри сообщений чата (`conversation-view`). Любые клики по вкладкам, заголовкам панелей и крестикам закрытия `[X]` полностью исключены из перехвата.
+  - Устранена блокировка закрытия вкладок: пользователь может свободно закрывать вкладки крестиком `[X]` без вызова модального окна.
+  - В `generated/main.js` (`iY`) заблокировано создание вкладок артефактов и файлов (`fileView`/`artifactView`) для `.apk`-файлов, а при запуске добавлен авто-клинер случайно открытых вкладок APK.
 - **Полная русская локализация контекстного меню проектов и диалога удаления (`agy_i18n.js`):**
   - В контекстном меню проекта (кнопка трёх точек): «Copy Project Name» переведено как «Копировать название проекта», «Delete Project» — как «Удалить проект».
   - В контекстном меню рабочего пространства: «Copy Workspace Name» переведено как «Копировать название рабочего пространства», «Delete Workspace» — как «Удалить рабочее пространство».
@@ -30,6 +34,10 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Fixed a regression where clicking any file inspected by the agent in chat (source code, scripts, markdown, JSON, logs) erroneously triggered the folder opening modal instead of the built-in IDE/chat file viewer.
   - The path action sheet ("Open folder" and "Install APK") is now strictly limited to Android package files (`.apk`).
   - All other file types (`.py`, `.ts`, `.js`, `.json`, `.md`, `.txt`, `.java`, `.xml`, etc.) pass directly to the standard Leostryx file viewer and editor.
+- **Action sheet isolation and blocking APK opening in artifacts (`agy_paths.js`, `main.js`):**
+  - Path action sheets are strictly scoped to the chat messages area (`conversation-view`). Tabs, aux panes, headers, and close buttons (`[X]`) are completely excluded from interception.
+  - Fixed tab close obstruction: users can seamlessly click the `[X]` cross to close tabs without modal sheet interruptions.
+  - Blocked opening `.apk` files in aux tabs (`iY`), and added automatic cleanup for stuck APK tabs on launch.
 - **Full Russian localization for project context menu and delete confirmation (`agy_i18n.js`):**
   - Project kebab menu: "Copy Project Name" is translated to "Копировать название проекта", "Delete Project" to "Удалить проект".
   - Workspace kebab menu: "Copy Workspace Name" is translated to "Копировать название рабочего пространства", "Delete Workspace" to "Удалить рабочее пространство".

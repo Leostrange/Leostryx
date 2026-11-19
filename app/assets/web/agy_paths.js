@@ -144,10 +144,32 @@
     return p;
   }
 
+  function isAllowedChatTarget(target) {
+    if (!target) return false;
+    // 1. Исключаем саму всплывающую карточку
+    if (target.closest && target.closest(".agy-path-sheet")) return false;
+
+    // 2. Исключаем вкладки, кнопки закрытия вкладок, панель артефактов/файлов, навигацию и диалоги
+    var excluded = target.closest && target.closest(
+      '[role="tab"], [role="tablist"], [data-testid*="tab"], .tab, ' +
+      'button[aria-label*="close" i], button[aria-label*="Close" i], button[title*="close" i], button[title*="Close" i], ' +
+      '[data-aux-pane-open], [data-testid="aux-pane"], [class*="aux-pane"], [class*="auxPane"], [class*="artifact-view"], ' +
+      'header, nav, [role="dialog"], [role="menu"]'
+    );
+    if (excluded) return false;
+
+    // 3. Разрешаем строго внутри области сообщений чата
+    var inChat = target.closest && target.closest(
+      '[data-testid="conversation-view"], [data-turn-content], [data-testid="virtuoso-scroller"], ' +
+      '[data-testid="virtuoso-item-list"], [data-testid="conversation-turn"], .conversation-view, [class*="conversation-view"]'
+    );
+    return !!inChat;
+  }
+
   function extractFromElement(el) {
     if (!el) return "";
     var target = el.nodeType === 3 ? el.parentElement : el;
-    if (!target) return "";
+    if (!target || !isAllowedChatTarget(target)) return "";
 
     // Всплывающее окно предназначено ТОЛЬКО для APK-файлов (открытие папки с APK и установка APK).
     // Все остальные файлы (исходники, логи, тексты, markdown) должны открываться
@@ -231,6 +253,7 @@
   function pathAtPoint(x, y, target) {
     // Приоритет 1: проверка целевого элемента или элемента под координатами
     var el = target || (document.elementFromPoint ? document.elementFromPoint(x, y) : null);
+    if (!isAllowedChatTarget(el)) return "";
     var fromEl = extractFromElement(el);
     if (fromEl) return fromEl;
 
@@ -450,7 +473,7 @@
   function tryIntercept(e, source) {
     if (sheet) return false;
     var target = e.target;
-    if (target && target.closest && target.closest(".agy-path-sheet")) return false;
+    if (!isAllowedChatTarget(target)) return false;
 
     var x = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
     var y = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
@@ -495,6 +518,7 @@
     clearTimeout(pendingTap);
     pendingTap = setTimeout(function () {
       if (Date.now() - lastClickAt < 400) return;
+      if (!isAllowedChatTarget(target)) return;
       var path = pathAtPoint(x, y, target);
       if (path && isApk(path)) {
         try { console.info("[agy_paths] open APK " + path + " via pointerup fallback"); } catch (_) {}
@@ -502,6 +526,35 @@
       }
     }, 260);
   }, true);
+
+  // Автоматическое закрытие ошибочно открытых вкладок с APK в панели артефактов/редактора
+  function autoCloseApkTabs() {
+    try {
+      var tabs = document.querySelectorAll('[role="tab"], [data-testid*="tab"], .tab');
+      for (var i = 0; i < tabs.length; i++) {
+        var t = tabs[i];
+        var text = (t.textContent || "") + " " + (t.getAttribute("title") || "");
+        if (/\.apk\b/i.test(text)) {
+          var closeBtn = t.querySelector('button[aria-label*="close" i], button[aria-label*="Close" i], [data-testid*="close"]');
+          if (closeBtn) {
+            try { console.info("[agy_paths] auto-closing stuck APK tab: " + text); } catch (_) {}
+            closeBtn.click();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      setTimeout(autoCloseApkTabs, 300);
+      setTimeout(autoCloseApkTabs, 1200);
+    });
+  } else {
+    setTimeout(autoCloseApkTabs, 300);
+    setTimeout(autoCloseApkTabs, 1200);
+  }
+  setInterval(autoCloseApkTabs, 2000);
 
   try { console.info("[agy_paths] installed, hash=" + (location.hash || "")); } catch (e) {}
 
