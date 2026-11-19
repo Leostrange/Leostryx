@@ -298,11 +298,6 @@
     syncFromBridge();
   }
 
-  var CTX_SVG = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<circle cx="12" cy="12" r="9" stroke-dasharray="38 18" stroke-width="2"/>' +
-    '<circle cx="12" cy="12" r="3.5" fill="currentColor"/>' +
-    '</svg>';
-
   var ctxPop = null;
 
   function close() {
@@ -366,12 +361,99 @@
     return { enabled: enabled, threshold: threshold, keepRecent: keepRecent, count: msgs };
   }
 
+  /* Calculate context tokens spent in the active chat */
+  function getContextUsage(maxCtx) {
+    var exactTokens = 0;
+    var stepCount = 0;
+    try {
+      var store = window.__agySettings && window.__agySettings.store;
+      if (store && typeof store.getState === "function") {
+        var state = store.getState();
+        if (state && state.api && state.api.queries) {
+          for (var qk in state.api.queries) {
+            var q = state.api.queries[qk];
+            if (!q || !q.data) continue;
+            var traj = q.data.trajectory || q.data;
+            var steps = traj.steps || traj.stepsInSlice || (Array.isArray(traj) ? traj : null);
+            if (Array.isArray(steps) && steps.length > 0) {
+              stepCount = Math.max(stepCount, steps.length);
+              steps.forEach(function (s) {
+                if (!s) return;
+                var m = s.metadata;
+                if (m) {
+                  if (m.modelUsage && Number(m.modelUsage.totalTokens) > 0) {
+                    exactTokens = Math.max(exactTokens, Number(m.modelUsage.totalTokens));
+                  } else if (m.modelUsage && (Number(m.modelUsage.inputTokens) > 0 || Number(m.modelUsage.outputTokens) > 0)) {
+                    exactTokens = Math.max(exactTokens, (Number(m.modelUsage.inputTokens) || 0) + (Number(m.modelUsage.outputTokens) || 0));
+                  } else if (Number(m.toolCallOutputTokens) > 0) {
+                    exactTokens = Math.max(exactTokens, Number(m.toolCallOutputTokens));
+                  }
+                }
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    var domChars = 0;
+    var msgCount = 0;
+    try {
+      var convo = document.querySelector("[data-testid='conversation-view']") || document.querySelector(".conversation-view");
+      if (convo) {
+        var turns = convo.querySelectorAll("[data-testid='chat-message'], [class*='message-turn'], [data-testid='conversation-turn'], [data-turn-content]");
+        if (turns.length === 0) turns = convo.children;
+        msgCount = turns.length;
+        for (var i = 0; i < turns.length; i++) {
+          var t = turns[i].innerText || turns[i].textContent || "";
+          domChars += t.length;
+        }
+      }
+    } catch (e) {}
+
+    var estimatedTokens = Math.round(domChars / 3.5);
+    var used = exactTokens > 0 ? exactTokens : estimatedTokens;
+    var max = Number(maxCtx) > 0 ? Number(maxCtx) : 1048576;
+    var pct = max > 0 ? Math.min(100, Math.round((used / max) * 1000) / 10) : 0;
+
+    return {
+      used: used,
+      max: max,
+      percent: pct,
+      isExact: exactTokens > 0,
+      messages: Math.max(msgCount, stepCount)
+    };
+  }
+
+  function updateCircleBtn(ctxBtn) {
+    if (!ctxBtn) return;
+    var modelName = getActiveModel();
+    var prov = getModelProvider(modelName);
+    var catalogFn = window.AgyModelCatalog;
+    var info = catalogFn ? catalogFn(prov ? prov.baseUrl : "", modelName) : null;
+    var usage = getContextUsage(info ? info.ctx : 1048576);
+    var pct = usage.percent;
+    var color = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e";
+    var circ = 50.26; // 2 * PI * 8
+    var offset = Math.max(0, circ * (1 - Math.min(100, Math.max(2, pct)) / 100));
+    var labelText = pct >= 1 ? (pct >= 10 ? Math.round(pct) + "%" : pct.toFixed(1) + "%") : "";
+
+    var svg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="display:block;transform:rotate(-90deg);pointer-events:none;">' +
+      '<circle cx="12" cy="12" r="8" stroke="rgba(127,127,127,0.22)" stroke-width="2.4"/>' +
+      '<circle cx="12" cy="12" r="8" stroke="' + color + '" stroke-width="2.4" stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset.toFixed(2) + '" stroke-linecap="round"/>' +
+      (pct < 1 ? '<circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.6"/>' : '') +
+      '</svg>';
+
+    ctxBtn.innerHTML = svg + (labelText ? '<span class="agy-ctx-circle-pct" style="color:' + color + ';">' + labelText + '</span>' : '');
+    ctxBtn.setAttribute("title", T("Контекст: ", "Context: ") + Number(usage.used).toLocaleString() + " / " + Number(usage.max).toLocaleString() + " (" + pct + "% " + T("потрачено", "spent") + ")");
+  }
+
   function placeCtx() {
     if (!ctxPop) return;
     var box = document.querySelector(BOX); if (!box) return;
     var r = box.getBoundingClientRect();
     var vw = window.innerWidth || document.documentElement.clientWidth;
-    var w = Math.min(350, vw - 16);
+    var w = Math.min(360, vw - 16);
     var left = Math.max(8, Math.min(r.right - w - 8, vw - w - 8));
     ctxPop.style.setProperty("width", Math.round(w) + "px", "important");
     ctxPop.style.setProperty("max-width", Math.round(w) + "px", "important");
@@ -379,7 +461,7 @@
     ctxPop.style.setProperty("left", Math.round(left) + "px", "important");
     ctxPop.style.setProperty("right", "auto", "important");
     ctxPop.style.setProperty("bottom", Math.round(window.innerHeight - r.top + 6) + "px", "important");
-    ctxPop.style.setProperty("max-height", Math.max(200, Math.round(r.top - 64)) + "px", "important");
+    ctxPop.style.setProperty("max-height", Math.max(220, Math.round(r.top - 64)) + "px", "important");
   }
 
   function renderCtx() {
@@ -389,13 +471,16 @@
     var catalogFn = window.AgyModelCatalog;
     var info = catalogFn ? catalogFn(prov ? prov.baseUrl : "", modelName) : null;
     var cmp = getCompactorStats();
+    var maxCtx = (info && info.ctx > 0) ? info.ctx : 1048576;
+    var usage = getContextUsage(maxCtx);
 
     function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
     function value(x) { return x === null || x === undefined ? T("неизвестно", "unknown") : x ? T("да", "yes") : T("нет", "no"); }
-    var modes = info && Array.isArray(info.inputModes) ? info.inputModes : [];
+    var modes = info && Array.isArray(info.inputModes) ? info.inputModes : ["text", "image"];
     function mode(m) { return value(modes.length ? modes.indexOf(m) >= 0 : null); }
 
-    var ctxFormatted = (info && info.ctx > 0) ? Number(info.ctx).toLocaleString() + " " + T("токенов", "tokens") : T("128 000 токенов (базовый)", "128,000 tokens (default)");
+    var ctxFormatted = Number(maxCtx).toLocaleString() + " " + T("токенов", "tokens");
+    var maxOutputStr = (info && Number(info.maxOutput) > 0) ? Number(info.maxOutput).toLocaleString() + " " + T("токенов", "tokens") : T("8 192 токенов", "8,192 tokens");
     var srcMap = {
       "xiaomi-docs": T("официальная документация Xiaomi", "official Xiaomi documentation"),
       "anthropic-spec": T("спецификация Anthropic Claude", "Anthropic Claude specification"),
@@ -413,10 +498,11 @@
       "auto-detected": T("каталог характеристик моделей", "model capability catalog")
     };
     var src = (info && srcMap[info.source]) || (info && info.source) || T("каталог характеристик моделей", "model capability catalog");
+    var color = usage.percent > 80 ? "#ef4444" : usage.percent > 50 ? "#f59e0b" : "#22c55e";
 
     var h = '<div class="agy-ctx-head">' +
       '<div class="agy-ctx-title-wrap">' +
-        '<span class="agy-ctx-dot">●</span>' +
+        '<span class="agy-ctx-dot" style="color:' + color + ';">●</span>' +
         '<span class="agy-ctx-title" title="' + esc(modelName) + '">' + esc(modelName) + '</span>' +
       '</div>' +
       '<button type="button" class="agy-ctx-close" data-act="close" title="' + esc(T("Закрыть", "Close")) + '">✕</button>' +
@@ -425,11 +511,25 @@
       '<span class="agy-ctx-tag">' + esc(prov ? prov.name : T("Модель", "Model")) + '</span>' +
       '<span class="agy-ctx-tag green">' + esc(ctxFormatted) + '</span>' +
     '</div>' +
+    '<div class="agy-ctx-usage-card">' +
+      '<div class="agy-ctx-usage-head">' +
+        '<span class="agy-ctx-usage-title">' + esc(T("Расход контекста диалога", "Conversation context usage")) + '</span>' +
+        '<span class="agy-ctx-usage-val" style="color:' + color + ';">' + esc(Number(usage.used).toLocaleString() + " / " + Number(usage.max).toLocaleString() + " (" + usage.percent + "%)") + '</span>' +
+      '</div>' +
+      '<div class="agy-ctx-prog-track">' +
+        '<div class="agy-ctx-prog-fill" style="width:' + Math.min(100, Math.max(1, usage.percent)) + '%; background-color:' + color + ';"></div>' +
+      '</div>' +
+      '<div class="agy-ctx-usage-sub">' +
+        '<span>' + esc(T("Свободно: ", "Free: ") + Number(Math.max(0, usage.max - usage.used)).toLocaleString() + " " + T("токенов", "tokens")) + '</span>' +
+        (usage.messages > 0 ? '<span>' + esc(usage.messages + " " + T("реплик", "turns")) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
     '<div class="agy-ctx-rows">' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Контекст:", "Context:")) + '</span><span class="agy-ctx-val">' + esc(ctxFormatted) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Вложения:", "Attachments:")) + '</span><span class="agy-ctx-val">' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Контекстное окно:", "Context window:")) + '</span><span class="agy-ctx-val">' + esc(ctxFormatted) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Макс. вывод:", "Max output:")) + '</span><span class="agy-ctx-val">' + esc(maxOutputStr) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Входные модальности:", "Input modalities:")) + '</span><span class="agy-ctx-val">' +
         esc(T("Картинки ", "Images ") + mode("image") + ' · ' + T("Аудио ", "Audio ") + mode("audio") + ' · ' + T("Видео ", "Video ") + mode("video")) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Функции:", "Capabilities:")) + '</span><span class="agy-ctx-val">' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Возможности:", "Capabilities:")) + '</span><span class="agy-ctx-val">' +
         esc("Reasoning " + value(info ? info.reasoning : null) + ' · ' + T("Инструменты ", "Tools ") + value(info ? info.tools : true)) + '</span></div>' +
       '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Источник:", "Source:")) + '</span><span class="agy-ctx-val">' + esc(src) + '</span></div>' +
       (info && info.effort ? '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Мышление:", "Effort:")) + '</span><span class="agy-ctx-val">' + esc(info.effort + (Array.isArray(info.efforts) && info.efforts.length ? ' (' + info.efforts.join(", ") + ')' : '')) + '</span></div>' : '') +
@@ -498,7 +598,7 @@
       ae.getAttribute("contenteditable") === "true");
   }
 
-  /* Buttons: toolbar group next to mic: [shield] [context circle] */
+  /* Buttons: toolbar group next to mic: [context circle] [shield] */
   function ensureButton() {
     var plus = document.querySelector(BOX + " button[aria-label='Add context'], " + BOX + " button[aria-label='Добавить контекст']");
     var footer = plus && plus.closest("[class*='input-footer']");
@@ -528,13 +628,15 @@
       ctxBtn.type = "button";
       ctxBtn.className = "agy-ctx-circle-btn";
       ctxBtn.setAttribute("aria-label", T("Контекст и данные модели", "Model context & capabilities"));
-      ctxBtn.setAttribute("title", T("Контекст и данные модели", "Model context & capabilities"));
       ctxBtn.setAttribute("aria-expanded", "false");
-      ctxBtn.innerHTML = CTX_SVG;
       ctxBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); });
       ctxBtn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); toggleContext(ctxBtn); });
-      group.insertBefore(ctxBtn, shieldBtn.nextSibling);
+      // Insert to the LEFT of the shield button
+      group.insertBefore(ctxBtn, shieldBtn);
+    } else if (shieldBtn && ctxBtn.nextSibling !== shieldBtn) {
+      group.insertBefore(ctxBtn, shieldBtn);
     }
+    updateCircleBtn(ctxBtn);
   }
   var raf = 0;
   function schedule() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; ensureButton(); if (pop) place(); if (ctxPop) placeCtx(); }); }

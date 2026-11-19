@@ -808,12 +808,24 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
 /* Context Circle Button & Popup (agy_shield.js) */
 .agy-ctx-circle-btn {
   display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
   width: 28px; height: 28px; padding: 0; border: 0; border-radius: 9999px;
   background: transparent; color: var(--secondary-foreground, currentColor); cursor: pointer; flex-shrink: 0;
   transition: background .15s, transform .15s;
 }
 .agy-ctx-circle-btn:hover { background: rgba(127,127,127,.14); }
 .agy-ctx-circle-btn[aria-expanded="true"] { background: rgba(127,127,127,.22); }
+.agy-ctx-circle-pct {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 7.5px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1;
+  pointer-events: none;
+  letter-spacing: -0.5px;
+}
 
 #agy-ctx-popup {
   position: fixed; z-index: 6100; overflow-y: auto; overscroll-behavior: contain;
@@ -829,15 +841,26 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
   display: flex; flex-direction: column; gap: 10px; width: 100%;
 }
 .agy-ctx-head {
-  display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 6px;
   border-bottom: 1px solid color-mix(in srgb, var(--foreground, #888) 12%, transparent);
 }
-.agy-ctx-title {
-  font-size: 14px; font-weight: 600; color: var(--foreground);
-  word-break: break-all;
+.agy-ctx-title-wrap {
+  display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto;
 }
+.agy-ctx-dot {
+  font-size: 10px; flex-shrink: 0;
+}
+.agy-ctx-title {
+  font-size: 13.5px; font-weight: 600; color: var(--foreground);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.agy-ctx-close {
+  all: unset; cursor: pointer; color: var(--muted-foreground, #888);
+  font-size: 12px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.agy-ctx-close:hover { color: var(--foreground); background: color-mix(in srgb, var(--foreground, #888) 12%, transparent); }
 .agy-ctx-tags {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px;
 }
 .agy-ctx-tag {
   display: inline-flex; align-items: center;
@@ -850,8 +873,56 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
   color: #22c55e;
   font-weight: 600;
 }
+
+/* Context usage card in popup */
+.agy-ctx-usage-card {
+  background: color-mix(in srgb, var(--foreground, #888) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground, #888) 12%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+.agy-ctx-usage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.agy-ctx-usage-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.agy-ctx-usage-val {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.agy-ctx-prog-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground, #888) 14%, transparent);
+  overflow: hidden;
+  position: relative;
+}
+.agy-ctx-prog-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width .3s ease, background-color .3s ease;
+}
+.agy-ctx-usage-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  color: var(--muted-foreground, #888);
+}
+
 .agy-ctx-rows {
-  display: flex; flex-direction: column; gap: 5px; font-size: 12px;
+  display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; margin-top: 8px;
 }
 .agy-ctx-row {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
@@ -863,29 +934,82 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
   color: var(--foreground); text-align: right; word-break: break-word; font-weight: 500;
 }
 .agy-ctx-compactor-box {
-  background: color-mix(in srgb, var(--foreground, #888) 6%, transparent);
+  background: color-mix(in srgb, var(--foreground, #888) 5%, transparent);
   border: 1px dashed color-mix(in srgb, var(--foreground, #888) 15%, transparent);
   border-radius: 8px; padding: 7px 9px;
-  display: flex; flex-direction: column; gap: 3px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 11px;
+  margin-top: 8px;
 }
-.agy-ctx-comp-title {
-  font-size: 11.5px; font-weight: 600; color: var(--foreground);
-}
-.agy-ctx-comp-desc {
-  font-size: 11px; color: var(--muted-foreground, #888); line-height: 1.35;
-}
-.agy-ctx-foot {
-  display: flex; justify-content: flex-end; padding-top: 4px;
+.agy-ctx-c-title {
+  display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600;
 }
 .agy-ctx-btn {
-  all: unset; box-sizing: border-box; cursor: pointer;
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
   font-size: 11.5px; font-weight: 500; color: var(--primary, #3b82f6);
-  padding: 4px 8px; border-radius: 6px;
+  padding: 6px 8px; border-radius: 6px; text-align: center; margin-top: 8px;
+  background: color-mix(in srgb, var(--primary, #3b82f6) 8%, transparent);
   transition: background .15s;
 }
 .agy-ctx-btn:hover {
-  background: color-mix(in srgb, var(--primary, #3b82f6) 12%, transparent);
+  background: color-mix(in srgb, var(--primary, #3b82f6) 16%, transparent);
 }
+
+/* Compact model cards & specs in Providers (agy_providers.js) */
+.agy-pv-model-card {
+  display: flex; flex-direction: column; gap: 5px; padding: 7px 9px; border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground, #888) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground, #888) 10%, transparent);
+  margin-bottom: 4px;
+}
+.agy-pv-model-card:hover {
+  background: color-mix(in srgb, var(--foreground, #888) 6%, transparent);
+}
+.agy-pv-model-right {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.agy-pv-btn-del {
+  all: unset; cursor: pointer; color: var(--muted-foreground, #888);
+  padding: 2px 6px; border-radius: 4px; font-size: 11px;
+}
+.agy-pv-btn-del:hover {
+  color: #ef4444; background: rgba(239, 68, 68, 0.15);
+}
+.agy-pv-caps-wrap {
+  display: flex; flex-direction: column; gap: 6px; padding-top: 5px;
+  border-top: 1px dashed color-mix(in srgb, var(--foreground, #888) 12%, transparent);
+}
+.agy-pv-eff-row {
+  display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+}
+.agy-pv-eff-lbl {
+  color: var(--muted-foreground, #888); white-space: nowrap; flex-shrink: 0; font-size: 11px;
+}
+.agy-pv-eff-sel {
+  font: inherit; font-size: 11.5px; padding: 3px 6px; border-radius: 6px;
+  background: color-mix(in srgb, var(--foreground, #888) 8%, transparent);
+  color: var(--foreground); border: 1px solid var(--border, rgba(127,127,127,.3));
+  flex-shrink: 0; outline: none;
+}
+.agy-pv-eff-inp {
+  font: inherit; font-size: 11.5px; padding: 3px 7px; border-radius: 6px;
+  background: color-mix(in srgb, var(--foreground, #888) 8%, transparent);
+  color: var(--foreground); border: 1px solid var(--border, rgba(127,127,127,.3));
+  flex: 1 1 auto; min-width: 0; outline: none;
+}
+.agy-pv-info-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;
+}
+.agy-pv-info-grid {
+  display: grid; grid-template-columns: 1fr; gap: 4px; font-size: 12px;
+}
+.agy-pv-info-item {
+  color: var(--foreground); line-height: 1.35;
+}
+.agy-pv-info-item .agy-pv-lbl {
+  color: var(--muted-foreground, #888); margin-right: 4px; font-size: 11.5px;
+}
+
 
 
 /* Settings › Tools (agy_tools.js) */

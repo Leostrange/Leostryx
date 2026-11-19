@@ -23,25 +23,24 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
     - **Zhipu GLM, Meta Llama, Mistral, xAI Grok, MiniMax, Xiaomi MiMo** и эвристическое распознавание суффиксов (`-128k`, `-256k`, `-1m`, `-vl`, `-thinking`, `-reasoner`).
   - Интеллектуальный парсер моделей (`parseModels`) для OpenAI-совместимых провайдеров: извлечение `context_length`, `architecture.input_modalities`, `supported_parameters`, `capabilities`.
   - Бесшовное обогащение существующих моделей (`effectiveInfo`) без затирания ручных настроек пользователя.
-  - Отображение длины контекста в карточках моделей и бейджах формы добавления (`200k`, `256k`, `1000k` и т.д.).
-- **Круг контекста в панели ввода чата (`agy_shield.js`, `agy_ru.css`):**
-  - Добавлена кнопка-индикатор контекста (`.agy-ctx-circle-btn`) с круговой векторной иконкой контекстного окна, расположенная рядом с щитом безопасности.
-  - По нажатию на круг открывается всплывающая карточка в стиле матового стекла (Frosted Glass) с актуальными данными:
-    - Активная модель и имя провайдера.
-    - Точный размер контекстного окна в форматированном виде (например, `200 000 токенов`, `1 048 576 токенов`).
-    - Поддерживаемые входные модальности (текст, изображения, аудио, видео).
-    - Возможности модели (рассуждения / reasoning, вызов инструментов / tools).
-    - Источник спецификации и доступные уровни усилий рассуждения.
-    - Текущий статус модуля автосжатия контекста Leostryx (порог срабатывания, скользящее окно, количество сообщений в чате).
-    - Быстрый переход в настройки провайдеров и моделей в 1 клик.
+  - Отображение полной спецификации в «Добавленные модели»: входные модальности, максимальный вывод, возможности, рассуждения, источник и ручные оверрайды.
+- **Устранение прыжков скролла и компактный список моделей (`agy_providers.js`, `agy_ru.css`):**
+  - Полностью устранён сброс скролла наверх при клике на параметры модели (чипы `[✓ картинки]`, `[✓ reasoning]`, селектор усилий рассуждений, выбор чекбокса модели).
+  - Интерактивные изменения применяются прямо в DOM без деструктивной перерисовки контейнера, а для глобальных действий добавлено сохранение и плавное восстановление позиции прокрутки (`saveScroll`, `restoreScroll`).
+  - Компактный дизайн карточек моделей (`.agy-pv-model-card`, `.agy-pv-eff-row`): уменьшена высота строк, элементы управления рассуждениями и модальностями объединены в компактные строки без загромождения экрана.
+- **Круг контекста слева от щита и трекер расхода токенов (`agy_shield.js`, `agy_ru.css`):**
+  - Кнопка-индикатор контекста (`.agy-ctx-circle-btn`) расположена строго **слева от щита безопасности** в панели ввода диалога.
+  - Динамический круговой индикатор (SVG progress ring) и процентный бейдж расхода контекста прямо на кнопке (зелёный/жёлтый/красный акцент в зависимости от заполненности).
+  - Подсчёт фактического расхода контекста (`getContextUsage`): сбор точных данных об использованных токенах из Redux store модели (`modelUsage.totalTokens`) с умной эвристической оценкой при отсутствии прямых метаданных.
+  - Всплывающее окно контекста отображает детальную карточку расхода: потрачено токенов, процент окна, прогресс-бар, свободный запас, число реплик и полные параметры активной модели.
 - **Исправление неработающей кнопки отправки в Standard-версии (`generated/main.js`):**
   - Устранена критическая проблема в `DYb`, из-за которой кнопка отправки сообщения (`data-testid="send-button"`) и клавиша Enter на клавиатуре оказывались заблокированными (`disabled: true`, `cursor-not-allowed`) в стандартной версии APK без авторизации в Google или при отсутствии квоты Language Server (`hasQuotaOrCredits === false`, `isSignedIn === false`, `cascadeModelConfigData === undefined`).
   - Условие разблокировки кнопки отправки и обработчика Enter приведено к безотказной логике: кнопка активна всегда при наличии введённого текста сообщения (`!r && !k && b;`), обеспечивая стабильную работу сторонних провайдеров в Standard-версии без региональных привязок.
 - **Версия 3.1.15** (`versionCode` 41) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Контрольные суммы сборки (SHA-256):**
-  - `Leostryx-3.1.15-standard.apk`: `1933fe859fadaeb66b1cd5acdf0a08b891df531516b2a4d6b878f4c4750f9222`
-  - `Leostryx-3.1.15-bypass.apk`: `8e9eda9046d38c5496b60213cda5d7368a1b2b56aca65f0d7b7788ff4de71d15`
-  - `Leostryx-repo.zip`: `c7738be4ffffc18a19323fb95d263d940fff538c12583ff3d0f959c557819bac`
+  - `Leostryx-3.1.15-standard.apk`: `792309b9e459e37bf541295fd90f44434fd5d42642ae1ee5414c2fab51713153`
+  - `Leostryx-3.1.15-bypass.apk`: `8976b37e17b84e5ad06a1cdfdc86a571019b4ac984a48b0f052ff0809262c353`
+  - `Leostryx-repo.zip`: `e03e70869feb1dba7f6cc33156bfdb94c86beee5b96c22db219329cb7b8e50ae`
 <!-- /RU -->
 
 <!-- EN -->
@@ -57,25 +56,24 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
     - **Zhipu GLM, Meta Llama, Mistral, xAI Grok, MiniMax, Xiaomi MiMo** and heuristic detection for context/capability suffixes (`-128k`, `-256k`, `-1m`, `-vl`, `-thinking`, `-reasoner`).
   - Enhanced model parser (`parseModels`) for OpenAI-compatible providers: extracts `context_length`, `architecture.input_modalities`, `supported_parameters`, `capabilities`.
   - Non-destructive dynamic enrichment of active models (`effectiveInfo`) preserving user chip overrides.
-  - Context size badges displayed on model cards and add-model forms (`200k`, `256k`, `1000k`, etc.).
-- **Context Circle button in chat input toolbar (`agy_shield.js`, `agy_ru.css`):**
-  - Added a dedicated circular context indicator button (`.agy-ctx-circle-btn`) next to the security shield in the input footer.
-  - Tapping the circle opens a Frosted Glass popup displaying live model and context diagnostics:
-    - Active model name and provider source.
-    - Formatted context window length (e.g., `200 000 tokens`, `1 048 576 tokens`).
-    - Input modalities (text, images, audio, video).
-    - Capabilities (reasoning, tools).
-    - Data specification source and reasoning effort settings.
-    - Active Leostryx auto-compaction diagnostics (threshold, sliding window, live turn count).
-    - Direct 1-tap link to Providers & Models settings.
+  - Comprehensive specification breakdown in "Added models": input modalities, max output, capabilities, reasoning effort, specification source, and live overrides.
+- **Eliminated scroll jumping & compact model list (`agy_providers.js`, `agy_ru.css`):**
+  - Fully fixed scroll resets throwing user to top when toggling model capabilities (`[✓ images]`, `[✓ reasoning]`), changing effort levels, or checking model checkboxes.
+  - In-place DOM updates without destructive container re-rendering, plus persistent scroll preservation and restoration (`saveScroll`, `restoreScroll`).
+  - Compact model cards (`.agy-pv-model-card`, `.agy-pv-eff-row`): reduced row heights, unified reasoning and capability rows, eliminating screen clutter.
+- **Context Circle button to the left of the shield & token usage tracking (`agy_shield.js`, `agy_ru.css`):**
+  - Dedicated circular context indicator button (`.agy-ctx-circle-btn`) positioned strictly to the **LEFT of the security shield** in the chat input footer.
+  - Dynamic SVG circular progress ring and percentage badge directly on the button (green/amber/red based on capacity).
+  - Exact token usage extraction (`getContextUsage`): captures actual consumed tokens from Redux store (`modelUsage.totalTokens`) with intelligent heuristic fallback.
+  - Rich diagnostics card showing spent tokens, context percentage, progress bar, free tokens remaining, message turns, and active model specifications.
 - **Fixed permanently disabled Send button in Standard variant (`generated/main.js`):**
   - Resolved a critical lockup in `DYb` where `data-testid="send-button"` and keyboard Enter were locked (`disabled: true`, `cursor-not-allowed`) in the standard APK when unauthenticated or lacking Google Language Server quota (`hasQuotaOrCredits === false`, `isSignedIn === false`, `cascadeModelConfigData === undefined`).
   - Switched send button enablement to dependable logic: sends whenever user input is non-empty (`!r && !k && b;`), enabling custom third-party providers in the standard build without regional or account dependencies.
 - **Version 3.1.15** (`versionCode` 41) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Build checksums (SHA-256):**
-  - `Leostryx-3.1.15-standard.apk`: `1933fe859fadaeb66b1cd5acdf0a08b891df531516b2a4d6b878f4c4750f9222`
-  - `Leostryx-3.1.15-bypass.apk`: `8e9eda9046d38c5496b60213cda5d7368a1b2b56aca65f0d7b7788ff4de71d15`
-  - `Leostryx-repo.zip`: `c7738be4ffffc18a19323fb95d263d940fff538c12583ff3d0f959c557819bac`
+  - `Leostryx-3.1.15-standard.apk`: `792309b9e459e37bf541295fd90f44434fd5d42642ae1ee5414c2fab51713153`
+  - `Leostryx-3.1.15-bypass.apk`: `8976b37e17b84e5ad06a1cdfdc86a571019b4ac984a48b0f052ff0809262c353`
+  - `Leostryx-repo.zip`: `e03e70869feb1dba7f6cc33156bfdb94c86beee5b96c22db219329cb7b8e50ae`
 <!-- /EN -->
 
 ## v3.1.14 — 2026-11-19 (Авто-сжатие контекста длинных диалогов, оптимизация токенов и защита от переполнения)

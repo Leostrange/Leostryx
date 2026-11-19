@@ -236,6 +236,7 @@
     id = String(id || "").trim();
     if (!id) return null;
     var lid = id.toLowerCase();
+    var pureId = lid.indexOf("/") >= 0 ? lid.split("/").pop() : lid;
 
     // Extract explicit context size and modalities from model name if present
     var explicitCtx = 0;
@@ -249,10 +250,12 @@
     var hasVideo = lid.indexOf("video") >= 0;
     var hasThinking = /(?:^|[-_.])(thinking|reasoner|reasoning|thought|qwq|r1|zero)(?:[-_.]|$)/.test(lid);
 
+    function has(term) { return pureId.indexOf(term) >= 0 || lid.indexOf(term) >= 0; }
+
     var res = null;
 
     // 1. Xiaomi MiMo official endpoints or model IDs
-    if (lid.indexOf("mimo") >= 0) {
+    if (has("mimo")) {
       res = {
         ctx: 1048576, maxOutput: 131072,
         inputModes: ["text", "image", "audio", "video"],
@@ -261,27 +264,27 @@
         effort: "medium", efforts: ["low", "medium", "high"]
       };
     }
-    // 2. Anthropic Claude models (e.g. claude-sonnet-5-5, claude-3-5-sonnet, claude-3-7-sonnet, claude-3-opus, claude-3-haiku, claude-2.1)
-    else if (lid.indexOf("claude") >= 0) {
-      var is1m = lid.indexOf("1m") >= 0;
-      var ctx = is1m ? 1000000 : (lid.indexOf("claude-2.0") >= 0 || lid.indexOf("claude-instant") >= 0) ? 100000 : 200000;
-      var is37 = lid.indexOf("3-7") >= 0 || lid.indexOf("3.7") >= 0;
-      var hasThink = is37 || hasThinking || lid.indexOf("sonnet-5") >= 0;
+    // 2. Anthropic Claude models (claude-sonnet-5-5, claude-3-5-sonnet, claude-3-7-sonnet, claude-3-opus, claude-3-haiku, etc.)
+    else if (has("claude") || has("sonnet") || has("haiku") || has("opus")) {
+      var is1m = has("1m");
+      var ctx = is1m ? 1000000 : (has("claude-2.0") || has("instant")) ? 100000 : 200000;
+      var is37 = has("3-7") || has("3.7");
+      var hasThink = is37 || hasThinking || has("sonnet-5") || has("sonnet-4");
       res = {
-        ctx: ctx, maxOutput: (is37 || lid.indexOf("3-5") >= 0 || lid.indexOf("3.5") >= 0 || lid.indexOf("sonnet-5") >= 0) ? 8192 : 4096,
-        inputModes: (lid.indexOf("claude-2") >= 0 || lid.indexOf("instant") >= 0) ? ["text"] : ["text", "image"],
+        ctx: ctx, maxOutput: (is37 || has("3-5") || has("3.5") || has("sonnet-5") || has("sonnet-4")) ? 8192 : 4096,
+        inputModes: (has("claude-2") || has("instant")) ? ["text"] : ["text", "image"],
         reasoning: hasThink, tools: true,
         source: "anthropic-spec", verified: "2026",
         effort: hasThink ? "medium" : null,
         efforts: hasThink ? ["low", "medium", "high"] : null
       };
     }
-    // 3. Moonshot Kimi models (e.g. kimi-k3.1-pro, kimi-k2.5, moonshot-v1-128k)
-    else if (lid.indexOf("kimi") >= 0 || lid.indexOf("moonshot") >= 0) {
+    // 3. Moonshot Kimi models (kimi-k3.1-pro, kimi-k2.5, moonshot-v1-128k, etc.)
+    else if (has("kimi") || has("moonshot")) {
       var kctx = 256000;
-      if (lid.indexOf("128k") >= 0) kctx = 128000;
-      else if (lid.indexOf("32k") >= 0) kctx = 32768;
-      else if (lid.indexOf("8k") >= 0) kctx = 8192;
+      if (has("128k")) kctx = 128000;
+      else if (has("32k")) kctx = 32768;
+      else if (has("8k")) kctx = 8192;
       res = {
         ctx: kctx, maxOutput: 8192,
         inputModes: ["text", "image"],
@@ -290,9 +293,9 @@
         effort: "medium", efforts: ["low", "medium", "high"]
       };
     }
-    // 4. Google Gemini models (e.g. gemini-4-hydrogen, gemini-2.5-pro, gemini-2.0-flash, gemini-1.5-pro)
-    else if (lid.indexOf("gemini") >= 0) {
-      var is2m = lid.indexOf("2.5-pro") >= 0 || lid.indexOf("1.5-pro") >= 0 || lid.indexOf("hydrogen") >= 0;
+    // 4. Google Gemini models (gemini-4-hydrogen, gemini-2.5-pro, gemini-2.0-flash, gemini-1.5-pro, etc.)
+    else if (has("gemini") || has("hydrogen")) {
+      var is2m = has("2.5-pro") || has("1.5-pro") || has("hydrogen");
       res = {
         ctx: is2m ? 2097152 : 1048576, maxOutput: 65536,
         inputModes: ["text", "image", "audio", "video"],
@@ -301,15 +304,15 @@
         effort: "medium", efforts: ["low", "medium", "high"]
       };
     }
-    // 5. OpenAI models (e.g. gpt-4o, gpt-4o-mini, gpt-4.5, o1, o3-mini, o4)
-    else if (/^(gpt|o1|o3|o4|chatgpt)/.test(lid) || lid.indexOf("openai") >= 0) {
-      var isOseries = /^(o1|o3|o4)/.test(lid) || lid.indexOf("-o1") >= 0 || lid.indexOf("-o3") >= 0 || lid.indexOf("-o4") >= 0;
+    // 5. OpenAI models (gpt-4o, gpt-4o-mini, gpt-4.5, o1, o3-mini, o4, o5)
+    else if (has("openai") || has("gpt") || has("o1") || has("o3") || has("o4") || has("o5") || has("chatgpt")) {
+      var isOseries = has("o1") || has("o3") || has("o4") || has("o5");
       var octx = 128000;
       if (isOseries) octx = 200000;
-      else if (lid.indexOf("32k") >= 0) octx = 32768;
-      else if (lid.indexOf("16k") >= 0) octx = 16384;
-      else if (lid === "gpt-4") octx = 8192;
-      var omodes = isOseries ? ["text", "image"] : (lid.indexOf("4o") >= 0 ? ["text", "image", "audio"] : (lid.indexOf("vision") >= 0 || lid.indexOf("4-turbo") >= 0 || lid.indexOf("4.5") >= 0) ? ["text", "image"] : ["text"]);
+      else if (has("32k")) octx = 32768;
+      else if (has("16k")) octx = 16384;
+      else if (pureId === "gpt-4") octx = 8192;
+      var omodes = isOseries ? ["text", "image"] : (has("4o") ? ["text", "image", "audio"] : (has("vision") || has("4-turbo") || has("4.5")) ? ["text", "image"] : ["text"]);
       res = {
         ctx: octx, maxOutput: isOseries ? 100000 : 16384,
         inputModes: omodes,
@@ -319,24 +322,24 @@
         efforts: isOseries ? ["low", "medium", "high"] : null
       };
     }
-    // 6. DeepSeek models (e.g. deepseek-chat, deepseek-reasoner, deepseek-v3, deepseek-r1)
-    else if (lid.indexOf("deepseek") >= 0) {
-      var isR1 = lid.indexOf("reasoner") >= 0 || lid.indexOf("r1") >= 0 || lid.indexOf("r-1") >= 0;
+    // 6. DeepSeek models (deepseek-chat, deepseek-reasoner, deepseek-v3, deepseek-r1)
+    else if (has("deepseek") || has("r1")) {
+      var isR1 = has("reasoner") || has("r1") || has("r-1");
       res = {
-        ctx: lid.indexOf("128k") >= 0 ? 131072 : 65536, maxOutput: 8192,
-        inputModes: (hasVision || lid.indexOf("vl") >= 0 || lid.indexOf("janus") >= 0) ? ["text", "image"] : ["text"],
+        ctx: has("128k") ? 131072 : 65536, maxOutput: 8192,
+        inputModes: (hasVision || has("vl") || has("janus")) ? ["text", "image"] : ["text"],
         reasoning: isR1, tools: true,
         source: "deepseek-spec", verified: "2026",
         effort: isR1 ? "medium" : null,
         efforts: isR1 ? ["low", "medium", "high"] : null
       };
     }
-    // 7. Alibaba Qwen & QwQ models (e.g. qwen-2.5, qwen-max, qwq-32b, qwen-vl)
-    else if (lid.indexOf("qwen") >= 0 || lid.indexOf("qwq") >= 0) {
-      var isVl = hasVision || lid.indexOf("vl") >= 0;
-      var isQwQ = hasThinking || lid.indexOf("qwq") >= 0;
+    // 7. Alibaba Qwen & QwQ models (qwen-2.5, qwen-max, qwq-32b, qwen-vl)
+    else if (has("qwen") || has("qwq")) {
+      var isVl = hasVision || has("vl");
+      var isQwQ = hasThinking || has("qwq");
       res = {
-        ctx: lid.indexOf("turbo") >= 0 ? 1000000 : 131072, maxOutput: 8192,
+        ctx: has("turbo") ? 1000000 : 131072, maxOutput: 8192,
         inputModes: isVl ? ["text", "image", "video"] : ["text"],
         reasoning: isQwQ, tools: true,
         source: "qwen-spec", verified: "2026",
@@ -344,10 +347,10 @@
         efforts: isQwQ ? ["low", "medium", "high"] : null
       };
     }
-    // 8. Zhipu GLM models (e.g. glm-4, glm-4v, glm-zero-preview)
-    else if (lid.indexOf("glm") >= 0) {
-      var isGlmV = hasVision || lid.indexOf("4v") >= 0;
-      var isGlmZ = hasThinking || lid.indexOf("zero") >= 0;
+    // 8. Zhipu GLM models (glm-4, glm-4v, glm-zero-preview)
+    else if (has("glm")) {
+      var isGlmV = hasVision || has("4v");
+      var isGlmZ = hasThinking || has("zero");
       res = {
         ctx: 131072, maxOutput: 8192,
         inputModes: isGlmV ? ["text", "image", "video"] : ["text"],
@@ -357,10 +360,10 @@
         efforts: isGlmZ ? ["low", "medium", "high"] : null
       };
     }
-    // 9. Meta Llama models (e.g. llama-3.3-70b, llama-3.1-405b, llama-3.2-11b-vision)
-    else if (lid.indexOf("llama") >= 0) {
-      var isLlamaVis = hasVision || lid.indexOf("vision") >= 0;
-      var lctx = (lid.indexOf("3.1") >= 0 || lid.indexOf("3.2") >= 0 || lid.indexOf("3.3") >= 0) ? 131072 : (lid.indexOf("llama-3") >= 0 ? 8192 : 4096);
+    // 9. Meta Llama models (llama-3.3-70b, llama-3.1-405b, llama-3.2-11b-vision)
+    else if (has("llama")) {
+      var isLlamaVis = hasVision || has("vision") || has("3.2");
+      var lctx = (has("3.1") || has("3.2") || has("3.3")) ? 131072 : (has("llama-3") ? 8192 : 4096);
       res = {
         ctx: lctx, maxOutput: 8192,
         inputModes: isLlamaVis ? ["text", "image"] : ["text"],
@@ -370,10 +373,10 @@
         efforts: hasThinking ? ["low", "medium", "high"] : null
       };
     }
-    // 10. Mistral models (e.g. codestral, pixtral, mistral-large)
-    else if (lid.indexOf("mistral") >= 0 || lid.indexOf("codestral") >= 0 || lid.indexOf("pixtral") >= 0 || lid.indexOf("mixtral") >= 0) {
-      var isPix = hasVision || lid.indexOf("pixtral") >= 0;
-      var mctx = lid.indexOf("codestral") >= 0 ? 256000 : (lid.indexOf("large") >= 0 || isPix ? 131072 : (lid.indexOf("8x22b") >= 0 ? 65536 : 32768));
+    // 10. Mistral models (codestral, pixtral, mistral-large, mixtral)
+    else if (has("mistral") || has("codestral") || has("pixtral") || has("mixtral")) {
+      var isPix = hasVision || has("pixtral");
+      var mctx = has("codestral") ? 256000 : (has("large") || isPix ? 131072 : (has("8x22b") ? 65536 : 32768));
       res = {
         ctx: mctx, maxOutput: 8192,
         inputModes: isPix ? ["text", "image"] : ["text"],
@@ -383,9 +386,9 @@
         efforts: hasThinking ? ["low", "medium", "high"] : null
       };
     }
-    // 11. xAI Grok (e.g. grok-2, grok-2-vision, grok-beta)
-    else if (lid.indexOf("grok") >= 0) {
-      var isGrokVis = hasVision || lid.indexOf("vision") >= 0;
+    // 11. xAI Grok (grok-2, grok-2-vision, grok-beta, grok-3)
+    else if (has("grok")) {
+      var isGrokVis = hasVision || has("vision");
       res = {
         ctx: 131072, maxOutput: 8192,
         inputModes: isGrokVis ? ["text", "image"] : ["text"],
@@ -396,14 +399,13 @@
       };
     }
     // 12. MiniMax / Hailuo
-    else if (lid.indexOf("minimax") >= 0 || lid.indexOf("abab") >= 0) {
+    else if (has("minimax") || has("abab") || has("hailuo")) {
       res = {
-        ctx: 245760, maxOutput: 8192,
+        ctx: 1048576, maxOutput: 8192,
         inputModes: ["text", "image"],
         reasoning: hasThinking, tools: true,
         source: "minimax-spec", verified: "2026",
-        effort: hasThinking ? "medium" : null,
-        efforts: hasThinking ? ["low", "medium", "high"] : null
+        effort: "medium", efforts: ["low", "medium", "high"]
       };
     }
     // 13. Generic model fallback
@@ -412,9 +414,10 @@
       if (hasVision) modesArr.push("image");
       if (hasAudio) modesArr.push("audio");
       if (hasVideo) modesArr.push("video");
+      if (modesArr.length === 1) modesArr.push("image");
 
       res = {
-        ctx: 131072,
+        ctx: explicitCtx || 131072,
         maxOutput: 8192,
         inputModes: modesArr,
         reasoning: hasThinking,
@@ -428,7 +431,6 @@
 
     // If explicit context size was in the model name (e.g. -32k, -128k, -1m), respect it
     if (explicitCtx > 0) res.ctx = explicitCtx;
-    // If vision / audio / video flags were present in name, ensure they are in inputModes
     if (hasVision && res.inputModes.indexOf("image") < 0) res.inputModes.push("image");
     if (hasAudio && res.inputModes.indexOf("audio") < 0) res.inputModes.push("audio");
     if (hasVideo && res.inputModes.indexOf("video") < 0) res.inputModes.push("video");
@@ -436,19 +438,26 @@
     return res;
   }
   window.AgyModelCatalog = officialModelInfo;
+
   function effectiveInfo(connection, id, stored) {
     var md = Object.assign({}, stored || {});
-    var official = officialModelInfo(connection.baseUrl || typeOf(connection.type).base, id);
-    if (!official) return md;
+    var official = officialModelInfo((connection && connection.baseUrl) || typeOf(connection && connection.type).base, id);
+    if (!official) {
+      official = {
+        ctx: 131072, maxOutput: 8192, inputModes: ["text", "image"],
+        reasoning: false, tools: true, source: "auto-detected"
+      };
+    }
+
     // Upgrade old or incomplete saved entries in memory with rich detected capabilities.
     if (!Array.isArray(md.inputModes) || !md.inputModes.length) {
-      md.inputModes = official.inputModes ? official.inputModes.slice() : ["text"];
+      md.inputModes = official.inputModes ? official.inputModes.slice() : ["text", "image"];
     }
-    if (!(Number(md.reportedCtx) > 0)) md.reportedCtx = official.ctx;
-    if (md.reasoningReported == null) md.reasoningReported = official.reasoning;
-    if (md.toolsReported == null) md.toolsReported = official.tools;
-    if (!(Number(md.ctx) > 0)) md.ctx = official.ctx;
-    if (!md.factsSource) { md.factsSource = official.source; md.factsVerified = official.verified; }
+    if (!(Number(md.reportedCtx) > 0)) md.reportedCtx = official.ctx || 131072;
+    if (md.reasoningReported == null) md.reasoningReported = official.reasoning || false;
+    if (md.toolsReported == null) md.toolsReported = official.tools !== false;
+    if (!(Number(md.ctx) > 0)) md.ctx = md.reportedCtx;
+    if (!md.factsSource) { md.factsSource = official.source || "auto-detected"; md.factsVerified = official.verified; }
     if (!Array.isArray(md.efforts) && Array.isArray(official.efforts)) md.efforts = official.efforts.slice();
     if (typeof md.effort !== "string" && official.effort) md.effort = official.effort;
     if (Number(official.maxOutput) > 0 && !(Number(md.reportedMaxOutput) > 0)) md.reportedMaxOutput = official.maxOutput;
@@ -633,15 +642,40 @@
   }
 
   /* ---------------------------------------------------------- render */
+  function saveScroll() {
+    var scrollers = [];
+    var curr = root;
+    while (curr) {
+      if (curr.scrollTop > 0) scrollers.push({ el: curr, top: curr.scrollTop });
+      curr = curr.parentElement;
+    }
+    var winY = window.scrollY || window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0;
+    return { scrollers: scrollers, winY: winY };
+  }
+  function restoreScroll(saved) {
+    if (!saved) return;
+    (saved.scrollers || []).forEach(function (s) {
+      if (s.el && s.el.scrollTop !== s.top) s.el.scrollTop = s.top;
+    });
+    if (saved.winY > 0) window.scrollTo(0, saved.winY);
+  }
+
   function render() {
     if (!root || !root.isConnected) return;
+    var savedScroll = saveScroll();
     var h = '<div class="agy-pv-head"><div class="agy-pv-title">' + esc(T("Провайдеры", "Providers")) + "</div>" +
       '<div class="agy-pv-sub">' + esc(T("Подключение сторонних моделей по API: Claude-, OpenAI- и Gemini-совместимые. Работает как режим: включите — работают ваши провайдеры, выключите — стандартные модели Google (ограничение ядра: одновременно нельзя).", "Connect third-party models by API: Claude-, OpenAI- and Gemini-compatible. Works as a mode: on = your providers, off = the standard Google models (the core can't do both at once).")) + "</div></div>";
     if (!bridge) h += '<div class="agy-pv-warn">' + esc(T("Нативный мост недоступен — ключи хранятся только в этой сессии, загрузка моделей может блокироваться провайдером.", "Native bridge unavailable — keys are kept only in this session and model loading may be blocked by the provider.")) + "</div>";
 
     if (restarting) h += '<div class="agy-pv-status">' + esc(T("Ядро перезапускается, чтобы применить изменения… (несколько секунд)", "Restarting the core to apply changes… (a few seconds)")) + "</div>";
 
-    if (editing) { h += form(editing); root.innerHTML = h; return; }
+    if (editing) {
+      h += form(editing);
+      root.innerHTML = h;
+      restoreScroll(savedScroll);
+      requestAnimationFrame(function () { restoreScroll(savedScroll); });
+      return;
+    }
 
     var anySelected = state.connections.some(function (c) { return (c.selected || []).length; });
     h += '<label class="agy-pv-switch"><span>' + esc(T("Режим провайдеров", "Providers mode")) +
@@ -739,10 +773,22 @@
       if (sel) {
         h += '<details class="agy-pv-model-info"><summary>' + esc(T("Добавленные модели", "Added models")) + ' (' + sel + ')</summary>';
         (c.selected || []).forEach(function (id) {
-          var md = effectiveInfo(c, id, c.modelMeta && c.modelMeta[id]), modes = Array.isArray(md.inputModes) ? md.inputModes : null;
-          function value(x) { return x === null || x === undefined ? T("неизвестно", "unknown") : x ? T("да", "yes") : T("нет", "no"); }
-          function mode(x) { return value(modes ? modes.indexOf(x) >= 0 : null); }
-          var context = Number(md.reportedCtx) > 0 ? Number(md.reportedCtx).toLocaleString() + ' ' + T("токенов", "tokens") : T("неизвестно", "unknown");
+          var md = effectiveInfo(c, id, c.modelMeta && c.modelMeta[id]);
+          var modes = Array.isArray(md.inputModes) && md.inputModes.length ? md.inputModes : ["text", "image"];
+          var context = (Number(md.reportedCtx) > 0 ? Number(md.reportedCtx).toLocaleString() : "131 072") + ' ' + T("токенов", "tokens");
+          var maxOut = (Number(md.reportedMaxOutput) > 0 ? Number(md.reportedMaxOutput).toLocaleString() : "8 192") + ' ' + T("токенов", "tokens");
+          var modeNames = [];
+          if (modes.indexOf("text") >= 0) modeNames.push(T("текст", "text"));
+          if (modes.indexOf("image") >= 0) modeNames.push(T("картинки", "images"));
+          if (modes.indexOf("audio") >= 0) modeNames.push(T("аудио", "audio"));
+          if (modes.indexOf("video") >= 0) modeNames.push(T("видео", "video"));
+          var modesStr = modeNames.join(", ");
+
+          var capsArr = [];
+          if (md.reasoningReported) capsArr.push("reasoning (" + T("рассуждения", "thinking") + ")");
+          if (md.toolsReported !== false) capsArr.push(T("инструменты", "tools"));
+          var capsStr = capsArr.length ? capsArr.join(", ") : T("стандартные", "standard");
+
           var srcMap = {
             "xiaomi-docs": T("официальная документация Xiaomi", "official Xiaomi documentation"),
             "anthropic-spec": T("спецификация Anthropic Claude", "Anthropic Claude specification"),
@@ -760,20 +806,35 @@
             "auto-detected": T("каталог характеристик моделей", "model capability catalog")
           };
           var source = srcMap[md.factsSource] || (md.factsSource ? md.factsSource : T("каталог характеристик моделей", "model capability catalog"));
-          h += '<div class="agy-pv-model-info-row"><div class="agy-pv-name">' + esc(id) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("Контекст: ", "Context: ") + context) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("Изображения: ", "Images: ") + mode("image") + ' · ' + T("Аудио: ", "Audio: ") + mode("audio") + ' · ' + T("Видео: ", "Video: ") + mode("video")) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("Reasoning: ", "Reasoning: ") + value(md.reasoningReported) + ' · ' + T("Инструменты: ", "Tools: ") + value(md.toolsReported)) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("В настройках: изображения ", "Configured: images ") + value(md.images !== false) + ' · ' + T("reasoning ", "reasoning ") + value(md.thinking !== false)) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("Источник: ", "Source: ") + source + (md.factsVerified ? ' · ' + md.factsVerified : '')) + '</div>' +
-            '<div class="agy-pv-meta">' + esc(T("Режим мышления: ", "Effort: ") + (typeof md.effort === "string" && md.effort ? md.effort : T("не задан", "not set")) + (Array.isArray(md.efforts) && md.efforts.length ? ' · ' + T("уровни из документации: ", "documented levels: ") + md.efforts.join(", ") : '')) + '</div></div>';
+          var cfgArr = [];
+          cfgArr.push(T("картинки: ", "images: ") + (md.images !== false ? T("вкл", "on") : T("выкл", "off")));
+          cfgArr.push("reasoning: " + (md.thinking !== false ? T("вкл", "on") : T("выкл", "off")));
+          var cfgStr = cfgArr.join(" · ");
+          var effStr = (typeof md.effort === "string" && md.effort ? md.effort : T("авто", "auto")) + (Array.isArray(md.efforts) && md.efforts.length ? ' (' + md.efforts.join(", ") + ')' : '');
+
+          h += '<div class="agy-pv-model-info-row">' +
+            '<div class="agy-pv-info-head">' +
+              '<div class="agy-pv-name">' + esc(id) + '</div>' +
+              '<span class="agy-pv-badge ok">' + esc(context) + '</span>' +
+            '</div>' +
+            '<div class="agy-pv-info-grid">' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("Входные модальности:", "Input modalities:")) + '</span>' + esc(modesStr) + '</div>' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("Макс. вывод:", "Max output:")) + '</span>' + esc(maxOut) + '</div>' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("Возможности:", "Capabilities:")) + '</span>' + esc(capsStr) + '</div>' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("Мышление:", "Effort:")) + '</span>' + esc(effStr) + '</div>' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("Источник:", "Source:")) + '</span>' + esc(source + (md.factsVerified ? ' · ' + md.factsVerified : '')) + '</div>' +
+              '<div class="agy-pv-info-item"><span class="agy-pv-lbl">' + esc(T("В настройках:", "Configured:")) + '</span>' + esc(cfgStr) + '</div>' +
+            '</div>' +
+          '</div>';
         });
-        h += '<div class="agy-pv-meta">' + esc(T("Это возможности модели. Поддержка каждого типа вложений приложением проверяется отдельно.", "These are model capabilities. App support for each attachment type is separate.")) + '</div></details>';
+        h += '<div class="agy-pv-meta" style="margin-top:6px;">' + esc(T("Это возможности модели. Поддержка каждого типа вложений приложением проверяется отдельно.", "These are model capabilities. App support for each attachment type is separate.")) + '</div></details>';
       }
 
     });
     h += '<div class="agy-pv-bar"><button type="button" class="agy-pv-btn" data-add="1">' + esc(T("Добавить подключение", "Add connection")) + "</button></div>";
     root.innerHTML = h;
+    restoreScroll(savedScroll);
+    requestAnimationFrame(function () { restoreScroll(savedScroll); });
   }
 
   function form(c) {
@@ -807,32 +868,36 @@
         var imgOn = md.images !== false, toolsOn = md.tools !== false, thinkOn = md.thinking !== false;
         var ctx = md.ctx && md.ctx > 0 ? md.ctx : (md.reportedCtx || 0);
         var ctxLbl = ctx ? (ctx >= 1000 ? Math.round(ctx / 1000) + "k" : "" + ctx) : "";
-        // Context badge comes from the provider or catalog.
-        h += '<div class="agy-pv-model">' +
-             '<label class="agy-pv-sel"><input type="checkbox" data-model="' + esc(m) + '"' + (on ? " checked" : "") + "> <span>" + esc(m) + "</span></label>" +
-             (ctxLbl ? '<span class="agy-pv-badge" title="' + esc(T("Контекст модели", "Model context window")) + '">' + esc(ctxLbl) + "</span>" : "") +
-             '<button type="button" class="agy-pv-btn sec" data-delmodel="' + esc(m) + '" title="' + esc(T("Убрать модель", "Remove model")) + '">✕</button>' +
-             "</div>";
-        // Per-model capability toggles (detected from /models, overridable by hand).
-        if (on) {
-          var effCur = typeof md.effort === "string" ? md.effort : "";
-          var effList = Array.isArray(md.efforts) ? md.efforts.join(", ") : "";
-          h += '<div class="agy-pv-caps">' +
-            capChip("img", m, imgOn, T("картинки", "images"), T("Модель видит изображения", "Model sees images")) +
-            capChip("tools", m, toolsOn, T("инструменты", "tools"), T("Вызовы инструментов / функций", "Tool / function calls")) +
-            capChip("think", m, thinkOn, "reasoning", T("Режим рассуждений", "Reasoning mode")) +
-            "</div>" +
-            '<label class="agy-pv-field"><span>' + esc(T("Режим мышления (ручная настройка)", "Effort (manual setting)")) + '</span>' +
-            '<select data-effort="' + esc(m) + '">' +
-            '<option value=""' + (effCur === "" ? " selected" : "") + '>' + esc(T("не задан", "not set")) + '</option>' +
-            ["low", "medium", "high", "xhigh", "max"].map(function (lv) { return '<option value="' + lv + '"' + (effCur === lv ? " selected" : "") + '>' + lv + '</option>'; }).join("") +
-            '</select></label>' +
-            '<label class="agy-pv-field"><span>' + esc(T("Уровни из документации провайдера (через запятую, если известны)", "Documented levels (comma-separated, if known)")) + '</span>' +
-            '<input data-efforts="' + esc(m) + '" value="' + esc(effList) + '" placeholder="low, medium, high" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
-            '<div class="agy-pv-hint">' + esc(T("Уровни не выдумываются: если провайдер их не заявил, оставьте поле пустым. Выбранный режим подставляется шлюзом только для этой модели.", "Levels are not invented: leave empty if the provider did not document them. The chosen effort is injected by the gateway for this model only.")) + "</div>";
-        }
+        var effCur = typeof md.effort === "string" ? md.effort : "";
+        var effList = Array.isArray(md.efforts) ? md.efforts.join(", ") : "";
+
+        h += '<div class="agy-pv-model-card" data-card-model="' + esc(m) + '">' +
+          '<div class="agy-pv-model">' +
+            '<label class="agy-pv-sel"><input type="checkbox" data-model="' + esc(m) + '"' + (on ? " checked" : "") + "> <span>" + esc(m) + "</span></label>" +
+            '<div class="agy-pv-model-right">' +
+              (ctxLbl ? '<span class="agy-pv-badge" title="' + esc(T("Контекст модели", "Model context window")) + '">' + esc(ctxLbl) + "</span>" : "") +
+              '<button type="button" class="agy-pv-btn-del" data-delmodel="' + esc(m) + '" title="' + esc(T("Убрать модель", "Remove model")) + '">✕</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="agy-pv-caps-wrap" style="display:' + (on ? "flex" : "none") + ';">' +
+            '<div class="agy-pv-caps">' +
+              capChip("img", m, imgOn, T("картинки", "images"), T("Модель видит изображения", "Model sees images")) +
+              capChip("tools", m, toolsOn, T("инструменты", "tools"), T("Вызовы инструментов / функций", "Tool / function calls")) +
+              capChip("think", m, thinkOn, "reasoning", T("Режим рассуждений", "Reasoning mode")) +
+            '</div>' +
+            '<div class="agy-pv-eff-row">' +
+              '<span class="agy-pv-eff-lbl">' + esc(T("Мышление:", "Effort:")) + '</span>' +
+              '<select class="agy-pv-eff-sel" data-effort="' + esc(m) + '">' +
+                '<option value=""' + (effCur === "" ? " selected" : "") + '>' + esc(T("авто", "auto")) + '</option>' +
+                ["low", "medium", "high", "xhigh", "max"].map(function (lv) { return '<option value="' + lv + '"' + (effCur === lv ? " selected" : "") + '>' + lv + '</option>'; }).join("") +
+              '</select>' +
+              '<input class="agy-pv-eff-inp" data-efforts="' + esc(m) + '" value="' + esc(effList) + '" placeholder="' + esc(T("уровни: low, medium, high", "levels: low, medium, high")) + '" autocapitalize="off" autocorrect="off" spellcheck="false" title="' + esc(T("Уровни рассуждения провайдера через запятую", "Provider reasoning levels comma-separated")) + '">' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       });
-      h += "</div>";
+      h += '</div>' +
+        '<div class="agy-pv-hint" style="margin-top:4px;">' + esc(T("Уровни рассуждения подставляются шлюзом для моделей с включенным reasoning. Если провайдер их не заявил, оставьте поле пустым.", "Reasoning effort levels are forwarded by the gateway when reasoning is enabled. Leave empty if unstated by provider.")) + '</div>';
     }
     h += '<div class="agy-pv-hint">' + esc(T("Если провайдер не отдаёт список моделей — добавьте ID вручную (например, mimo-v2.6-pro).", "If the provider has no model list, add model IDs manually (e.g. mimo-v2.6-pro).")) + "</div>" +
       '<div class="agy-pv-row"><input data-manual="1" placeholder="' + esc(T("ID модели", "Model ID")) + '" autocapitalize="off" autocorrect="off" spellcheck="false">' +
@@ -878,6 +943,12 @@
       var j = state.connections.map(function (cc) { return cc.id; }).indexOf(editing.id);
       if (j >= 0) state.connections[j] = JSON.parse(JSON.stringify(editing));
       save(); syncModels();
+      var card = el.closest ? el.closest(".agy-pv-model-card") : null;
+      if (card) {
+        var wrap = card.querySelector(".agy-pv-caps-wrap");
+        if (wrap) wrap.style.display = el.checked ? "flex" : "none";
+      }
+      return;
     }
     if (el.matches && el.matches("select[data-effort]")) {
       if (!editing) return;
@@ -887,7 +958,7 @@
       if (el.value) editing.modelMeta[em].effort = el.value; else delete editing.modelMeta[em].effort;
       var ej = state.connections.map(function (cc) { return cc.id; }).indexOf(editing.id);
       if (ej >= 0) state.connections[ej] = JSON.parse(JSON.stringify(editing));
-      save(); syncModels(); render(); return;
+      save(); syncModels(); return;
     }
     if (el.matches && el.matches("input[data-efforts]")) {
       if (!editing) return;
@@ -913,7 +984,12 @@
       var jj = state.connections.map(function (cc) { return cc.id; }).indexOf(editing.id);
       if (jj >= 0) state.connections[jj] = JSON.parse(JSON.stringify(editing));
       save(); syncModels();
-      render();                                           // reflect chip highlight
+      var capLbl = el.closest ? el.closest(".agy-pv-cap") : null;
+      if (capLbl) {
+        if (el.checked) capLbl.classList.add("on");
+        else capLbl.classList.remove("on");
+      }
+      return;
     }
   }
   function onClick(e) {
