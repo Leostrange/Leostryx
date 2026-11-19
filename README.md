@@ -90,8 +90,8 @@
 
 | Вариант | Назначение | Пакет | SHA-256 контрольная сумма |
 |---|---|---|---|
-| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.14-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `4bf66aaa4a2ed329387e5710854b81128bba3d1352e911638968ed84d1d0a683` |
-| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.14-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `1b0b301b82421f0f66d3b70a78266bba96afd6227abd5f381efe5a0c5e753208` |
+| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.14-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `1ec76f3eaab7d0bc350c349370166004b0d5f54beca2d306bd34400d29e9de85` |
+| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.14-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14) | `257586c588f9cf572bfd666be910103108655a6d2848683ad88bbdaba716f100` |
 
 > [!TIP]
 > **Чем отличается Bypass?**

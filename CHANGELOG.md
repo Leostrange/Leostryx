@@ -28,7 +28,19 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Настройка порога сжатия истории (12, 16, 24, 32 сообщения).
   - Настройка окна свежих реплик (4, 6, 8, 10, 12 сообщений).
   - Полная двуязычная локализация (русский и английский языки).
+- **Авторазрешение путей APK и починка действий модального окна (`agy_paths.js`):**
+  - Реализовано авторазрешение относительных путей файлов (`resolveAbsolutePath()`) для ссылок в чате относительно корня проекта `/storage/emulated/0/Leostryx Projects/Leostryx-repo` с нормализацией путей `/sdcard/`.
+  - Починено действие «Открыть папку»: корректный вызов `AgyTools.openPath` с абсолютным путём директории и параллельный запуск через Shizuku (`rish -c "am start -a android.intent.action.VIEW -d 'content://com.android.externalstorage.documents/document/...'"`), обходящий ограничения прав Android 11+.
+  - Починено действие «Установить APK»: корректная инициализация системного установщика через `AppFileProvider` и параллельная прямая установка через Shizuku (`rish -c "pm install -r <apk>"`).
+- **Компактная локализация и вёрстка списка действий и команд (`agy_i18n.js`, `agy_ru.css`):**
+  - Меню вызова команд по кнопке `+` › «Действия» (слеш-команды): добавлены недостающие переводы промптов MCP Exa (`mcp:exa:web_search_help` — «Поиск в вебе через Exa», `mcp:exa:agent_research_help` — «Исследование в вебе через Exa»).
+  - Описания всех действий и слеш-команд переведены в ёмкие однострочные формулировки (`schedule`: «Запуск по расписанию или таймеру», `teamwork-preview`: «Команда автономных агентов», `learn`: «Сохранение навыков и правил», `goal`: «Автономная работа до достижения цели», `browser`: «Веб-агент для браузера», `grill-me`: «Интервью для согласования плана», `btw`: «Быстрый вопрос без прерывания чата»), что полностью устранило обрезку многоточиями (`...`) на экранах смартфонов.
+  - Адаптивные стили `#typeahead-menu`, `[data-testid="menu-option-label"]` и `[data-testid="menu-option-description"]` с эффектом матового стекла и автоматической подгонкой ширины под экран мобильного устройства.
 - **Версия 3.1.14** (`versionCode` 40) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Контрольные суммы сборки (SHA-256):**
+  - `Leostryx-3.1.14-standard.apk`: `1ec76f3eaab7d0bc350c349370166004b0d5f54beca2d306bd34400d29e9de85`
+  - `Leostryx-3.1.14-bypass.apk`: `257586c588f9cf572bfd666be910103108655a6d2848683ad88bbdaba716f100`
+  - `Leostryx-repo.zip`: `f4361cdd4528e6d5647ad0b8b6c16145acbbb7c6f709caf51ea1c90ad50f0522`
 <!-- /RU -->
 
 <!-- EN -->
@@ -48,7 +60,19 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Configurable compaction threshold (12, 16, 24, 32 messages).
   - Configurable recent messages window (4, 6, 8, 10, 12 messages).
   - Full bilingual localization (Russian and English).
+- **APK path auto-resolution and modal actions fix (`agy_paths.js`):**
+  - Added relative path auto-resolution (`resolveAbsolutePath()`) for chat links against project root `/storage/emulated/0/Leostryx Projects/Leostryx-repo` with `/sdcard/` normalization.
+  - Fixed "Open folder": resolves absolute directory path with dual-layer launch via `AgyTools.openPath` and Shizuku (`rish -c "am start -a android.intent.action.VIEW -d 'content://com.android.externalstorage.documents/document/...'"`), bypassing Android 11+ storage restrictions.
+  - Fixed "Install APK": reliable system package installer trigger via `AppFileProvider` and direct elevated install via Shizuku (`rish -c "pm install -r <apk>"`).
+- **Compact localization and layout for actions and slash commands (`agy_i18n.js`, `agy_ru.css`):**
+  - Actions menu triggered by `+` › "Actions" (slash commands): localized missing Exa MCP prompts (`mcp:exa:web_search_help` -> "Поиск в вебе через Exa", `mcp:exa:agent_research_help` -> "Исследование в вебе через Exa").
+  - Formatted all action descriptions into concise single-line phrases (`schedule`, `teamwork-preview`, `learn`, `goal`, `browser`, `grill-me`, `btw`), preventing truncation with ellipses (`...`) on mobile displays.
+  - Responsive frosted glass styling for `#typeahead-menu`, `[data-testid="menu-option-label"]`, and `[data-testid="menu-option-description"]` bounded to mobile screen width.
 - **Version 3.1.14** (`versionCode` 40) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Build checksums (SHA-256):**
+  - `Leostryx-3.1.14-standard.apk`: `1ec76f3eaab7d0bc350c349370166004b0d5f54beca2d306bd34400d29e9de85`
+  - `Leostryx-3.1.14-bypass.apk`: `257586c588f9cf572bfd666be910103108655a6d2848683ad88bbdaba716f100`
+  - `Leostryx-repo.zip`: `f4361cdd4528e6d5647ad0b8b6c16145acbbb7c6f709caf51ea1c90ad50f0522`
 <!-- /EN -->
 
 ## v3.1.13 — 2026-11-19 (Восстановление просмотра файлов в чате, карточка действий только для APK, локализация контекстного меню проектов)

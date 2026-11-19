@@ -672,9 +672,92 @@ html[data-base-ui-scroll-locked] {
 .z-\[6000\] > [role="menu"] [role="menuitem"] { flex-wrap: wrap !important; row-gap: 0 !important; }
 .z-\[6000\] > [role="menu"] [role="menuitem"] > span:not(:first-child) { white-space: normal !important; }
 
-/* Slash / mention list */
-#typeahead-menu.agy-typeahead li, #typeahead-menu.agy-typeahead [role="option"] {
-  min-height: 0 !important; padding-top: 4px !important; padding-bottom: 4px !important; font-size: 13px !important;
+/* Slash / actions / mention list (компактный вид, пояснение действия, адаптивность к экрану) */
+#typeahead-menu.agy-typeahead {
+  max-width: min(440px, calc(100vw - 16px)) !important;
+  width: auto !important;
+  border-radius: 14px !important;
+  background: var(--agy-glass-surface, rgba(25, 25, 25, 0.94)) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--agy-glass-border, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45) !important;
+  padding: 4px !important;
+  overflow: hidden !important;
+}
+#typeahead-menu.agy-typeahead ul {
+  padding: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+  max-height: min(42vh, 320px) !important;
+  overflow-y: auto !important;
+}
+#typeahead-menu.agy-typeahead li,
+#typeahead-menu.agy-typeahead [role="option"] {
+  min-height: 0 !important;
+  padding: 5px 10px !important;
+  font-size: 12.5px !important;
+  line-height: 1.35 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  transition: background 0.12s ease !important;
+}
+#typeahead-menu.agy-typeahead li:hover,
+#typeahead-menu.agy-typeahead [role="option"]:hover,
+#typeahead-menu.agy-typeahead li[aria-selected="true"],
+#typeahead-menu.agy-typeahead [role="option"][aria-selected="true"] {
+  background: var(--agy-glass-item-hover, rgba(255, 255, 255, 0.08)) !important;
+}
+#typeahead-menu.agy-typeahead [data-testid="menu-option-label"],
+#typeahead-menu [data-testid="menu-option-label"] {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  direction: ltr !important;
+}
+#typeahead-menu.agy-typeahead [data-testid="menu-option-description"],
+#typeahead-menu [data-testid="menu-option-description"],
+#typeahead-menu.agy-typeahead [role="option"] .text-muted-foreground,
+#typeahead-menu.agy-typeahead li .text-muted-foreground {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  color: var(--muted-foreground, #8e8e93) !important;
+  opacity: 0.7 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  direction: ltr !important;
+}
+
+/* Компактное выпадающее меню кнопки «+» (Добавить контекст) */
+[role="menu"].border-border.w-max,
+[role="dialog"] .border-border.w-max,
+div[data-radix-popper-content-wrapper] .border-border.w-max {
+  max-width: min(280px, calc(100vw - 16px)) !important;
+  border-radius: 14px !important;
+  background: var(--agy-glass-surface, rgba(25, 25, 25, 0.94)) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--agy-glass-border, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45) !important;
+  padding: 4px !important;
+}
+[role="menu"].border-border.w-max button,
+div[data-radix-popper-content-wrapper] .border-border.w-max button {
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: background 0.12s ease !important;
+}
+[role="menu"].border-border.w-max button:hover,
+div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
+  background: var(--agy-glass-item-hover, rgba(255, 255, 255, 0.08)) !important;
 }
 
 /* Баг: длинное имя кастомного провайдера сжимает остальные кнопки в футере */

@@ -144,6 +144,21 @@
     return p;
   }
 
+  function resolveAbsolutePath(path) {
+    if (!path) return "";
+    var p = clean(path);
+    if (!p) return "";
+    p = normalizeSymlink(p);
+    // Если путь уже абсолютный к известному корню Android
+    if (/^\/(?:storage|sdcard|data|root|mnt|system)\b/i.test(p)) {
+      return p;
+    }
+    // Если путь относительный (например dist/signed/Leostryx-3.1.14-bypass.apk)
+    var cleanRel = p.replace(/^\.?\//, "");
+    var defaultRepo = "/storage/emulated/0/Leostryx Projects/Leostryx-repo";
+    return defaultRepo + "/" + cleanRel;
+  }
+
   function isAllowedChatTarget(target) {
     if (!target) return false;
     // 1. Исключаем саму всплывающую карточку
@@ -338,30 +353,25 @@
 
   function openPath(path) {
     var rawPath = clean(path);
-    var normPath = normalizeSymlink(rawPath);
+    var normPath = resolveAbsolutePath(rawPath);
     flash(T("Открываю папку в проводнике…", "Opening folder in file manager…"));
 
-    // 1. Попытка через нативный мост AgyTools (DocumentsUI без SecurityException)
+    // 1. Попытка через нативный мост AgyTools
     var b = bridge("openPath");
     if (b) {
-      try {
-        b.openPath(normPath);
-        closeSheet();
-        return;
-      } catch (_) {
-        try {
-          b.openPath(rawPath);
-          closeSheet();
-          return;
-        } catch (__) {}
-      }
+      try { b.openPath(normPath); } catch (_) {}
     }
 
-    // 2. Резервный запуск DocumentsUI через termrun (am start)
+    // 2. Резервный запуск DocumentsUI через termrun (am start) с автопоиском пути
     var pyCmd = [
       'python3 -c "',
       'import os, urllib.parse, subprocess;',
-      'p = \'\'\'' + normPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'\'\';',
+      'raw = \'\'\'' + normPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'\'\';',
+      'p = raw;',
+      'if not os.path.exists(p):',
+      '    for root in [\'/storage/emulated/0/Leostryx Projects/Leostryx-repo\', \'/storage/emulated/0/Documents\', \'/storage/emulated/0/Download\', \'/storage/emulated/0\']:',
+      '        cand = os.path.join(root, raw.lstrip(\'/\'));',
+      '        if os.path.exists(cand): p = cand; break;',
       'if os.path.isfile(p): p = os.path.dirname(p);',
       'p = os.path.realpath(p);',
       'rel = p;',
@@ -371,7 +381,7 @@
       'enc = urllib.parse.quote(doc_id);',
       'cmd = \'am start -a android.intent.action.VIEW -d \"content://com.android.externalstorage.documents/document/\' + enc + \'\" -t \"vnd.android.document/directory\" -f 0x10000000\';',
       'try: subprocess.run([\'rish\', \'-c\', cmd], timeout=5);',
-      'except Exception: subprocess.run([\'/system/bin/am\', \'start\', \'-a\', \'android.intent.action.VIEW\', \'-d\', \'content://com.android.externalstorage.documents/document/\' + enc, \'-t\', \'vnd.android.document/directory\', \'-f\', \'0x10000000\'], timeout=5);',
+      'except Exception: pass;',
       '"'
     ].join("");
     runTerm(pyCmd);
@@ -381,32 +391,34 @@
 
   function installApk(path) {
     var rawPath = clean(path);
-    var normPath = normalizeSymlink(rawPath);
+    var normPath = resolveAbsolutePath(rawPath);
     flash(T("Запуск установки APK…", "Launching APK install…"));
 
     // 1. Попытка через нативный мост AgyTools (системный PackageInstaller через FileProvider)
     var b = bridge("installApk");
     if (b) {
-      try {
-        b.installApk(normPath);
-        closeSheet();
-        return;
-      } catch (_) {
-        try {
-          b.installApk(rawPath);
-          closeSheet();
-          return;
-        } catch (__) {}
-      }
+      try { b.installApk(normPath); } catch (_) {}
     }
 
-    // 2. Резервный запуск установки через rish (pm install)
+    // 2. Запуск установки через Shizuku (rish am start PackageInstaller + pm install)
     var pyCmd = [
       'python3 -c "',
-      'import subprocess;',
-      'p = \'\'\'' + normPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'\'\';',
-      'try: subprocess.run([\'rish\', \'-c\', \'pm install -r \"\' + p + \'\" \'], timeout=15);',
-      'except Exception: pass;',
+      'import os, urllib.parse, subprocess;',
+      'raw = \'\'\'' + normPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\'\'\';',
+      'p = raw;',
+      'if not os.path.exists(p):',
+      '    for root in [\'/storage/emulated/0/Leostryx Projects/Leostryx-repo\', \'/storage/emulated/0/Documents\', \'/storage/emulated/0/Download\', \'/storage/emulated/0\']:',
+      '        cand = os.path.join(root, raw.lstrip(\'/\'));',
+      '        if os.path.exists(cand): p = cand; break;',
+      'p = os.path.realpath(p);',
+      'if os.path.isfile(p):',
+      '    enc = urllib.parse.quote(p);',
+      '    cmd_ui = \'am start -a android.intent.action.VIEW -d \"content://com.agyru.t2.fileprovider\' + enc + \'\" -t \"application/vnd.android.package-archive\" -f 0x10000001\';',
+      '    try: subprocess.run([\'rish\', \'-c\', cmd_ui], timeout=6);',
+      '    except Exception: pass;',
+      '    cmd_pm = \'pm install -r \"\' + p + \'\"\';',
+      '    try: subprocess.run([\'rish\', \'-c\', cmd_pm], timeout=25);',
+      '    except Exception: pass;',
       '"'
     ].join("");
     runTerm(pyCmd);
@@ -427,7 +439,8 @@
     styleOnce();
     closeSheet();
     var cleaned = clean(path);
-    var apk = isApk(cleaned);
+    var resolved = resolveAbsolutePath(cleaned);
+    var apk = isApk(cleaned) || isApk(resolved);
     var box = document.createElement("div");
     box.className = "agy-path-sheet";
     box.innerHTML =
@@ -446,7 +459,7 @@
             "The system may ask for “Install unknown apps” permission for Leostryx.") + '</div>' : '') +
       '</div>';
 
-    box.querySelector("[data-path]").textContent = cleaned;
+    box.querySelector("[data-path]").textContent = resolved || cleaned;
     box.addEventListener("pointerdown", function (e) {
       if (e.target === box) closeSheet();
     });
@@ -456,9 +469,9 @@
       e.preventDefault();
       e.stopPropagation();
       var act = b.getAttribute("data-act");
-      if (act === "open") openPath(cleaned);
-      else if (act === "install") installApk(cleaned);
-      else if (act === "copy") { flash(copy(cleaned) ? T("Путь скопирован.", "Path copied.") : T("Не удалось скопировать.", "Copy failed.")); }
+      if (act === "open") openPath(resolved || cleaned);
+      else if (act === "install") installApk(resolved || cleaned);
+      else if (act === "copy") { flash(copy(resolved || cleaned) ? T("Путь скопирован.", "Path copied.") : T("Не удалось скопировать.", "Copy failed.")); }
       else closeSheet();
     }, true);
 
