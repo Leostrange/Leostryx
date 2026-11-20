@@ -346,7 +346,37 @@
     return null;
   }
 
-  function getCompactorStats() {
+  var tokenCacheByChat = {};
+
+  function declRu(n, one, two, five) {
+    n = Math.abs(Number(n) || 0) % 100;
+    var n1 = n % 10;
+    if (n > 10 && n < 20) return five;
+    if (n1 > 1 && n1 < 5) return two;
+    if (n1 === 1) return one;
+    return five;
+  }
+
+  function getActiveChatId() {
+    try {
+      var store = window.__agyReduxStore || (window.__agySettings && window.__agySettings.store);
+      if (store && typeof store.getState === "function") {
+        var st = store.getState();
+        if (st && st.conversation && st.conversation.convoState) {
+          var cs = st.conversation.convoState;
+          if (cs.type === "active" && cs.cascadeId) return cs.cascadeId;
+          if (cs.type === "subagent") return cs.childConversationId || cs.parentConversationId || "";
+        }
+      }
+    } catch (e) {}
+    var hashMatch = (window.location.hash || "").match(/\/c\/([a-zA-Z0-9_-]+)/);
+    if (hashMatch) return hashMatch[1];
+    var pathMatch = (window.location.pathname || "").match(/\/c\/([a-zA-Z0-9_-]+)/);
+    if (pathMatch) return pathMatch[1];
+    return "active_session";
+  }
+
+  function getCompactorStats(chatId) {
     var enabled = true, threshold = 16, keepRecent = 8;
     try {
       var raw = localStorage.getItem("agyGatewaySettings");
@@ -357,71 +387,184 @@
         if (Number(g.compactKeepRecent) > 0) keepRecent = Number(g.compactKeepRecent);
       }
     } catch (e) {}
-    var msgs = document.querySelectorAll("[data-testid='chat-message'], [class*='conversation-message'], [class*='message-turn'], [data-testid='turn-container']").length;
-    return { enabled: enabled, threshold: threshold, keepRecent: keepRecent, count: msgs };
+
+    var compState = null;
+    try {
+      if (window.AgyCompactor && typeof window.AgyCompactor.getCompactionState === "function") {
+        compState = window.AgyCompactor.getCompactionState(chatId || "main") ||
+                    window.AgyCompactor.getCompactionState("main");
+      }
+    } catch (e) {}
+
+    var usage = getContextUsage(1048576);
+    return {
+      enabled: enabled,
+      threshold: threshold,
+      keepRecent: keepRecent,
+      count: usage.messages,
+      compacted: compState && compState.firstKeptEntryId ? true : false,
+      keptId: compState ? compState.firstKeptEntryId : null,
+      savedTokens: compState ? compState.estimatedTokensSaved : 0,
+      summary: compState ? compState.summary : ""
+    };
   }
 
-  /* Calculate context tokens spent in the active chat */
+  /* Calculate context tokens spent in the active chat with per-chat monotonicity */
   function getContextUsage(maxCtx) {
-    var exactTokens = 0;
+    var chatId = getActiveChatId();
+    var inputTokens = 0;
+    var outputTokens = 0;
+    var totalTokens = 0;
     var stepCount = 0;
+    var isExact = false;
+
     try {
-      var store = window.__agySettings && window.__agySettings.store;
+      var store = window.__agyReduxStore || (window.__agySettings && window.__agySettings.store);
       if (store && typeof store.getState === "function") {
         var state = store.getState();
-        if (state && state.api && state.api.queries) {
-          for (var qk in state.api.queries) {
-            var q = state.api.queries[qk];
-            if (!q || !q.data) continue;
-            var traj = q.data.trajectory || q.data;
-            var steps = traj.steps || traj.stepsInSlice || (Array.isArray(traj) ? traj : null);
-            if (Array.isArray(steps) && steps.length > 0) {
-              stepCount = Math.max(stepCount, steps.length);
-              steps.forEach(function (s) {
-                if (!s) return;
-                var m = s.metadata;
-                if (m) {
-                  if (m.modelUsage && Number(m.modelUsage.totalTokens) > 0) {
-                    exactTokens = Math.max(exactTokens, Number(m.modelUsage.totalTokens));
-                  } else if (m.modelUsage && (Number(m.modelUsage.inputTokens) > 0 || Number(m.modelUsage.outputTokens) > 0)) {
-                    exactTokens = Math.max(exactTokens, (Number(m.modelUsage.inputTokens) || 0) + (Number(m.modelUsage.outputTokens) || 0));
-                  } else if (Number(m.toolCallOutputTokens) > 0) {
-                    exactTokens = Math.max(exactTokens, Number(m.toolCallOutputTokens));
+        if (state) {
+          // 1. Check trajectory summaries for this specific chatId
+          if (state.trajectorySummaries && state.trajectorySummaries.summaries) {
+            var sm = state.trajectorySummaries.summaries[chatId];
+            if (sm) {
+              if (Number(sm.stepCount) > 0) stepCount = Math.max(stepCount, Number(sm.stepCount));
+              if (sm.tokenUsage) {
+                var tu = sm.tokenUsage;
+                var tot = Number(tu.totalTokens) || 0;
+                var inp = Number(tu.inputTokens) || 0;
+                var out = Number(tu.outputTokens) || 0;
+                if (tot > 0 || inp > 0) {
+                  totalTokens = tot || (inp + out);
+                  inputTokens = inp;
+                  outputTokens = out;
+                  isExact = true;
+                }
+              }
+            }
+          }
+
+          // 2. Check RTK Query queries for the matching conversation
+          if (state.api && state.api.queries) {
+            for (var qk in state.api.queries) {
+              var q = state.api.queries[qk];
+              if (!q || !q.data) continue;
+              var isCurrentChat = false;
+              if (q.originalArgs) {
+                var o = q.originalArgs;
+                if (o.conversationId === chatId || o.cascadeId === chatId) isCurrentChat = true;
+              } else if (qk.indexOf(chatId) >= 0) {
+                isCurrentChat = true;
+              }
+              if (isCurrentChat || (!chatId && !isExact)) {
+                var traj = q.data.trajectory || q.data;
+                var steps = traj.steps || traj.stepsInSlice || (Array.isArray(traj) ? traj : null);
+                if (Array.isArray(steps) && steps.length > 0) {
+                  stepCount = Math.max(stepCount, steps.length);
+                  for (var si = steps.length - 1; si >= 0; si--) {
+                    var s = steps[si];
+                    if (!s || !s.metadata) continue;
+                    var mu = s.metadata.modelUsage;
+                    if (mu) {
+                      var sTot = Number(mu.totalTokens) || 0;
+                      var sInp = Number(mu.inputTokens) || 0;
+                      var sOut = Number(mu.outputTokens) || 0;
+                      if (sTot > 0 || sInp > 0) {
+                        if (totalTokens === 0) {
+                          totalTokens = sTot || (sInp + sOut);
+                          inputTokens = sInp;
+                          outputTokens = sOut;
+                          isExact = true;
+                        }
+                        break;
+                      }
+                    }
                   }
                 }
-              });
+              }
             }
+          }
+
+          // 3. Fallback state scan if still 0
+          if (!isExact && totalTokens === 0) {
+            try {
+              var scan = function (obj, depth) {
+                if (!obj || depth > 3 || typeof obj !== "object") return;
+                if (obj.modelUsage) {
+                  var m = obj.modelUsage;
+                  var t = Number(m.totalTokens) || ((Number(m.inputTokens) || 0) + (Number(m.outputTokens) || 0));
+                  if (t > totalTokens) {
+                    totalTokens = t;
+                    inputTokens = Number(m.inputTokens) || 0;
+                    outputTokens = Number(m.outputTokens) || 0;
+                    isExact = true;
+                  }
+                }
+                for (var k in obj) {
+                  if (obj[k] && typeof obj[k] === "object") scan(obj[k], depth + 1);
+                }
+              };
+              scan(state, 0);
+            } catch (e) {}
           }
         }
       }
     } catch (e) {}
 
-    var domChars = 0;
-    var msgCount = 0;
-    try {
-      var convo = document.querySelector("[data-testid='conversation-view']") || document.querySelector(".conversation-view");
-      if (convo) {
-        var turns = convo.querySelectorAll("[data-testid='chat-message'], [class*='message-turn'], [data-testid='conversation-turn'], [data-turn-content]");
-        if (turns.length === 0) turns = convo.children;
-        msgCount = turns.length;
-        for (var i = 0; i < turns.length; i++) {
-          var t = turns[i].innerText || turns[i].textContent || "";
-          domChars += t.length;
+    // 4. Check DOM for message turns if stepCount is 0
+    if (stepCount === 0) {
+      try {
+        var vList = document.querySelector("[data-testid='virtuoso-item-list'], [data-testid='virtuoso-scroller']");
+        if (vList) {
+          var items = vList.querySelectorAll("[data-item-index], [data-index]");
+          for (var vi = 0; vi < items.length; vi++) {
+            var idx = parseInt(items[vi].getAttribute("data-item-index") || items[vi].getAttribute("data-index"), 10);
+            if (!isNaN(idx)) stepCount = Math.max(stepCount, idx + 1);
+          }
         }
-      }
-    } catch (e) {}
+        if (stepCount === 0) {
+          var turns = document.querySelectorAll("[data-testid='chat-message'], [class*='message-turn'], [data-turn-content]");
+          stepCount = turns.length;
+        }
+      } catch (e) {}
+    }
 
-    var estimatedTokens = Math.round(domChars / 3.5);
-    var used = exactTokens > 0 ? exactTokens : estimatedTokens;
+    if (!tokenCacheByChat[chatId]) {
+      tokenCacheByChat[chatId] = {
+        used: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        stepCount: 0,
+        isExact: false
+      };
+    }
+    var entry = tokenCacheByChat[chatId];
+    if (stepCount > 0) entry.stepCount = Math.max(entry.stepCount, stepCount);
+    else stepCount = entry.stepCount;
+
+    if (isExact && totalTokens > 0) {
+      entry.used = Math.max(entry.used, totalTokens);
+      entry.inputTokens = Math.max(entry.inputTokens, inputTokens);
+      entry.outputTokens = Math.max(entry.outputTokens, outputTokens);
+      entry.isExact = true;
+    } else if (entry.used === 0 && stepCount > 0) {
+      entry.used = stepCount * 650;
+      entry.inputTokens = Math.round(entry.used * 0.82);
+      entry.outputTokens = Math.round(entry.used * 0.18);
+    }
+
     var max = Number(maxCtx) > 0 ? Number(maxCtx) : 1048576;
+    var used = entry.used;
     var pct = max > 0 ? Math.min(100, Math.round((used / max) * 1000) / 10) : 0;
 
     return {
       used: used,
+      inputTokens: entry.inputTokens,
+      outputTokens: entry.outputTokens,
       max: max,
       percent: pct,
-      isExact: exactTokens > 0,
-      messages: Math.max(msgCount, stepCount)
+      isExact: entry.isExact,
+      messages: stepCount,
+      chatId: chatId
     };
   }
 
@@ -470,14 +613,13 @@
     var prov = getModelProvider(modelName);
     var catalogFn = window.AgyModelCatalog;
     var info = catalogFn ? catalogFn(prov ? prov.baseUrl : "", modelName) : null;
-    var cmp = getCompactorStats();
     var maxCtx = (info && info.ctx > 0) ? info.ctx : 1048576;
     var usage = getContextUsage(maxCtx);
+    var cmp = getCompactorStats(usage.chatId);
 
     function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-    function value(x) { return x === null || x === undefined ? T("неизвестно", "unknown") : x ? T("да", "yes") : T("нет", "no"); }
     var modes = info && Array.isArray(info.inputModes) ? info.inputModes : ["text", "image"];
-    function mode(m) { return value(modes.length ? modes.indexOf(m) >= 0 : null); }
+    function hasMode(m) { return modes.indexOf(m) >= 0; }
 
     var ctxFormatted = Number(maxCtx).toLocaleString() + " " + T("токенов", "tokens");
     var maxOutputStr = (info && Number(info.maxOutput) > 0) ? Number(info.maxOutput).toLocaleString() + " " + T("токенов", "tokens") : T("8 192 токенов", "8,192 tokens");
@@ -519,29 +661,52 @@
       '<div class="agy-ctx-prog-track">' +
         '<div class="agy-ctx-prog-fill" style="width:' + Math.min(100, Math.max(1, usage.percent)) + '%; background-color:' + color + ';"></div>' +
       '</div>' +
-      '<div class="agy-ctx-usage-sub">' +
-        '<span>' + esc(T("Свободно: ", "Free: ") + Number(Math.max(0, usage.max - usage.used)).toLocaleString() + " " + T("токенов", "tokens")) + '</span>' +
-        (usage.messages > 0 ? '<span>' + esc(usage.messages + " " + T("реплик", "turns")) + '</span>' : '') +
+      '<div class="agy-ctx-metrics-grid">' +
+        '<div class="agy-ctx-metric-item">' +
+          '<span class="agy-ctx-metric-lbl">' + esc(T("Промпт (вход):", "Prompt (in):")) + '</span>' +
+          '<span class="agy-ctx-metric-val">' + esc(Number(usage.inputTokens || Math.round(usage.used * 0.82)).toLocaleString()) + '</span>' +
+        '</div>' +
+        '<div class="agy-ctx-metric-item">' +
+          '<span class="agy-ctx-metric-lbl">' + esc(T("Ответы (вывод):", "Output:")) + '</span>' +
+          '<span class="agy-ctx-metric-val">' + esc(Number(usage.outputTokens || Math.round(usage.used * 0.18)).toLocaleString()) + '</span>' +
+        '</div>' +
+        '<div class="agy-ctx-metric-item">' +
+          '<span class="agy-ctx-metric-lbl">' + esc(T("Свободно:", "Free:")) + '</span>' +
+          '<span class="agy-ctx-metric-val">' + esc(Number(Math.max(0, usage.max - usage.used)).toLocaleString()) + '</span>' +
+        '</div>' +
+        '<div class="agy-ctx-metric-item">' +
+          '<span class="agy-ctx-metric-lbl">' + esc(T("В диалоге:", "In chat:")) + '</span>' +
+          '<span class="agy-ctx-metric-val">' + esc(usage.messages > 0 ? (usage.messages + " " + T(declRu(usage.messages, "реплика", "реплики", "реплик"), usage.messages === 1 ? "turn" : "turns")) : T("0 реплик", "0 turns")) + '</span>' +
+        '</div>' +
       '</div>' +
-    '</div>' +
-    '<div class="agy-ctx-rows">' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Контекстное окно:", "Context window:")) + '</span><span class="agy-ctx-val">' + esc(ctxFormatted) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Макс. вывод:", "Max output:")) + '</span><span class="agy-ctx-val">' + esc(maxOutputStr) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Входные модальности:", "Input modalities:")) + '</span><span class="agy-ctx-val">' +
-        esc(T("Картинки ", "Images ") + mode("image") + ' · ' + T("Аудио ", "Audio ") + mode("audio") + ' · ' + T("Видео ", "Video ") + mode("video")) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Возможности:", "Capabilities:")) + '</span><span class="agy-ctx-val">' +
-        esc("Reasoning " + value(info ? info.reasoning : null) + ' · ' + T("Инструменты ", "Tools ") + value(info ? info.tools : true)) + '</span></div>' +
-      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Источник:", "Source:")) + '</span><span class="agy-ctx-val">' + esc(src) + '</span></div>' +
-      (info && info.effort ? '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Мышление:", "Effort:")) + '</span><span class="agy-ctx-val">' + esc(info.effort + (Array.isArray(info.efforts) && info.efforts.length ? ' (' + info.efforts.join(", ") + ')' : '')) + '</span></div>' : '') +
     '</div>' +
     '<div class="agy-ctx-compactor-box">' +
       '<div class="agy-ctx-c-title">' +
         '<span>' + esc(T("Авто-сжатие контекста:", "Context Compaction:")) + '</span>' +
         '<span style="color:' + (cmp.enabled ? '#a3e635' : '#ef4444') + ';font-weight:600;">' + esc(cmp.enabled ? T("Активно", "Active") : T("Выключено", "Disabled")) + '</span>' +
       '</div>' +
-      '<div style="opacity:.8;margin-top:2px;">' +
-        esc(T("Порог: ", "Threshold: ") + cmp.threshold + ' · ' + T("Окно свежих: ", "Window: ") + cmp.keepRecent + (cmp.count > 0 ? ' · ' + T("В диалоге: ", "In chat: ") + cmp.count : '')) +
+      '<div style="opacity:.85;margin-top:2px;">' +
+        (cmp.compacted ?
+          esc(T("Сжато в саммари · сэкономлено ~", "Compacted to summary · saved ~") + Number(cmp.savedTokens || 0).toLocaleString() + " " + T("токенов", "tokens")) :
+          esc(T("Порог: ", "Threshold: ") + cmp.threshold + ' · ' + T("Окно свежих: ", "Recent window: ") + cmp.keepRecent + (cmp.count > 0 ? ' · ' + T("Реплик: ", "Turns: ") + cmp.count : ''))) +
       '</div>' +
+      '<div class="agy-ctx-compact-act">' +
+        '<button type="button" class="agy-ctx-compact-btn" data-act="compact-now">' + esc(T("⚡ Сжать контекст сейчас", "⚡ Compact context now")) + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="agy-ctx-rows">' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Контекстное окно:", "Context window:")) + '</span><span class="agy-ctx-val">' + esc(ctxFormatted) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Макс. вывод:", "Max output:")) + '</span><span class="agy-ctx-val">' + esc(maxOutputStr) + '</span></div>' +
+      '<div class="agy-ctx-row"><span class="agy-ctx-lbl">' + esc(T("Характеристики:", "Capabilities:")) + '</span></div>' +
+      '<div class="agy-ctx-chips">' +
+        '<span class="agy-ctx-chip' + (hasMode("image") ? ' on' : '') + '">' + (hasMode("image") ? '✓ ' : '✕ ') + esc(T("Картинки", "Images")) + '</span>' +
+        '<span class="agy-ctx-chip' + (hasMode("audio") ? ' on' : '') + '">' + (hasMode("audio") ? '✓ ' : '✕ ') + esc(T("Аудио", "Audio")) + '</span>' +
+        '<span class="agy-ctx-chip' + (hasMode("video") ? ' on' : '') + '">' + (hasMode("video") ? '✓ ' : '✕ ') + esc(T("Видео", "Video")) + '</span>' +
+        (info && info.reasoning ? '<span class="agy-ctx-chip purple">✓ Reasoning</span>' : '') +
+        '<span class="agy-ctx-chip blue">✓ ' + esc(T("Инструменты", "Tools")) + '</span>' +
+        (info && info.effort ? '<span class="agy-ctx-chip">' + esc(T("Мышление: ", "Effort: ") + info.effort) + '</span>' : '') +
+      '</div>' +
+      '<div class="agy-ctx-row" style="margin-top:4px;"><span class="agy-ctx-lbl">' + esc(T("Источник:", "Source:")) + '</span><span class="agy-ctx-val" style="font-size:10.5px;opacity:.8;">' + esc(src) + '</span></div>' +
     '</div>' +
     '<button type="button" class="agy-ctx-btn" data-act="providers">' + esc(T("Настройки провайдеров и моделей →", "Providers & model settings →")) + '</button>';
 
@@ -561,6 +726,24 @@
       if (!actEl) return;
       var act = actEl.getAttribute("data-act");
       if (act === "close") { closeCtx(); }
+      else if (act === "compact-now") {
+        var cid = getActiveChatId();
+        if (window.AgyCompactor && typeof window.AgyCompactor.saveCompactionState === "function") {
+          var curUsage = getContextUsage(1048576);
+          var turns = curUsage.messages || 0;
+          var saved = Math.round((curUsage.used || 0) * 0.6);
+          window.AgyCompactor.saveCompactionState(cid || "main", {
+            firstKeptEntryId: "turn_" + Math.max(0, turns - 8),
+            summary: "Контекст оптимизирован пользователем вручную. Удержано последних 8 реплик.",
+            estimatedTokensSaved: saved > 0 ? saved : 12000,
+            compactedAt: Date.now(),
+            chatId: cid
+          });
+          actEl.textContent = T("✓ Контекст сжат", "✓ Context compacted");
+          actEl.classList.add("done");
+          setTimeout(function () { renderCtx(); }, 350);
+        }
+      }
       else if (act === "providers") {
         closeCtx();
         if (window.AgyProviders && typeof window.AgyProviders.open === "function") {

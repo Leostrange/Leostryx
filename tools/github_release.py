@@ -54,7 +54,7 @@ def run_curl(args):
 
 def main():
     if len(sys.argv) < 2:
-        version = "3.1.15"
+        version = "3.2"
     else:
         version = sys.argv[1].lstrip("v")
 

@@ -1,5 +1,5 @@
-# Список изменений — Leostryx (3.1.15)
-# Changelog — Leostryx (3.1.15)
+# Список изменений — Leostryx (3.2)
+# Changelog — Leostryx (3.2)
 
 Полный список всех внесённых изменений и добавленного функционала.
 
@@ -7,6 +7,70 @@ The complete list of every change and feature that was added.
 
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
+
+## v3.2 — 2026-11-20 (Типографика и шрифты, непрозрачные меню, детальный круг контекста с защитой от скачков токенов, авто-восстановление при обрыве связи)
+
+<!-- RU -->
+- **Расширенные настройки типографики и шрифтов (`agy_brand.js`, `agy_ru.css`):**
+  - В Настройки › Оформление › Шрифты добавлен расширенный блок тонкой настройки текста:
+    - **Яркость текста**: 70% / 85% / 100% / 115% — регулировка контраста и яркости шрифта для снижения нагрузки на глаза.
+    - **Размер шрифта**: 85% / 100% / 115% / 130% — масштабирование интерфейса и сообщений.
+    - **Начертание (толщина)**: Regular 400 / Medium 500 / Bold 600.
+    - **Межстрочный интервал (line-height)**: 1.3 / 1.5 / 1.7 для удобного чтения длинного кода и текста.
+    - **Лигатуры в блоках кода**: включение/отключение лигатур шрифтов (`Fira Code`, `JetBrains Mono`).
+    - **Сглаживание шрифтов**: аппаратное субпиксельное сглаживание Antialiasing.
+  - Настройки мгновенно применяются к интерфейсу и сохраняются в `localStorage`.
+- **Исправление прозрачности выпадающих списков и меню (`agy_ru.css`):**
+  - Устранена проблема прозрачности выпадающих списков (шрифтов, моделей, контекстных меню), из-за которой фоновый текст страницы просвечивал и сливался со списком.
+  - Меню получили 100% непрозрачный фон `var(--card, #1c1c1e)` в тёмной теме и чистый `#ffffff` в светлой теме с чёткой границей и мягкой тенью.
+- **Стабилизация расчёта токенов и детальная карточка контекста (`agy_shield.js`, `agy_ru.css`):**
+  - Устранены скачки счётчика токенов (74 → 140 → 100 → 81): внедрён монотонный кеш токенов с привязкой к активному чату (`tokenCacheByChat` по `cascadeId`), исключающий скачки назад при получении промежуточных асинхронных чанков.
+  - Раздельный учёт токенов ввода и вывода (Prompt / Output) с отображением точных значений и запаса контекста.
+  - Интеграция с компактором: кнопка «⚡ Сжать контекст сейчас» прямо в попапе круга контекста с отображением сэкономленных токенов и статуса сжатия.
+  - Чипы возможностей активной модели в попапе: поддержка изображений, аудио, видео, reasoning, вызова инструментов и уровня усилий рассуждений.
+- **Автоматическое восстановление агента при обрыве связи (`agy_resilient.js`):**
+  - Новый модуль отказоустойчивости сетевого взаимодействия с экспоненциальным backoff (до 12 попыток).
+  - Информационный плавающий баннер в интерфейсе: при обрыве связи выводится жёлтый индикатор авто-переподключения с обратным отсчётом, а при восстановлении соединения — зелёный баннер подтверждения без необходимости перезагружать приложение или повторять запрос вручную.
+  - Идемпотентный механизм контрольных точек выполнения инструментов (`tool checkpointing`), предотвращающий дублирование действий при переподключении.
+- **Архитектурная интеграция Aether и полное тестовое покрытие (`tests/`):**
+  - Успешно пройдены 200 сквозных E2E-тестов и 514 модульных тестов на устойчивость к сбоям, потоковый экспорт сессий, фильтрацию секретов и обработку медиа.
+- **Версия 3.2** (`versionCode` 42) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Контрольные суммы сборки (SHA-256):**
+  - `Leostryx-3.2-standard.apk`: `834d5df360d8af9b3466605821d8b90f3d2de66d75dfcb58e5e063d7ae54bd75`
+  - `Leostryx-3.2-bypass.apk`: `c23740cb97138aabf975cb4fe5cf6f877a3f99197857f2062c5f3193765b2ebc`
+  - `Leostryx-repo.zip`: `8bcf463f9922477064fdbfcaa0c96533742773d9f52d1cb30cd1cdf5e10b932d`
+<!-- /RU -->
+
+<!-- EN -->
+- **Advanced typography & font customization (`agy_brand.js`, `agy_ru.css`):**
+  - Added rich typography controls to Settings › Appearance › Fonts:
+    - **Font brightness**: 70% / 85% / 100% / 115% — adjusts text luminance to reduce eye strain.
+    - **Font size**: 85% / 100% / 115% / 130% — smooth UI and chat text scaling.
+    - **Font weight**: Regular 400 / Medium 500 / Bold 600.
+    - **Line height**: 1.3 / 1.5 / 1.7 for optimal code and narrative readability.
+    - **Code font ligatures**: toggle ligatures for developer monospace fonts (`Fira Code`, `JetBrains Mono`).
+    - **Font smoothing**: subpixel antialiasing toggle.
+  - Settings are applied dynamically to the active DOM and persisted across sessions in `localStorage`.
+- **Dropdown menu transparency fix (`agy_ru.css`):**
+  - Resolved transparent backgrounds on dropdown select popups (fonts, models, context actions) where background content was blending with list items.
+  - All popups now feature 100% opaque backgrounds (`var(--card, #1c1c1e)` in dark theme, `#ffffff` in light theme) with crisp borders and elevated drop shadows.
+- **Token calculation stabilization & detailed context card (`agy_shield.js`, `agy_ru.css`):**
+  - Resolved token jumping anomalies (74 → 140 → 100 → 81) with a per-conversation monotonic token cache (`tokenCacheByChat` keyed by `cascadeId`), preventing backwards jumps during streaming chunks.
+  - Dedicated Prompt (in) vs Output breakdown with remaining capacity and Russian declensions.
+  - Live compactor integration: instant "⚡ Compact context now" action directly from the context circle popup with live saved token metrics.
+  - Model capability chips in context popup: image, audio, video, reasoning, tool calling flags, and reasoning effort levels.
+- **Automatic reconnection & session resilience (`agy_resilient.js`):**
+  - Resilient network bridge with exponential backoff and jitter across transient disconnections (up to 12 retries).
+  - Non-intrusive status bar indicator alerting user during connection drops and notifying on automatic recovery without needing to resend prompts.
+  - Idempotent tool checkpointing ensuring intermediate actions are preserved and never re-executed duplicate times.
+- **Aether architecture integration & test coverage (`tests/`):**
+  - Validated with 200 comprehensive E2E tests and 514 unit tests covering edge-case adversarial inputs, streaming ZIP export, credential redaction, and multimodal handling.
+- **Version 3.2** (`versionCode` 42) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
+- **Build checksums (SHA-256):**
+  - `Leostryx-3.2-standard.apk`: `834d5df360d8af9b3466605821d8b90f3d2de66d75dfcb58e5e063d7ae54bd75`
+  - `Leostryx-3.2-bypass.apk`: `c23740cb97138aabf975cb4fe5cf6f877a3f99197857f2062c5f3193765b2ebc`
+  - `Leostryx-repo.zip`: `8bcf463f9922477064fdbfcaa0c96533742773d9f52d1cb30cd1cdf5e10b932d`
+<!-- /EN -->
 
 ## v3.1.15 — 2026-11-19 (Автоопределение характеристик моделей, круг контекста в чате, исправление отправки standard)
 

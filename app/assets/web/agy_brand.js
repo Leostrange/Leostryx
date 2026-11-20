@@ -151,7 +151,18 @@
   function loadCfg() {
     var raw = store(STORE_KEY);
     var savedFont = store("agyFontFamily");
-    var cfg = { pack: DEFAULT_PACK, color: DEFAULT_COLOR, recolorLogo: true, font: savedFont || DEFAULT_FONT };
+    var cfg = {
+      pack: DEFAULT_PACK,
+      color: DEFAULT_COLOR,
+      recolorLogo: true,
+      font: savedFont || DEFAULT_FONT,
+      brightness: 100,
+      size: 100,
+      weight: 400,
+      lineHeight: 1.5,
+      ligatures: true,
+      smoothing: true
+    };
     if (raw) {
       try {
         var p = JSON.parse(raw);
@@ -160,6 +171,12 @@
           if (p.color) cfg.color = p.color;
           if (p.recolorLogo !== undefined) cfg.recolorLogo = p.recolorLogo !== false;
           if (p.font) cfg.font = p.font;
+          if (p.brightness) cfg.brightness = Number(p.brightness) || 100;
+          if (p.size) cfg.size = Number(p.size) || 100;
+          if (p.weight) cfg.weight = Number(p.weight) || 400;
+          if (p.lineHeight) cfg.lineHeight = Number(p.lineHeight) || 1.5;
+          if (p.ligatures !== undefined) cfg.ligatures = p.ligatures !== false;
+          if (p.smoothing !== undefined) cfg.smoothing = p.smoothing !== false;
         }
       } catch (e) {}
     }
@@ -182,6 +199,7 @@
 
   /* -------------------------------------------------------- font apply */
   function applyFont(fontId) {
+    if (!fontId) fontId = cfg.font;
     var f = FONTS.filter(function (x) { return x.id === fontId; })[0] || FONTS[0];
     var root = document.documentElement;
     var body = document.body;
@@ -194,16 +212,16 @@
       (document.head || root).appendChild(styleEl);
     }
 
-    if (f.id === "system") {
-      styleEl.textContent = "";
-      root.style.removeProperty("--default-font-family");
-      root.style.removeProperty("--font-sans");
-      root.style.removeProperty("--vscode-font-family");
-      if (body) {
-        body.style.removeProperty("font-family");
-      }
-    } else {
-      var cssRule =
+    var brightness = Number(cfg.brightness) || 100;
+    var size = Number(cfg.size) || 100;
+    var weight = Number(cfg.weight) || 400;
+    var lineHeight = Number(cfg.lineHeight) || 1.5;
+    var ligatures = cfg.ligatures !== false;
+    var smoothing = cfg.smoothing !== false;
+
+    var cssRule = "";
+    if (f.id !== "system") {
+      cssRule +=
         ":root, html, body, button, input, select, textarea, .font-sans {\n" +
         "  --default-font-family: " + f.family + " !important;\n" +
         "  --font-sans: " + f.family + " !important;\n" +
@@ -219,8 +237,46 @@
           "  font-family: " + f.family + " !important;\n" +
           "}\n";
       }
-      styleEl.textContent = cssRule;
     }
+
+    // Typography overrides
+    cssRule +=
+      ":root {\n" +
+      "  --agy-font-scale: " + (size / 100).toFixed(2) + ";\n" +
+      "  --agy-font-weight: " + weight + ";\n" +
+      "  --agy-line-height: " + lineHeight + ";\n" +
+      "  --agy-font-brightness: " + (brightness / 100).toFixed(2) + ";\n" +
+      "}\n";
+
+    cssRule +=
+      "body, .font-sans, p, [class*='message'], [data-testid='turn-content'], textarea, input {\n" +
+      "  font-weight: var(--agy-font-weight) !important;\n" +
+      "  line-height: var(--agy-line-height) !important;\n";
+
+    if (brightness !== 100) {
+      cssRule += "  filter: brightness(var(--agy-font-brightness)) !important;\n";
+    }
+    if (smoothing) {
+      cssRule +=
+        "  -webkit-font-smoothing: antialiased !important;\n" +
+        "  -moz-osx-font-smoothing: grayscale !important;\n" +
+        "  text-rendering: optimizeLegibility !important;\n";
+    }
+    cssRule += "}\n";
+
+    if (size !== 100) {
+      cssRule +=
+        "[data-testid='conversation-view'], [class*='conversation-view'], .prose, [data-testid='chat-message'] {\n" +
+        "  font-size: calc(14px * var(--agy-font-scale)) !important;\n" +
+        "}\n";
+    }
+
+    cssRule +=
+      "code, pre, .font-mono {\n" +
+      "  font-variant-ligatures: " + (ligatures ? "normal" : "none") + " !important;\n" +
+      "}\n";
+
+    styleEl.textContent = cssRule;
   }
   window.__agyApplyFont = applyFont;
 
@@ -613,9 +669,9 @@
     dropdown.id = "agy-font-dropdown";
     dropdown.setAttribute("role", "listbox");
     dropdown.style.cssText = "display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;width:100%;" +
-      "max-height:280px;overflow-y:auto;z-index:9999;border-radius:14px;background:var(--agy-glass-surface,rgba(24,24,28,.95));" +
-      "border:1px solid var(--agy-glass-border,rgba(127,127,127,.25));" +
-      "box-shadow:var(--agy-glass-shadow,0 16px 40px rgba(0,0,0,.5));padding:6px;box-sizing:border-box";
+      "max-height:280px;overflow-y:auto;z-index:9999;border-radius:14px;background:var(--card,var(--popover,var(--background,#1e1e22)));" +
+      "border:1px solid var(--border,rgba(127,127,127,.28));" +
+      "box-shadow:0 16px 40px rgba(0,0,0,.65);padding:6px;box-sizing:border-box";
 
     FONTS.forEach(function (f) {
       var isSel = f.id === cfg.font;
@@ -698,6 +754,164 @@
     }, true);
 
     fontContainer.appendChild(selectCol);
+
+    /* Typography settings section */
+    function makeControlRow(label, currentVal, options, onChange) {
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0";
+
+      var lbl = document.createElement("span");
+      lbl.style.cssText = "font-size:12px;font-weight:500;color:var(--foreground,#eee)";
+      lbl.textContent = label;
+      row.appendChild(lbl);
+
+      var grp = document.createElement("div");
+      grp.style.cssText = "display:inline-flex;border-radius:8px;background:rgba(127,127,127,.12);padding:2px;gap:2px";
+
+      options.forEach(function (opt) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        var isAct = opt.val === currentVal;
+        btn.style.cssText = "all:unset;box-sizing:border-box;cursor:pointer;font-size:11px;font-weight:" + (isAct ? "600" : "500") +
+          ";padding:3px 7px;border-radius:6px;transition:all .12s;background:" +
+          (isAct ? "var(--primary,#0b84ff)" : "transparent") + ";color:" +
+          (isAct ? "#ffffff" : "var(--muted-foreground,#888)");
+        btn.textContent = opt.lbl;
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          onChange(opt.val);
+        };
+        grp.appendChild(btn);
+      });
+      row.appendChild(grp);
+      return row;
+    }
+
+    function makeToggleRow(label, checked, onChange) {
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0";
+
+      var lbl = document.createElement("span");
+      lbl.style.cssText = "font-size:12px;font-weight:500;color:var(--foreground,#eee)";
+      lbl.textContent = label;
+      row.appendChild(lbl);
+
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.style.cssText = "all:unset;box-sizing:border-box;cursor:pointer;width:38px;height:22px;border-radius:11px;padding:2px;" +
+        "transition:background .2s;background:" + (checked ? "var(--primary,#0b84ff)" : "rgba(127,127,127,.25)") + ";position:relative";
+
+      var thumb = document.createElement("div");
+      thumb.style.cssText = "width:18px;height:18px;border-radius:50%;background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.3);" +
+        "transition:transform .2s;transform:translateX(" + (checked ? "16px" : "0") + ")";
+      toggle.appendChild(thumb);
+
+      toggle.onclick = function (e) {
+        e.stopPropagation();
+        onChange(!checked);
+      };
+      row.appendChild(toggle);
+      return row;
+    }
+
+    var typoWrap = document.createElement("div");
+    typoWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px dashed rgba(127,127,127,.2);margin-top:4px";
+
+    // 1. Font Brightness
+    typoWrap.appendChild(makeControlRow(
+      T("Яркость текста", "Font brightness"),
+      cfg.brightness || 100,
+      [
+        { val: 70, lbl: T("70% Ночь", "70% Night") },
+        { val: 85, lbl: T("85% Мягкий", "85% Soft") },
+        { val: 100, lbl: T("100% Стандарт", "100% Std") },
+        { val: 115, lbl: T("115% Яркий", "115% Bright") }
+      ],
+      function (v) {
+        cfg.brightness = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    // 2. Font Size
+    typoWrap.appendChild(makeControlRow(
+      T("Размер шрифта", "Font size"),
+      cfg.size || 100,
+      [
+        { val: 85, lbl: T("85% Мелкий", "85% Small") },
+        { val: 100, lbl: T("100% Обычный", "100% Norm") },
+        { val: 115, lbl: T("115% Крупный", "115% Large") },
+        { val: 130, lbl: T("130% Большой", "130% XL") }
+      ],
+      function (v) {
+        cfg.size = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    // 3. Font Weight
+    typoWrap.appendChild(makeControlRow(
+      T("Начертание (вес)", "Font weight"),
+      cfg.weight || 400,
+      [
+        { val: 400, lbl: T("Обычный", "Regular") },
+        { val: 500, lbl: T("Средний", "Medium") },
+        { val: 600, lbl: T("Жирный", "Bold") }
+      ],
+      function (v) {
+        cfg.weight = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    // 4. Line Height
+    typoWrap.appendChild(makeControlRow(
+      T("Высота строки", "Line height"),
+      cfg.lineHeight || 1.5,
+      [
+        { val: 1.3, lbl: "1.3 " + T("Плотный", "Tight") },
+        { val: 1.5, lbl: "1.5 " + T("Обычный", "Normal") },
+        { val: 1.7, lbl: "1.7 " + T("Просторный", "Loose") }
+      ],
+      function (v) {
+        cfg.lineHeight = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    // 5. Code Ligatures
+    typoWrap.appendChild(makeToggleRow(
+      T("Лигатуры в блоках кода (=>, !=, ===)", "Code ligatures (=>, !=, ===)"),
+      cfg.ligatures !== false,
+      function (v) {
+        cfg.ligatures = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    // 6. Font Smoothing
+    typoWrap.appendChild(makeToggleRow(
+      T("Сглаживание и чёткость (Antialiasing)", "Font smoothing (Antialiasing)"),
+      cfg.smoothing !== false,
+      function (v) {
+        cfg.smoothing = v;
+        saveCfg();
+        applyFont(cfg.font);
+        render(el);
+      }
+    ));
+
+    fontContainer.appendChild(typoWrap);
     c3.appendChild(fontContainer);
     el.appendChild(c3);
 

@@ -7,6 +7,7 @@
  * step; this page configures and validates connections. */
 (function () {
   "use strict";
+  var window = typeof globalThis !== "undefined" && globalThis.window ? globalThis.window : (typeof globalThis !== "undefined" ? globalThis : this);
   if (window.__agyProvidersReady) return;
   window.__agyProvidersReady = true;
 
@@ -362,7 +363,7 @@
     }
     // 9. Meta Llama models (llama-3.3-70b, llama-3.1-405b, llama-3.2-11b-vision)
     else if (has("llama")) {
-      var isLlamaVis = hasVision || has("vision") || has("3.2");
+      var isLlamaVis = hasVision || has("vision") || (has("3.2") && (has("11b") || has("90b") || has("vis")));
       var lctx = (has("3.1") || has("3.2") || has("3.3")) ? 131072 : (has("llama-3") ? 8192 : 4096);
       res = {
         ctx: lctx, maxOutput: 8192,
@@ -1046,7 +1047,17 @@
     if (dm && editing) {
       editing.models = (editing.models || []).filter(function (x) { return x !== dm; });
       editing.selected = (editing.selected || []).filter(function (x) { return x !== dm; });
-      render(); return;
+      if (editing.modelMeta) delete editing.modelMeta[dm];
+      var j = state.connections.map(function (cc) { return cc.id; }).indexOf(editing.id);
+      if (j >= 0) state.connections[j] = JSON.parse(JSON.stringify(editing));
+      save(); syncModels();
+      var card = b.closest ? b.closest(".agy-pv-model-card") : null;
+      if (card && card.parentNode) {
+        card.parentNode.removeChild(card);
+      } else {
+        render();
+      }
+      return;
     }
     var ed = b.getAttribute("data-edit");
     if (ed) { editing = JSON.parse(JSON.stringify(state.connections.filter(function (c) { return c.id === ed; })[0])); fetchMsg = ""; render(); return; }
@@ -1210,4 +1221,13 @@
     setTimeout(function () { syncModels(); }, 0);
     render();
   };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      officialModelInfo: officialModelInfo,
+      effectiveInfo: effectiveInfo,
+      buildSpecs: buildSpecs
+    };
+  }
 })();
+

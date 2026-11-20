@@ -1178,47 +1178,71 @@
  * "Stop recording" while recording). We match it by that aria-label.
  * ===================================================================== */
 (function () {
-  // Prefer the offline streaming engine (Vosk: continuous, no beep, no reconnect)
-  // when the model is bundled; otherwise fall back to the system SpeechRecognizer
-  // (AgySTT: one phrase per tap). Both expose the same poll protocol, so the UI
-  // below is identical for either.
-  function voskReady() { try { return !!(window.AgyVosk && window.AgyVosk.available && window.AgyVosk.available()); } catch (e) { return false; } }
-  var VOSK = voskReady() ? window.AgyVosk : null;   // offline streaming (preferred)
-  var SYS = window.AgySTT || null;                   // system recognizer (fallback)
-  if (!VOSK && !SYS) return;
   var BOX = "[data-testid='agent-input-box']";
   var MIC_SEL = 'button[aria-label="Record voice memo"],button[aria-label="Stop recording"],button[aria-label="Записать голосовое сообщение"],button[aria-label="Остановить запись"]';
-  var listening = false, pollTimer = null, liveBtn = null, lastPartial = "", gotFinal = false;
-  var curEng = null, sawEvent = false, wdTimer = 0;
+
+  var activeSessionId = null;
+  var liveMicBtn = null;
+  var previewBarEl = null;
 
   function providerMode() {
-    try { 
+    try {
       var s = window.__agyProviderSpecs && window.__agyProviderSpecs();
-      return !!(s && s.length); 
-    } catch (e) { 
-      console.log("[AgyMic] providerMode error:", e);
-      return false; 
+      return !!(s && s.length);
+    } catch (e) {
+      return false;
     }
   }
+
+  function dictCfg() {
+    try { return (window.__agyDictationCfg && window.__agyDictationCfg()) || {}; } catch (e) { return {}; }
+  }
+
+  function uiLang() {
+    var c = dictCfg();
+    if (c.lang === "ru") return "ru-RU";
+    if (c.lang === "en") return "en-US";
+    var l;
+    try { l = (document.documentElement.getAttribute("data-agy-language") || "ru").toLowerCase(); } catch (e) { l = "ru"; }
+    return l.indexOf("en") === 0 ? "en-US" : "ru-RU";
+  }
+
+  function getActiveChatId() {
+    try {
+      var view = document.querySelector("[data-testid='conversation-view']");
+      if (view && view.getAttribute("data-cascade-id")) {
+        return view.getAttribute("data-cascade-id");
+      }
+      var row = document.querySelector("[data-testid^='conversation-row-'][data-selected='true']");
+      if (row && row.getAttribute("data-cascade-id")) {
+        return row.getAttribute("data-cascade-id");
+      }
+    } catch (e) {}
+    return "default_chat";
+  }
+
   function editorEl() {
     var box = document.querySelector(BOX);
     if (!box) return null;
     return box.querySelector("[contenteditable='true']") || box.querySelector("textarea");
   }
+
   function placeCaret(ed) {
-    // execCommand("insertText") needs a live selection INSIDE the editor;
-    // tapping the mic button leaves the caret elsewhere, so put it at the end.
     try {
       var sel = window.getSelection();
       if (!sel) return;
       if (!sel.rangeCount || !ed.contains(sel.anchorNode)) {
         var r = document.createRange();
-        r.selectNodeContents(ed); r.collapse(false);
-        sel.removeAllRanges(); sel.addRange(r);
+        r.selectNodeContents(ed);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
       }
     } catch (e) {}
   }
+
   function insertText(text) {
+    if (!text) return false;
     var ed = editorEl();
     if (!ed) return false;
     try { ed.focus(); } catch (e) {}
@@ -1234,134 +1258,201 @@
     }
     return ok;
   }
+
   function mark(on) {
-    // Visual feedback on the native button (re-applied each poll tick, since React re-renders).
-    var b = liveBtn && liveBtn.isConnected ? liveBtn : document.querySelector(MIC_SEL);
+    var b = liveMicBtn && liveMicBtn.isConnected ? liveMicBtn : document.querySelector(MIC_SEL);
     if (!b) return;
-    if (on) b.classList.add("agy-stt-live"); else b.classList.remove("agy-stt-live");
+    if (on) b.classList.add("agy-stt-live");
+    else b.classList.remove("agy-stt-live");
   }
-  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } mark(false); }
-  // If an utterance produced only interim results (no final arrived), commit the
-  // last interim so speech is never silently lost.
-  function flushPartial() {
-    if (!gotFinal && lastPartial) { insertText(lastPartial.replace(/\s+$/, "") + " "); }
-    lastPartial = ""; gotFinal = false;
+
+  function ensureLivePreviewBar() {
+    if (previewBarEl && previewBarEl.isConnected) return previewBarEl;
+    var box = document.querySelector(BOX);
+    if (!box || !box.parentElement) return null;
+
+    var bar = document.createElement("div");
+    bar.id = "agy-dictation-live-bar";
+    bar.className = "agy-dictation-live-bar";
+    bar.innerHTML =
+      '<div class="agy-dictation-pulse-dot"></div>' +
+      '<span class="agy-dictation-preview-text">...</span>' +
+      '<button type="button" class="agy-dictation-cancel-btn" title="Отмена (Esc)" aria-label="Cancel recording">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>' +
+      '</button>';
+
+    var cancelBtn = bar.querySelector(".agy-dictation-cancel-btn");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        handleCancel();
+      });
+    }
+
+    box.parentElement.insertBefore(bar, box);
+    previewBarEl = bar;
+    return bar;
   }
-  function startPoll() {
-    stopPoll();
-    pollTimer = setInterval(function () {
-      if (listening) mark(true);
-      var e; try { e = curEng ? curEng.pollStt() : ""; } catch (err) { e = ""; }
-      if (!e) return;
-      sawEvent = true;
-      var tag = e.charAt(0);
-      if (tag === "F") { var t = e.slice(2); if (t) { insertText(t.replace(/\s+$/, "") + " "); gotFinal = true; } lastPartial = ""; }
-      else if (tag === "P") { lastPartial = e.slice(2); }       // remember newest interim
-      else if (tag === "R" || tag === "B") { lastPartial = ""; gotFinal = false; } // new utterance
-      else if (tag === "E") {
-        // Offline engine failed (e.g. model/native-lib load) -> fall back to the
-        // system recogniser instead of dying.
-        if (curEng === VOSK && SYS && listening) { clearWd(); lastPartial = ""; gotFinal = false; engStart(SYS); }
-        else { flushPartial(); listening = false; stopPoll(); }
-      }
-      else if (tag === "X") {
-        // Vosk "X" only on real stop; but if it ended without ever producing a
-        // result and we have a fallback, switch to it.
-        if (curEng === VOSK && SYS && listening && !gotFinal && !lastPartial) { clearWd(); engStart(SYS); }
-        else { flushPartial(); listening = false; stopPoll(); }
-      }
-    }, 180);
+
+  function updateLivePreview(buffer, partial) {
+    var bar = ensureLivePreviewBar();
+    if (!bar) return;
+    var txtEl = bar.querySelector(".agy-dictation-preview-text");
+    if (!txtEl) return;
+    var full = (buffer + (partial ? " " + partial : "")).trim();
+    txtEl.textContent = full || "Слушаю...";
   }
-  function dictCfg() { try { return (window.__agyDictationCfg && window.__agyDictationCfg()) || {}; } catch (e) { return {}; } }
-  function uiLang() {
-    // Dictation language: the explicit choice from the Dictation tab, else the
-    // app's UI language (agy_i18n sets <html data-agy-language="ru|en">).
-    var c = dictCfg();
-    if (c.lang === "ru") return "ru-RU";
-    if (c.lang === "en") return "en-US";
-    var l;
-    try { l = (document.documentElement.getAttribute("data-agy-language") || "ru").toLowerCase(); } catch (e) { l = "ru"; }
-    return l.indexOf("en") === 0 ? "en-US" : "ru-RU";
-  }
-  function pickEngine() {
-    // Engine from the Dictation tab: system / vosk / auto (Vosk if present).
-    var c = dictCfg();
-    if (c.engine === "system") return SYS || VOSK;
-    if (c.engine === "vosk") return VOSK || SYS;
-    return VOSK || SYS;
-  }
-  function clearWd() { if (wdTimer) { clearTimeout(wdTimer); wdTimer = 0; } }
-  function engStart(eng) {
-    curEng = eng; sawEvent = false;
-    try { eng.ensurePermission && eng.ensurePermission(); } catch (e) {}
-    var r = "ERR"; try { r = eng.start(uiLang()); } catch (e) { console.error("[AgyMic] eng.start error:", e); }
-    console.log("[AgyMic] engStart engine:", (eng === VOSK ? "VOSK" : "SYS"), "lang:", uiLang(), "result:", r);
-    return !(typeof r === "string" && r.indexOf("ERR") === 0);
-  }
-  function startListening(btn) {
-    liveBtn = btn || null;
-    var eng = pickEngine();
-    if (!eng) { listening = false; return; }
-    if (!engStart(eng)) { listening = false; return; } // e.g. permission just requested — tap again
-    listening = true;
-    var ed = editorEl(); if (ed) try { ed.focus(); } catch (e) {}
-    mark(true); startPoll();
-    // Watchdog: if the offline engine (Vosk) produces nothing (e.g. native lib
-    // failed to load), fall back to the system recogniser so the mic still works.
-    clearWd();
-    if (eng === VOSK && SYS) {
-      wdTimer = setTimeout(function () {
-        if (listening && !sawEvent) {
-          try { VOSK.stop && VOSK.stop(); } catch (e) {}
-          lastPartial = ""; gotFinal = false;
-          engStart(SYS);
-        }
-      }, 4500);
+
+  function removeLivePreviewBar() {
+    if (previewBarEl) {
+      try { previewBarEl.remove(); } catch (e) {}
+      previewBarEl = null;
     }
   }
-  function stopListening() {
-    if (!listening) return;
-    clearWd();
-    try { if (curEng) curEng.stop(); } catch (e) {}
-    listening = false;
-    flushPartial();
-    setTimeout(stopPoll, 600);
-  }
-  function toggle(btn) { if (listening) stopListening(); else startListening(btn); }
 
-  // Capture-phase: intercept the native mic tap BEFORE React, in all chat modes.
+  function teardownUi() {
+    mark(false);
+    removeLivePreviewBar();
+    liveMicBtn = null;
+  }
+
+  function handleStart(btn) {
+    if (!window.AgyDictation) {
+      console.warn("[AgyMic] window.AgyDictation is not initialized");
+      return;
+    }
+
+    liveMicBtn = btn || null;
+    mark(true);
+    ensureLivePreviewBar();
+
+    var cfg = dictCfg();
+    var chatId = getActiveChatId();
+    var ed = editorEl(); if (ed) try { ed.focus(); } catch (e) {}
+
+    activeSessionId = window.AgyDictation.startDictation({
+      chatId: chatId,
+      continuous: true,
+      engine: cfg.engine,
+      lang: uiLang(),
+      onPartial: function (partial, sessId) {
+        var sess = window.AgyDictation.getStatus ? window.AgyDictation.getStatus() : { buffer: "" };
+        updateLivePreview(sess.buffer || "", partial || "");
+      },
+      onFinal: function (phrase, sessId) {
+        var sess = window.AgyDictation.getStatus ? window.AgyDictation.getStatus() : { buffer: "" };
+        updateLivePreview(sess.buffer || "", "");
+      },
+      onStateChange: function (nextState, prevState, session) {
+        if (nextState === "recording" || nextState === "preparing") {
+          mark(true);
+        } else if (nextState === "processing") {
+          var txtEl = previewBarEl ? previewBarEl.querySelector(".agy-dictation-preview-text") : null;
+          if (txtEl) txtEl.textContent = "Финализация...";
+        } else if (nextState === "idle" || nextState === "cancelled" || nextState === "error") {
+          teardownUi();
+        }
+      },
+      onError: function (err) {
+        console.error("[AgyMic] Dictation error:", err);
+        teardownUi();
+        activeSessionId = null;
+      }
+    });
+  }
+
+  function handleStop() {
+    if (!window.AgyDictation) return;
+    var sid = activeSessionId || window.AgyDictation.sessionId;
+    activeSessionId = null;
+
+    window.AgyDictation.stopDictation(sid).then(function (committedText) {
+      if (committedText && committedText.trim()) {
+        insertText(committedText.trim() + " ");
+      }
+      teardownUi();
+    }).catch(function (err) {
+      console.error("[AgyMic] stopDictation error:", err);
+      teardownUi();
+    });
+  }
+
+  function handleCancel() {
+    if (!window.AgyDictation) return;
+    var sid = activeSessionId || window.AgyDictation.sessionId;
+    activeSessionId = null;
+
+    try {
+      window.AgyDictation.cancelDictation(sid);
+    } catch (e) {
+      console.error("[AgyMic] cancelDictation error:", e);
+    }
+    // Guarantees EXACTLY 0 characters inserted into the editor
+    teardownUi();
+  }
+
+  function toggle(btn) {
+    if (window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+      handleStop();
+    } else {
+      handleStart(btn);
+    }
+  }
+
+  // Capture-phase: intercept native mic button clicks in provider mode
   document.addEventListener("click", function (e) {
-    if (!providerMode()) return; // Standard models use the original core transcription.
-    if (dictCfg().enabled === false) return;   // voice input turned off in the Dictation tab
+    if (!providerMode()) return;
+    if (dictCfg().enabled === false) return;
     var b = e.target && e.target.closest && e.target.closest(MIC_SEL);
     if (!b) return;
-    var pm = providerMode();
-    console.log("[AgyMic] Mic button tapped! providerMode:", pm, "dictCfg:", dictCfg());
+
     e.preventDefault();
     e.stopPropagation();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     toggle(b);
   }, true);
 
-  // Hard stop: cancel recognition immediately and clear state. Used whenever the
-  // app is backgrounded or the chat is left, so the recogniser never keeps
-  // running (and beeping) off-screen.
-  function hardStop() {
-    clearWd();
-    try { if (curEng) { if (curEng.cancel) curEng.cancel(); else curEng.stop(); } } catch (e) {}
-    listening = false; lastPartial = ""; gotFinal = false; stopPoll();
-  }
-  // App backgrounded / tab hidden -> stop at once (this was the "keeps beeping in
-  // the background" bug: we only stopped when leaving provider mode before).
+  // Escape key cancels active dictation session
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" || e.keyCode === 27) {
+      if (window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCancel();
+      }
+    }
+  }, true);
+
+  // Lifecycle listeners: Cancel session on backgrounding or tab hiding
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState !== "visible" && listening) hardStop();
+    if (document.visibilityState !== "visible" && window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+      handleCancel();
+    }
   });
-  window.addEventListener("pagehide", function () { if (listening) hardStop(); }, true);
-  window.addEventListener("blur", function () { if (listening && document.visibilityState !== "visible") hardStop(); }, true);
-  // Also stop if we are no longer in a chat.
+  window.addEventListener("pagehide", function () {
+    if (window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+      handleCancel();
+    }
+  }, true);
+  window.addEventListener("blur", function () {
+    if (document.visibilityState !== "visible" && window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+      handleCancel();
+    }
+  }, true);
+
+  // Conversation switch observer: Cancel if chat changes during recording
+  var lastChatId = getActiveChatId();
   setInterval(function () {
-    if (listening && (!providerMode() || !document.querySelector(BOX))) hardStop();
-  }, 1200);
+    var curChat = getActiveChatId();
+    if (window.AgyDictation && window.AgyDictation.isRecording && window.AgyDictation.isRecording()) {
+      if (curChat !== lastChatId || !document.querySelector(BOX) || !providerMode()) {
+        console.log("[AgyMic] Chat switched from", lastChatId, "to", curChat, "-> cancelling dictation");
+        handleCancel();
+      }
+    }
+    lastChatId = curChat;
+  }, 300);
 
 })();
 

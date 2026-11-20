@@ -55,16 +55,22 @@
     '  cursor: pointer !important;',
     '  user-select: none !important;',
     '}',
+    '[data-testid="input-attachment"] {',
+    '  overflow: hidden !important;',
+    '}',
     '[data-testid="input-attachment"] .agy-media-badge {',
     '  width: 100% !important;',
-    '  height: 72px !important;',
-    '  min-height: 72px !important;',
+    '  height: 100% !important;',
+    '  min-height: 32px !important;',
     '  max-height: 72px !important;',
-    '  flex: 0 0 72px !important;',
-    '  border-radius: 0 !important;',
+    '  border-radius: 6px !important;',
     '  border: none !important;',
     '}',
-    'button .agy-media-badge,',
+    '[data-testid="input-attachment"] .agy-media-badge svg {',
+    '  width: 18px !important;',
+    '  height: 18px !important;',
+    '}',
+    'button:not([data-testid="input-attachment-open"]) .agy-media-badge,',
     '.agy-media-badge--msg {',
     '  width: 64px !important;',
     '  height: 64px !important;',
@@ -143,23 +149,28 @@
 
   function decorateChip(chip) {
     if (!isVideoElement(chip)) return;
-    var open = chip.querySelector(SEL_OPEN) || chip;
-    if (chip.querySelector(".agy-media-badge")) return;
+    var existing = chip.querySelectorAll(".agy-media-badge");
+    if (existing.length === 1) return;
+    if (existing.length > 1) {
+      for (var i = 1; i < existing.length; i++) existing[i].remove();
+      return;
+    }
 
-    var img = open.querySelector("img");
+    var open = chip.querySelector(SEL_OPEN) || chip;
+    var img = open.querySelector("img") || chip.querySelector("img");
     if (img) img.style.display = "none";
 
     var badge = makeBadge(chip, false);
     if (img && img.parentNode) {
       img.parentNode.insertBefore(badge, img);
     } else {
-      var holder = open.firstElementChild || open;
-      holder.insertBefore(badge, holder.firstChild);
+      open.appendChild(badge);
     }
   }
 
   function decorateButton(btn) {
     if (!btn || !isVideoElement(btn)) return;
+    if (btn.closest(SEL_CHIP)) return;
     if (btn.querySelector(".agy-media-badge")) return;
 
     var img = btn.querySelector("img");
@@ -193,18 +204,19 @@
       try { decorateChip(chips[i]); } catch (e) {}
     }
 
-    // 2. Кнопки медиа-вложений в истории чата
+    // 2. Кнопки медиа-вложений в истории чата (только вне поля ввода)
     var btns = document.querySelectorAll(SEL_BTNS);
     for (var j = 0; j < btns.length; j++) {
+      if (btns[j].closest(SEL_CHIP)) continue;
       try { decorateButton(btns[j]); } catch (e) {}
     }
 
-    // 3. Картинки медиа (поиск родительской кнопки для data:video/ или альтов)
+    // 3. Картинки медиа (поиск родительской кнопки для data:video/ или альтов вне поля ввода)
     var mediaImgs = document.querySelectorAll('img[alt^="User uploaded media"], img[src^="data:video/"], img[src*="video/"]');
     for (var k = 0; k < mediaImgs.length; k++) {
       try {
         var p = mediaImgs[k].closest("button") || mediaImgs[k].parentElement;
-        if (p) decorateButton(p);
+        if (p && !p.closest(SEL_CHIP)) decorateButton(p);
       } catch (e) {}
     }
   }

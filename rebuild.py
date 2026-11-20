@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Сборка Leostryx 3.1.15 (standard / bypass) из полного дерева.
+"""Сборка Leostryx 3.2 (standard / bypass) из полного дерева.
 
 Источники:
   app/                      — распакованное дерево standard-APK (без META-INF)
@@ -210,8 +210,8 @@ def main():
         zipalign4(unsigned)
         sign(unsigned)
 
-    # Finalize release 3.1.15 artifacts
-    version = "3.1.15"
+    # Finalize release 3.2 artifacts
+    version = "3.2"
     signed_dir = ROOT / "dist/signed"
     parent_dir = ROOT.parent
     built = [name for name, _ in jobs]

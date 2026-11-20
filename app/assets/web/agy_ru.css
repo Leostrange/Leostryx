@@ -281,15 +281,65 @@ html[data-base-ui-scroll-locked] {
   #typeahead-menu,
   #agy-font-dropdown
 ) {
-  background: var(--agy-glass-surface) !important;
-  background-color: var(--agy-glass-surface) !important;
+  background: var(--card, var(--popover, var(--background, #1e1e22))) !important;
+  background-color: var(--card, var(--popover, var(--background, #1e1e22))) !important;
   border-radius: 12px !important;
-  border: 1px solid var(--agy-glass-border) !important;
-  box-shadow: var(--agy-glass-shadow) !important;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.28)) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(127, 127, 127, 0.15) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
   max-width: calc(100vw - 12px) !important;
   box-sizing: border-box !important;
+}
+
+/* Световая тема: гарантированно непрозрачный светлый фон */
+html.light :is(
+  [role="menu"],
+  [role="listbox"],
+  [data-select-popup],
+  [data-testid="context-menu-popup"],
+  [class*="animate-slideIn"],
+  .z-\[6000\] > *,
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content],
+  .typeahead-popover,
+  #typeahead-menu,
+  #agy-font-dropdown
+),
+body.theme-light :is(
+  [role="menu"],
+  [role="listbox"],
+  [data-select-popup],
+  [data-testid="context-menu-popup"],
+  [class*="animate-slideIn"],
+  .z-\[6000\] > *,
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content],
+  .typeahead-popover,
+  #typeahead-menu,
+  #agy-font-dropdown
+),
+body.light :is(
+  [role="menu"],
+  [role="listbox"],
+  [data-select-popup],
+  [data-testid="context-menu-popup"],
+  [class*="animate-slideIn"],
+  .z-\[6000\] > *,
+  [data-radix-popper-content-wrapper] > *,
+  [data-radix-menu-content],
+  [data-radix-select-content],
+  .typeahead-popover,
+  #typeahead-menu,
+  #agy-font-dropdown
+) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Избегаем двойного слоя стекла: внутренний список role="listbox" и дочерние контейнеры внутри data-select-popup прозрачны */
@@ -955,6 +1005,44 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
   background: color-mix(in srgb, var(--primary, #3b82f6) 16%, transparent);
 }
 
+/* Context popup: metrics grid, chips, compact action (agy_shield.js v3.2) */
+.agy-ctx-metrics-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;
+}
+.agy-ctx-metric-item {
+  display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border-radius: 7px;
+  background: color-mix(in srgb, var(--foreground, #888) 5%, transparent);
+}
+.agy-ctx-metric-lbl {
+  font-size: 10px; color: var(--muted-foreground, #888); font-weight: 500;
+}
+.agy-ctx-metric-val {
+  font-size: 12px; font-weight: 700; color: var(--foreground);
+  font-family: ui-monospace, monospace;
+}
+.agy-ctx-compact-act { margin-top: 6px; }
+.agy-ctx-compact-btn {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
+  font-size: 11.5px; font-weight: 600; color: #f59e0b;
+  padding: 5px 8px; border-radius: 6px; text-align: center;
+  background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.3);
+  transition: background .15s;
+}
+.agy-ctx-compact-btn:hover { background: rgba(245,158,11,0.18); }
+.agy-ctx-compact-btn.done {
+  color: #22c55e; background: rgba(34,197,94,0.10); border-color: rgba(34,197,94,0.3);
+}
+.agy-ctx-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; margin-bottom: 4px; }
+.agy-ctx-chip {
+  display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 5px;
+  font-size: 10.5px; font-weight: 500;
+  background: color-mix(in srgb, var(--foreground, #888) 8%, transparent);
+  color: var(--muted-foreground, #888);
+}
+.agy-ctx-chip.on  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.agy-ctx-chip.purple { background: rgba(139,92,246,0.12); color: #8b5cf6; }
+.agy-ctx-chip.blue   { background: rgba(59,130,246,0.12); color: #3b82f6; }
+
 /* Compact model cards & specs in Providers (agy_providers.js) */
 .agy-pv-model-card {
   display: flex; flex-direction: column; gap: 5px; padding: 7px 9px; border-radius: 8px;
@@ -979,23 +1067,54 @@ div[data-radix-popper-content-wrapper] .border-border.w-max button:hover {
   display: flex; flex-direction: column; gap: 6px; padding-top: 5px;
   border-top: 1px dashed color-mix(in srgb, var(--foreground, #888) 12%, transparent);
 }
-.agy-pv-eff-row {
-  display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+.agy-pv-eff-row,
+.agy-providers .agy-pv-eff-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11.5px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
-.agy-pv-eff-lbl {
-  color: var(--muted-foreground, #888); white-space: nowrap; flex-shrink: 0; font-size: 11px;
+.agy-pv-eff-lbl,
+.agy-providers .agy-pv-eff-lbl {
+  color: var(--muted-foreground, #888) !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  font-size: 11px !important;
 }
-.agy-pv-eff-sel {
-  font: inherit; font-size: 11.5px; padding: 3px 6px; border-radius: 6px;
-  background: color-mix(in srgb, var(--foreground, #888) 8%, transparent);
-  color: var(--foreground); border: 1px solid var(--border, rgba(127,127,127,.3));
-  flex-shrink: 0; outline: none;
+.agy-pv-eff-sel,
+.agy-providers select.agy-pv-eff-sel {
+  width: auto !important;
+  min-width: 72px !important;
+  max-width: 95px !important;
+  flex: 0 0 auto !important;
+  font: inherit !important;
+  font-size: 11px !important;
+  padding: 3px 6px !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--foreground, #888) 9%, transparent) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border, rgba(127,127,127,.3)) !important;
+  outline: none !important;
+  box-sizing: border-box !important;
 }
-.agy-pv-eff-inp {
-  font: inherit; font-size: 11.5px; padding: 3px 7px; border-radius: 6px;
-  background: color-mix(in srgb, var(--foreground, #888) 8%, transparent);
-  color: var(--foreground); border: 1px solid var(--border, rgba(127,127,127,.3));
-  flex: 1 1 auto; min-width: 0; outline: none;
+.agy-pv-eff-inp,
+.agy-providers input.agy-pv-eff-inp {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  font: inherit !important;
+  font-size: 11px !important;
+  padding: 3px 6px !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--foreground, #888) 7%, transparent) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border, rgba(127,127,127,.3)) !important;
+  outline: none !important;
+  box-sizing: border-box !important;
 }
 .agy-pv-info-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;
@@ -1866,10 +1985,10 @@ html.light .agy-providers .agy-compact-ddlist {
   :has([role="option"] span:nth-child(2)),
   [data-agy-dense="1"]
 ) {
-  background: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #18181c) 95%, transparent)) !important;
-  background-color: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #18181c) 95%, transparent)) !important;
-  border: 1px solid var(--agy-glass-border, rgba(255, 255, 255, 0.22)) !important;
-  box-shadow: var(--agy-glass-shadow-dense, 0 14px 44px rgba(0, 0, 0, 0.75)) !important;
+  background: var(--card, var(--popover, var(--background, #1e1e22))) !important;
+  background-color: var(--card, var(--popover, var(--background, #1e1e22))) !important;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.28)) !important;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.75) !important;
   isolation: isolate !important;
 }
 
@@ -1894,10 +2013,10 @@ body.light :is([data-select-popup], .z-\[6000\] > div, [class*="animate-slideIn"
   :has([role="option"] span:nth-child(2)),
   [data-agy-dense="1"]
 ) {
-  background: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #ffffff) 94%, transparent)) !important;
-  background-color: var(--agy-glass-surface-dense, color-mix(in srgb, var(--background, #ffffff) 94%, transparent)) !important;
-  border: 1px solid var(--agy-glass-border, rgba(0, 0, 0, 0.22)) !important;
-  box-shadow: var(--agy-glass-shadow-dense, 0 14px 44px rgba(0, 0, 0, 0.18)) !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.22) !important;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18) !important;
   isolation: isolate !important;
 }
 
@@ -1961,4 +2080,57 @@ button .agy-media-badge,
   height: 24px !important;
   flex-shrink: 0 !important;
 }
+
+/* Live dictation preview bar & cancel button (M2) */
+.agy-dictation-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 4px 8px;
+  background: var(--card, #1c1c1e);
+  border: 1px solid var(--border, rgba(127,127,127,.3));
+  border-radius: 14px;
+  font-size: 12.5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  animation: agyFadeIn 150ms ease-out;
+}
+.agy-dictation-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d64545;
+  flex-shrink: 0;
+  animation: agyPulse 1.2s infinite ease-in-out;
+}
+@keyframes agyPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+.agy-dictation-preview-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+.agy-dictation-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--muted, rgba(127,127,127,.2));
+  color: var(--muted-foreground, #aaa);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms, color 150ms;
+}
+.agy-dictation-cancel-btn:hover {
+  background: var(--secondary, rgba(127,127,127,.35));
+  color: var(--foreground, #fff);
+}
+
 
