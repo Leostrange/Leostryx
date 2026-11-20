@@ -68,7 +68,7 @@ def main():
 
     print(f"Preparing GitHub release for {tag} ({repo})...")
     body = extract_changelog(version)
-    title = f"Leostryx {version} — автоопределение данных моделей, круг контекста в чате, фикс отправки standard"
+    title = f"Leostryx {version} — типографика и шрифты, непрозрачные меню, детальный круг контекста, авто-восстановление при обрыве связи"
 
     # Check if release exists
     check_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
