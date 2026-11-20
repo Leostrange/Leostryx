@@ -32,13 +32,20 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Новый модуль отказоустойчивости сетевого взаимодействия с экспоненциальным backoff (до 12 попыток).
   - Информационный плавающий баннер в интерфейсе: при обрыве связи выводится жёлтый индикатор авто-переподключения с обратным отсчётом, а при восстановлении соединения — зелёный баннер подтверждения без необходимости перезагружать приложение или повторять запрос вручную.
   - Идемпотентный механизм контрольных точек выполнения инструментов (`tool checkpointing`), предотвращающий дублирование действий при переподключении.
+- **Локализация субагентов, статуса выполнения и описаний плагинов (`agy_i18n.js`, `agy_customizations.js`):**
+  - Переведён статус выполнения активных субагентов и задач над панелью ввода («1 субагент работает», «2 субагента работают», «5 субагентов работают», «X задач выполняются»).
+  - Добавлен полный русский перевод для всех запускаемых субагентов (Оркестратор Teamwork, Независимый аудитор победы, Страж Sentinel, Исполнители, Оппоненты, Исследователь и др.).
+  - Добавлена локализация описаний установленных и каталожных плагинов и навыков в Настройках пользователя (`agy_customizations.js`).
+- **Очистка слэш-меню «/» и гарантированная непрозрачность (`agy_ru.css`):**
+  - Убран избыточный правый столбец с источником плагина, устранив скученность из 3 длинных строк на узких мобильных экранах — названия и описания теперь выводятся чисто и в полную ширину.
+  - Меню `[data-mention-menu]` получило 100% непрозрачный фон, устранив просвечивание фонового текста диалога.
 - **Архитектурная интеграция Aether и полное тестовое покрытие (`tests/`):**
   - Успешно пройдены 200 сквозных E2E-тестов и 514 модульных тестов на устойчивость к сбоям, потоковый экспорт сессий, фильтрацию секретов и обработку медиа.
 - **Версия 3.2** (`versionCode` 42) в манифесте и скриптах сборки (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Контрольные суммы сборки (SHA-256):**
-  - `Leostryx-3.2-standard.apk`: `834d5df360d8af9b3466605821d8b90f3d2de66d75dfcb58e5e063d7ae54bd75`
-  - `Leostryx-3.2-bypass.apk`: `c23740cb97138aabf975cb4fe5cf6f877a3f99197857f2062c5f3193765b2ebc`
-  - `Leostryx-repo.zip`: `8bcf463f9922477064fdbfcaa0c96533742773d9f52d1cb30cd1cdf5e10b932d`
+  - `Leostryx-3.2-standard.apk`: `1305618f07723e4748476dd7f57bc4a5187787f18d583a43753fa47857dc5c2f`
+  - `Leostryx-3.2-bypass.apk`: `39b94d487b4bd32eb6dabb3fe8c22bbaea87509fbed1a4f73de2e6aa282763b4`
+  - `Leostryx-repo.zip`: `f1075867f0884a1f59d848c60a913c5dbb28531e91acbffe560052aac5bb30c4`
 <!-- /RU -->
 
 <!-- EN -->
@@ -51,9 +58,9 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
     - **Code font ligatures**: toggle ligatures for developer monospace fonts (`Fira Code`, `JetBrains Mono`).
     - **Font smoothing**: subpixel antialiasing toggle.
   - Settings are applied dynamically to the active DOM and persisted across sessions in `localStorage`.
-- **Dropdown menu transparency fix (`agy_ru.css`):**
-  - Resolved transparent backgrounds on dropdown select popups (fonts, models, context actions) where background content was blending with list items.
-  - All popups now feature 100% opaque backgrounds (`var(--card, #1c1c1e)` in dark theme, `#ffffff` in light theme) with crisp borders and elevated drop shadows.
+- **Dropdown menu transparency fix & slash menu cleanup (`agy_ru.css`):**
+  - Resolved transparent backgrounds on dropdown select popups (fonts, models, context actions) and slash mention menus (`[data-mention-menu]`). All popups now feature 100% opaque solid backgrounds (`var(--card, #1c1c1e)` in dark theme, `#ffffff` in light theme).
+  - Eliminated redundant trailing source labels in the slash command ("/") popup on mobile, providing full width for command names and translated descriptions without three-string crowding.
 - **Token calculation stabilization & detailed context card (`agy_shield.js`, `agy_ru.css`):**
   - Resolved token jumping anomalies (74 → 140 → 100 → 81) with a per-conversation monotonic token cache (`tokenCacheByChat` keyed by `cascadeId`), preventing backwards jumps during streaming chunks.
   - Dedicated Prompt (in) vs Output breakdown with remaining capacity and Russian declensions.
@@ -63,13 +70,17 @@ Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -
   - Resilient network bridge with exponential backoff and jitter across transient disconnections (up to 12 retries).
   - Non-intrusive status bar indicator alerting user during connection drops and notifying on automatic recovery without needing to resend prompts.
   - Idempotent tool checkpointing ensuring intermediate actions are preserved and never re-executed duplicate times.
+- **Subagents & plugin localization (`agy_i18n.js`, `agy_customizations.js`):**
+  - Added full Russian localization for subagent status lines ("1 subagent running", "2 subagents running", "X tasks running").
+  - Complete Russian translation of all invoked subagent names (Teamwork Orchestrator, Independent Victory Auditor, Sentinel, Workers, Challengers, Researchers, etc.).
+  - Added localized descriptions for all installed and marketplace plugins and skills in Customizations.
 - **Aether architecture integration & test coverage (`tests/`):**
   - Validated with 200 comprehensive E2E tests and 514 unit tests covering edge-case adversarial inputs, streaming ZIP export, credential redaction, and multimodal handling.
 - **Version 3.2** (`versionCode` 42) in manifest and build scripts (`AndroidManifest.xml`, `rebuild.py`, `tools/github_release.py`).
 - **Build checksums (SHA-256):**
-  - `Leostryx-3.2-standard.apk`: `834d5df360d8af9b3466605821d8b90f3d2de66d75dfcb58e5e063d7ae54bd75`
-  - `Leostryx-3.2-bypass.apk`: `c23740cb97138aabf975cb4fe5cf6f877a3f99197857f2062c5f3193765b2ebc`
-  - `Leostryx-repo.zip`: `8bcf463f9922477064fdbfcaa0c96533742773d9f52d1cb30cd1cdf5e10b932d`
+  - `Leostryx-3.2-standard.apk`: `1305618f07723e4748476dd7f57bc4a5187787f18d583a43753fa47857dc5c2f`
+  - `Leostryx-3.2-bypass.apk`: `39b94d487b4bd32eb6dabb3fe8c22bbaea87509fbed1a4f73de2e6aa282763b4`
+  - `Leostryx-repo.zip`: `f1075867f0884a1f59d848c60a913c5dbb28531e91acbffe560052aac5bb30c4`
 <!-- /EN -->
 
 ## v3.1.15 — 2026-11-19 (Автоопределение характеристик моделей, круг контекста в чате, исправление отправки standard)

@@ -36,6 +36,13 @@
   var mode = readMode();
   var effective = resolve(mode);
 
+    function ruPlural(n, one, few, many) {
+      var v = Math.abs(parseInt(n, 10)), m10 = v % 10, m100 = v % 100;
+      if (m10 === 1 && m100 !== 11) return n + " " + one;
+      if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return n + " " + few;
+      return n + " " + many;
+    }
+
     function translateExact(value) {
     if (!value) return value;
     const leading = value.match(/^\s*/)[0];
@@ -44,6 +51,101 @@
     if (!core) return value;
     const normalized = core.replace(/\s+/g, " ");
     if (effective === "ru") {
+      // 1. Статус выполнения субагентов и задач
+      let mSub = normalized.match(/^(\d+)\s+subagents?\s+running$/i);
+      if (mSub) return leading + ruPlural(mSub[1], "субагент работает", "субагента работают", "субагентов работают") + trailing;
+
+      mSub = normalized.match(/^(\d+)\s+subagents?\/tasks\s+running$/i);
+      if (mSub) return leading + ruPlural(mSub[1], "субагент/задача работает", "субагента/задачи работают", "субагентов/задач работают") + trailing;
+
+      mSub = normalized.match(/^(\d+)\s+tasks?\s+running$/i);
+      if (mSub) return leading + ruPlural(mSub[1], "задача выполняется", "задачи выполняются", "задач выполняются") + trailing;
+
+      mSub = normalized.match(/^(\d+)\s+subagents?\s+blocked$/i);
+      if (mSub) return leading + ruPlural(mSub[1], "субагент заблокирован", "субагента заблокировано", "субагентов заблокировано") + trailing;
+
+      mSub = normalized.match(/^(\d+)\s+blocked$/i);
+      if (mSub) return leading + ruPlural(mSub[1], "заблокирован", "заблокировано", "заблокировано") + trailing;
+
+      mSub = normalized.match(/^\((\d+)\s+subagents?\)$/i);
+      if (mSub) return leading + "(" + ruPlural(mSub[1], "субагент", "субагента", "субагентов") + ")" + trailing;
+
+      mSub = normalized.match(/^Child Subagents\s*\((.+)\)$/i);
+      if (mSub) return leading + "Дочерние субагенты (" + mSub[1] + ")" + trailing;
+
+      // 2. Имена и роли субагентов
+      if (/^Independent Victory Auditor$/i.test(normalized)) return leading + "Независимый аудитор победы" + trailing;
+      if (/^Victory Auditor$/i.test(normalized)) return leading + "Аудитор победы" + trailing;
+      if (/^Teamwork Orchestrator$/i.test(normalized)) return leading + "Оркестратор Teamwork" + trailing;
+      if (/^Sentinel$/i.test(normalized)) return leading + "Страж Sentinel" + trailing;
+      if (/^Codebase Researcher$/i.test(normalized)) return leading + "Исследователь кодовой базы" + trailing;
+      if (/^Researcher$/i.test(normalized)) return leading + "Исследователь" + trailing;
+      if (/^Android Debugger$/i.test(normalized)) return leading + "Android-отладчик" + trailing;
+      if (/^Code Reviewer$/i.test(normalized)) return leading + "Код-ревьюер" + trailing;
+      if (/^(?:Docs Architect|Documentation Architect)$/i.test(normalized)) return leading + "Архитектор документации" + trailing;
+      if (/^Security Auditor$/i.test(normalized)) return leading + "Аудитор безопасности" + trailing;
+      if (/^Test Engineer$/i.test(normalized)) return leading + "Инженер по тестированию" + trailing;
+      if (/^Image Generator$/i.test(normalized)) return leading + "Генератор изображений" + trailing;
+      if (/^Database Debugger$/i.test(normalized)) return leading + "Отладчик баз данных" + trailing;
+      if (/^(?:Browser Subagent|Browser Agent)$/i.test(normalized)) return leading + "Браузерный субагент" + trailing;
+      if (/^Current Agent$/i.test(normalized)) return leading + "Текущий агент" + trailing;
+      if (/^Agent Team$/i.test(normalized)) return leading + "Команда агентов" + trailing;
+      if (/^Team of subagents$/i.test(normalized)) return leading + "Команда субагентов" + trailing;
+      if (/^Subagents$/i.test(normalized)) return leading + "Субагенты" + trailing;
+      if (/^Subagent$/i.test(normalized)) return leading + "Субагент" + trailing;
+      if (/^Child Subagents$/i.test(normalized)) return leading + "Дочерние субагенты" + trailing;
+      if (/^Child Subagent$/i.test(normalized)) return leading + "Дочерний субагент" + trailing;
+      if (/^No subagents$/i.test(normalized)) return leading + "Нет субагентов" + trailing;
+      if (/^Stop Subagent$/i.test(normalized)) return leading + "Остановить субагента" + trailing;
+      if (/^Needs attention$/i.test(normalized)) return leading + "Требует внимания" + trailing;
+      if (/^Blocked, needs input$/i.test(normalized)) return leading + "Ожидает ввода" + trailing;
+
+      mSub = normalized.match(/^(?:Worker|worker)(?:[\s_]+(.+))?$/i);
+      if (mSub) return leading + "Исполнитель" + (mSub[1] ? " (" + mSub[1].replace(/_/g, " ") + ")" : "") + trailing;
+
+      mSub = normalized.match(/^(?:Challenger|challenger)(?:[\s_]+(.+))?$/i);
+      if (mSub) return leading + "Оппонент-верификатор" + (mSub[1] ? " (" + mSub[1].replace(/_/g, " ") + ")" : "") + trailing;
+
+      mSub = normalized.match(/^(?:Auditor|auditor)(?:[\s_]+(.+))?$/i);
+      if (mSub) return leading + "Аудитор" + (mSub[1] ? " (" + mSub[1].replace(/_/g, " ") + ")" : "") + trailing;
+
+      mSub = normalized.match(/^Subagent\s+(\d+)$/i);
+      if (mSub) return leading + "Субагент " + mSub[1] + trailing;
+
+      // 3. Описания плагинов из Настроек пользователя
+      if (/^Official Android CLI skill from android\/android-cli-plugin/i.test(normalized) ||
+          /^Official Android CLI guidance/i.test(normalized)) {
+        return leading + "Официальный набор Google для работы с Android CLI: сборка APK, тестирование, логирование и эмуляторы." + trailing;
+      }
+      if (/^Keep your coding agent up to date with the latest web best practices/i.test(normalized) ||
+          /^Official Google Chrome modern web development guidance/i.test(normalized)) {
+        return leading + "Справочник стандартов и лучших практик современной веб-разработки (HTML, CSS, JS, Chrome Extensions)." + trailing;
+      }
+      if (/^Integration with Google Workspace: Docs, Sheets, Slides, Drive and Cloud API/i.test(normalized)) {
+        return leading + "Инструменты для работы с Google Docs, Sheets, Slides, Drive и Cloud API." + trailing;
+      }
+      if (/^Data science & machine learning pack with Pandas, NumPy and data visualization skills/i.test(normalized)) {
+        return leading + "Пакет навыков для анализа данных, машинного обучения, работы с Pandas, NumPy и визуализации." + trailing;
+      }
+      if (/^Schema design and query tuning for SQLite/i.test(normalized)) {
+        return leading + "Проектирование схем и оптимизация запросов для SQLite — нативной БД Android." + trailing;
+      }
+      if (/^OWASP Top 10 vulnerability checks, dependency security scanning and secret leak detection/i.test(normalized)) {
+        return leading + "Поиск уязвимостей по стандарту OWASP Top 10, аудит зависимостей и сканер утечки токенов/ключей." + trailing;
+      }
+      if (/^Semantic conventional commits automation and structured pull request reviews/i.test(normalized)) {
+        return leading + "Стандарты семантических коммитов Conventional Commits и подготовка чеклистов Pull Request." + trailing;
+      }
+      if (/^Building AI agents with the Python SDK for Antigravity/i.test(normalized)) {
+        return leading + "Создание AI-агентов с помощью Python SDK для Antigravity." + trailing;
+      }
+      if (/^Agent skill pack for scientific work: methods, statistics and research formatting/i.test(normalized)) {
+        return leading + "Подборка навыков агента для научных задач: методы, статистика, оформление исследований." + trailing;
+      }
+      if (/^Designing, building and shipping Firebase projects: Auth, Firestore, Functions/i.test(normalized)) {
+        return leading + "Проектирование, создание и запуск проектов Firebase: Auth, Firestore, Functions." + trailing;
+      }
+
       // Навыки, действия и команды (Slash Commands & Skills) — ультракомпактные пояснения (приоритет над таблицей):
       if (normalized.startsWith("How to manage and create plugins")) {
         return leading + "Управление плагинами" + trailing;

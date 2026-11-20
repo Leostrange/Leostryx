@@ -279,7 +279,8 @@ html[data-base-ui-scroll-locked] {
   [data-radix-select-content],
   .typeahead-popover,
   #typeahead-menu,
-  #agy-font-dropdown
+  #agy-font-dropdown,
+  [data-mention-menu]
 ) {
   background: var(--card, var(--popover, var(--background, #1e1e22))) !important;
   background-color: var(--card, var(--popover, var(--background, #1e1e22))) !important;
@@ -306,7 +307,8 @@ html.light :is(
   [data-radix-select-content],
   .typeahead-popover,
   #typeahead-menu,
-  #agy-font-dropdown
+  #agy-font-dropdown,
+  [data-mention-menu]
 ),
 body.theme-light :is(
   [role="menu"],
@@ -320,7 +322,8 @@ body.theme-light :is(
   [data-radix-select-content],
   .typeahead-popover,
   #typeahead-menu,
-  #agy-font-dropdown
+  #agy-font-dropdown,
+  [data-mention-menu]
 ),
 body.light :is(
   [role="menu"],
@@ -334,12 +337,32 @@ body.light :is(
   [data-radix-select-content],
   .typeahead-popover,
   #typeahead-menu,
-  #agy-font-dropdown
+  #agy-font-dropdown,
+  [data-mention-menu]
 ) {
   background: #ffffff !important;
   background-color: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.18) !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Слэш-меню ("/"): скрываем избыточный ярлык источника плагина справа,
+   чтобы не было 3 длинных накладывающихся кусков текста в строке */
+[data-mention-menu] [data-testid="menu-option-trailing-label"] {
+  display: none !important;
+}
+[data-mention-menu] [data-testid="menu-option-label"] {
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+}
+[data-mention-menu] [data-testid="menu-option-description"] {
+  opacity: 0.75 !important;
+  font-size: 11.5px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
 }
 
 /* Избегаем двойного слоя стекла: внутренний список role="listbox" и дочерние контейнеры внутри data-select-popup прозрачны */

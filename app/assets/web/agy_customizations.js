@@ -35,6 +35,101 @@
     }
   }
 
+  function localizeDesc(idOrName, rawDesc) {
+    if (!rawDesc && !idOrName) return T("Описание отсутствует", "No description");
+    var key = (idOrName || "").toLowerCase().trim();
+    var desc = (rawDesc || "").trim();
+
+    // Плагины (Plugins)
+    if (key === "android-cli-plugin" || key === "android-cli" || /official android cli/i.test(desc)) {
+      return T("Официальный набор Google для работы с Android CLI: сборка APK, тестирование, логирование и эмуляторы.", desc);
+    }
+    if (key === "modern-web-guidance" || /latest web best practices/i.test(desc)) {
+      return T("Справочник стандартов и лучших практик современной веб-разработки (HTML, CSS, JS, Chrome Extensions).", desc);
+    }
+    if (key === "google-workspace" || /google workspace/i.test(desc)) {
+      return T("Инструменты для работы с Google Docs, Sheets, Slides, Drive и Cloud API.", desc);
+    }
+    if (key === "python-data-science" || /data science/i.test(desc)) {
+      return T("Пакет навыков для анализа данных, машинного обучения, работы с Pandas, NumPy и визуализации.", desc);
+    }
+    if (key === "database-tools" || /sqlite/i.test(desc)) {
+      return T("Проектирование схем и оптимизация запросов для SQLite — нативной БД Android.", desc);
+    }
+    if (key === "security-audit" || /owasp/i.test(desc)) {
+      return T("Поиск уязвимостей по стандарту OWASP Top 10, аудит зависимостей и сканер утечки токенов/ключей.", desc);
+    }
+    if (key === "git-advanced" || /conventional commits/i.test(desc)) {
+      return T("Стандарты семантических коммитов Conventional Commits и подготовка чеклистов Pull Request.", desc);
+    }
+    if (key === "antigravity-sdk" || /antigravity sdk/i.test(desc)) {
+      return T("Создание AI-агентов с помощью Python SDK для Antigravity.", desc);
+    }
+    if (key === "science" || /scientific/i.test(desc)) {
+      return T("Подборка навыков агента для научных задач: методы, статистика, оформление исследований.", desc);
+    }
+    if (key === "firebase" || /firebase/i.test(desc)) {
+      return T("Проектирование, создание и запуск проектов Firebase: Auth, Firestore, Functions.", desc);
+    }
+
+    // Навыки (Skills)
+    if (key === "chrome-extensions" || /chrome extension/i.test(desc)) {
+      return T("Разработка и публикация расширений для Google Chrome по стандарту Manifest V3.", desc);
+    }
+    if (key === "agy-customizations" || /customization system/i.test(desc)) {
+      return T("Руководство по системе кастомизации: навыки (skills), правила, плагины и MCP-серверы.", desc);
+    }
+    if (key === "antigravity_guide" || key === "antigravity-guide" || /sitemap for google antigravity/i.test(desc)) {
+      return T("Справочник по Google Antigravity / Leostryx: горячие клавиши, CLI, команды и SDK.", desc);
+    }
+    if (key === "generative_ui" || /interactive html widgets/i.test(desc)) {
+      return T("Рендеринг интерактивных HTML-виджетов, диаграмм и элементов интерфейса прямо в чате.", desc);
+    }
+    if (key === "automation" || /scheduled background automation/i.test(desc)) {
+      return T("Интерактивное руководство по созданию фоновых задач и автоматизаций по расписанию.", desc);
+    }
+    if (key === "migrate-workflows" || /migrate legacy workflows/i.test(desc)) {
+      return T("Автоматическая миграция устаревших воркфлоу в современные навыки (skills).", desc);
+    }
+    if (key === "permissioned-github" || /interacting with github/i.test(desc)) {
+      return T("Инструкции по безопасному взаимодействию с GitHub и управлению правами доступа.", desc);
+    }
+    if (key === "plugin" || /manage and create plugins/i.test(desc)) {
+      return T("Руководство по созданию и управлению плагинами для Antigravity.", desc);
+    }
+    if (key === "ui-plugin-navigation" || /discover ui plugin panels/i.test(desc)) {
+      return T("Навигация и поиск панелей UI-плагинов, относящихся к текущей задаче.", desc);
+    }
+
+    // Субагенты (Subagents)
+    if (key === "android-debugger" || /jadx-agy/i.test(desc)) {
+      return T("Диагностика крашей Android, анализ logcat/stacktrace, проверка манифестов, Gradle, JNI и декомпиляция через jadx-agy/apktool.", desc);
+    }
+    if (key === "code-reviewer" || /код-ревью/i.test(desc)) {
+      return T("Глубокое код-ревью изменений, поиск багов, гонок данных, утечек памяти и нарушений архитектуры без модификации файлов.", desc);
+    }
+    if (key === "docs-architect" || /mermaid/i.test(desc)) {
+      return T("Генерация и актуализация README.md, CHANGELOG.md, архитектурных Mermaid-диаграмм и документации API.", desc);
+    }
+    if (key === "security-auditor" || /owasp top 10/i.test(desc)) {
+      return T("Аудит безопасности по OWASP Top 10, поиск инъекций, XSS/CSRF, небезопасных прав Android и утечек API-ключей/секретов.", desc);
+    }
+    if (key === "test-engineer" || /junit/i.test(desc)) {
+      return T("Написание и запуск модульных и интеграционных тестов (pytest, vitest, jest, JUnit, go test) и проверка покрытия.", desc);
+    }
+    if (key === "image-generator" || /генерация картинок/i.test(desc)) {
+      return T("Создание и редактирование изображений по текстовому описанию с сохранением в проект.", desc);
+    }
+    if (key === "research" || /исследователь/i.test(desc)) {
+      return T("Поиск по кодовой базе, изучение документации и поиск информации в сети.", desc);
+    }
+    if (key === "self") {
+      return T("Субагент, наследующий полную конфигурацию, промпт и инструменты текущего агента.", desc);
+    }
+
+    return desc;
+  }
+
   var host = null, root = null;
   var activeTab = "skills"; // "skills" | "subagents" | "instructions" | "plugins"
   var skillFilter = "all";  // "all" | "user" | "plugin" | "builtin"
@@ -579,7 +674,7 @@
             }
             html += '      <span class="agy-cust-badge ' + (s.enabled ? "on" : "off") + '">' + (s.enabled ? esc(T("Активен", "Active")) : esc(T("Отключен", "Disabled"))) + '</span>';
             html += '    </div>';
-            html += '    <div class="agy-cust-card-desc">' + esc(s.desc || T("Описание отсутствует", "No description")) + '</div>';
+            html += '    <div class="agy-cust-card-desc">' + esc(localizeDesc(s.name, s.desc)) + '</div>';
             html += '    <div class="agy-cust-card-meta">';
             html += '      <span style="font-family:monospace; opacity:.8;">' + esc(s.path.split("/.gemini/")[1] || s.path) + '</span>';
             html += '    </div>';
@@ -662,7 +757,7 @@
           html += '      <span class="agy-cust-badge ' + (isBuiltin ? "builtin" : "user") + '" style="font-family:monospace;">' + esc(ag.name) + '</span>';
           html += '      <span class="agy-cust-badge ' + (ag.enabled ? "on" : "off") + '">' + (ag.enabled ? esc(T("Активен", "Active")) : esc(T("Отключен", "Disabled"))) + '</span>';
           html += '    </div>';
-          html += '    <div class="agy-cust-card-desc">' + esc(ag.desc || T("Описание роли отсутствует", "No role description")) + '</div>';
+          html += '    <div class="agy-cust-card-desc">' + esc(localizeDesc(ag.name, ag.desc)) + '</div>';
           html += '    <div class="agy-cust-card-meta" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">';
           html += '      <span class="agy-cust-badge plugin">' + esc(T("Модель: ", "Model: ") + ag.model) + '</span>';
           html += '      <span class="agy-cust-badge ' + (ag.write ? "on" : "builtin") + '">' + esc(ag.write ? T("Запись и терминал", "Write & Terminal") : T("Только чтение", "Read-only")) + '</span>';
@@ -815,7 +910,7 @@
             html += '    <span class="agy-cust-badge builtin">' + esc(T("Системный", "System")) + '</span>';
           }
           html += '    </div>';
-          html += '    <div class="agy-cust-card-desc">' + esc(p.desc || T("Описание плагина отсутствует", "No plugin description")) + '</div>';
+          html += '    <div class="agy-cust-card-desc">' + esc(localizeDesc(p.name, p.desc)) + '</div>';
           html += '    <div class="agy-cust-card-meta">';
           html += '      <span class="agy-cust-badge plugin">' + esc(T(p.skillsCount + " навыков", p.skillsCount + " skills")) + '</span>';
           if (p.hasRules) html += '      <span class="agy-cust-badge user">' + esc(T("Правила AGENTS.md", "AGENTS.md rules")) + '</span>';
