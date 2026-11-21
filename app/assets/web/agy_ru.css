@@ -760,6 +760,12 @@ body.light :is(
   padding: 4px !important;
   overflow: hidden !important;
 }
+/* Keep an empty suggestion portal from drawing a pill while its rows mount. */
+#typeahead-menu.agy-typeahead:empty,
+#typeahead-menu.agy-typeahead:has(> ul:only-child:empty) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 #typeahead-menu.agy-typeahead ul {
   padding: 0 !important;
   margin: 0 !important;
