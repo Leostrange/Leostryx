@@ -490,6 +490,64 @@
     removeChip(root, chip);
   }, true);
 
+  // Handle Android IME deletion at a chip boundary before WebView edits its DOM.
+  function contextChipBeforeCaret(root) {
+    var selection = root.ownerDocument.getSelection();
+    if (!selection || !selection.isCollapsed) return null;
+    var container = selection.anchorNode;
+    if (!container || container === root || !root.contains(container)) return null;
+    if (container.nodeType === 3 && selection.anchorOffset !== 0) return null;
+
+    var line = container;
+    while (line.parentNode !== root) line = line.parentNode;
+
+    var previous = container.nodeType === 1 && selection.anchorOffset > 0
+      ? container.childNodes[selection.anchorOffset - 1]
+      : null;
+    while (!previous && container !== line) {
+      previous = container.previousSibling;
+      container = container.parentNode;
+    }
+    while (previous && previous.nodeType === 1) {
+      if (previous.hasAttribute("data-lexical-decorator")) return previous;
+      previous = previous.lastChild;
+    }
+    return null;
+  }
+
+  function deleteAdjacentContextChip(event) {
+    if (event.defaultPrevented || !event.cancelable || event.isComposing) return;
+    var root = event.target && event.target.closest
+      ? event.target.closest("[contenteditable='true']")
+      : null;
+    if (!root || !root.closest(BOX)) return;
+
+    var editor = root.__lexicalEditor;
+    if (!editor || (typeof editor.isComposing === "function" && editor.isComposing())) return;
+    var element = contextChipBeforeCaret(root);
+    if (!element) return;
+
+    var key = element["__lexicalKey_" + editor._key];
+    var node = key && editor.getEditorState()._nodeMap.get(key);
+    if (!node) return;
+    var type = node.getType();
+    if (type !== "beautifulMention" && type !== "contextScopeItemMention") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    editor.update(function () { node.remove(); }, { discrete: true, tag: "skip-scroll-into-view" });
+  }
+
+  document.addEventListener("beforeinput", function (event) {
+    if (event.inputType === "deleteContentBackward") deleteAdjacentContextChip(event);
+  }, true);
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Backspace" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      deleteAdjacentContextChip(event);
+    }
+  }, true);
+
   /* ---- Chat input repaint nudge (No scroll jiggle) ------------------------ */
   /* `conversation-view` must never scroll: it is the flex column that holds the
    * message list AND the composer as siblings, so Chromium uses it to reveal the
