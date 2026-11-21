@@ -1,7 +1,10 @@
+> [!WARNING]
+> **Leostryx 3.2 временно не устанавливайте.** В этой версии обнаружены ошибки в окне ввода чата. Пока исправление проверяется, для новой установки доступен [релиз 3.1.14](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14).
+
 <p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
 
 <p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/latest"><img src="https://img.shields.io/badge/Release-v3.1.14-0b84ff?style=flat-square" alt="Release" /></a>
+  <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14"><img src="https://img.shields.io/badge/Release-v3.1.14-0b84ff?style=flat-square" alt="Release" /></a>
   <img src="https://img.shields.io/badge/Android-8.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
   <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
@@ -14,7 +17,7 @@
 <p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> · Сборка <a href="https://github.com/Leostrange">@Leostrange</a></sub></p>
 
 <p align="center">
-  <a href="#-скачать-сборки-v3114"><b>📥 Скачать APK</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14"><b>📥 Скачать APK</b></a> &nbsp;·&nbsp;
   <a href="#-интерфейс-и-скриншоты">📱 Скриншоты</a> &nbsp;·&nbsp;
   <a href="#-ключевые-возможности">✨ Возможности</a> &nbsp;·&nbsp;
   <a href="#-установка">⚙️ Установка</a> &nbsp;·&nbsp;
