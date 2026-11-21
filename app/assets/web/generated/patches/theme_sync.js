@@ -45,9 +45,7 @@ function fromClassList() {
   return null;
 }
 
-function resolveTheme() {
-  var cl = fromClassList();
-  if (cl) return cl;
+function resolveHostTheme() {
   if (hostTheme === 'light') return 'light';
   if (hostTheme === 'dark') return 'dark';
   if (typeof window !== 'undefined' && window.Android && typeof window.Android.getTheme === 'function') {
@@ -56,13 +54,20 @@ function resolveTheme() {
       if (t === 'dark' || t === 'light') return t;
     } catch (e) {}
   }
-  if (typeof window !== 'undefined' && window.__AG_RESOLVED_THEME__) {
+  if (window.__AG_RESOLVED_THEME__ === 'light' || window.__AG_RESOLVED_THEME__ === 'dark') {
     return window.__AG_RESOLVED_THEME__;
   }
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     return 'dark';
   }
   return 'light';
+}
+
+// The mounting UI can briefly expose its default body class. Keep the native
+// window in its saved theme until the app signals that its UI is ready.
+function resolveTheme() {
+  if (window.Android && !window.__agyUiReady) return resolveHostTheme();
+  return fromClassList() || resolveHostTheme();
 }
 
 /**
@@ -84,6 +89,7 @@ function notify() {
       window.__agyUpdateGlassTheme();
     }
   } catch (e) { /* ignore */ }
+  if (window.Android && !window.__agyUiReady) return theme;
   try {
     if (window.Android) {
       state.hasAndroid = true;
@@ -106,6 +112,10 @@ function notify() {
 function install() {
   if (state.installed) return;
   state.installed = true;
+  doc.addEventListener('agy-ui-ready', function () {
+    state.last = null;
+    notify();
+  }, { once: true });
 
   if (window.MutationObserver && doc.documentElement) {
     try {
