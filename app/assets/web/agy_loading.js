@@ -76,8 +76,6 @@
     ".agy-load__ring-o{position:absolute;width:152px;height:152px;border-radius:50%;pointer-events:none;",
     "border:1px dashed color-mix(in srgb,var(--agy-accent) 45%,transparent);opacity:0}",
     ".agy-load__ring-o--2{width:182px;height:182px}",
-    ".agy-load__sweep{position:absolute;inset:-24% -30%;pointer-events:none;opacity:0;",
-    "background:linear-gradient(100deg,transparent 42%,color-mix(in srgb,var(--agy-accent) 28%,transparent) 50%,transparent 58%)}",
     /* hexagon fallback, пока логотип не загрузился */
     ".agy-load__hex{fill:none;stroke:color-mix(in srgb,var(--agy-accent) 78%,transparent);stroke-width:12;",
     "transform-origin:60px 60px;animation:agyPulse 2.4s ease-in-out infinite}",
@@ -97,10 +95,6 @@
     "@keyframes agySpin{to{transform:rotate(360deg)}}@keyframes agySpinR{to{transform:rotate(-360deg)}}",
     "[data-variant='rise'] .agy-load__logo{animation:agyLogoRise .95s cubic-bezier(.16,1,.3,1) both}",
     "@keyframes agyLogoRise{from{opacity:0;transform:translateY(16px) scale(.9)}to{opacity:1;transform:none}}",
-    "[data-variant='scan'] .agy-load__sweep{opacity:1;animation:agySweep 2.8s cubic-bezier(.4,0,.2,1) infinite}",
-    "@keyframes agySweep{0%{transform:translateX(-70%)}65%,100%{transform:translateX(70%)}}",
-    "[data-variant='scan'] .agy-load__logo{animation:agyFlicker 4s steps(1) infinite}",
-    "@keyframes agyFlicker{0%,97%,100%{opacity:1}98%{opacity:.7}99%{opacity:.92}}",
     "[data-variant='rings'] .agy-load__halo{animation:agyHalo 2.8s ease-in-out infinite}",
     "[data-variant='rings'] .agy-load__ring-o{opacity:0;animation:agyRingOut 2.8s ease-out infinite}",
     "[data-variant='rings'] .agy-load__ring-o--2{animation-delay:1.4s}",
@@ -313,7 +307,7 @@
    * рестарт ядра берёт следующий вариант по кругу, поэтому анимация не
    * приедается. Все варианты живут на токенах темы, так что светлая, тёмная
    * и кастомная темы с любым акцентом выглядят согласованно. */
-  var VARIANTS = ["pulse", "orbit", "rise", "scan", "rings", "glow"];
+  var VARIANTS = ["pulse", "orbit", "rise", "rings", "glow"];
   var LAST_VARIANT_KEY = "__agyLoaderLastVariant";
   function nextVariant() {
     var key = "__agyLoaderVariant";
@@ -414,7 +408,6 @@
       '<span class="agy-load__ring-o"></span>' +
       '<span class="agy-load__ring-o agy-load__ring-o--2"></span>' +
       '<div class="agy-load__logo-wrap">' + (brandLogoMarkup() || fallbackGlyph()) + '</div>' +
-      '<span class="agy-load__sweep"></span>' +
       '</div>';
   }
 
