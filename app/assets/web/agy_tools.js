@@ -154,10 +154,14 @@
   var UPD_READY_KEY = "agy.upd.ready";
   var UPD_READY_TTL_MS = 6 * 60 * 60 * 1000;
   var UPD_DEFAULT_APK = "/storage/emulated/0/Download/update-temp.apk";
-  var APP_VERSION = "3.1.14";
-
   function getAppVersion() {
-    return (window.__agyAppVersion || APP_VERSION).replace(/^v/, "");
+    var installed = "";
+    try {
+      installed = window.Android.installedVersionName();
+    } catch (_) {
+      // Older Android bridges and browser previews use the bundled version.
+    }
+    return String(installed || window.__agyAppVersion || "3.2").trim().replace(/^v/i, "");
   }
 
   function parseVer(v) {
@@ -208,7 +212,7 @@
     if (!v || !v.ts || (Date.now() - v.ts) > UPD_READY_TTL_MS) return null;
     var cur = getAppVersion();
     // Если версия загруженного обновления не новее текущей — не показываем окно
-    if (v.version && !isNewer(v.version, cur)) {
+    if (!v.version || !isNewer(v.version, cur)) {
       shadeCancel(UPD_READY_TAG);
       return null;
     }
