@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/leostryx-banner.svg" alt="Leostryx для Android" width="100%"></p>
+<p align="center"><img src="assets/leostryx-banner.jpg" alt="Leostryx для Android" width="100%"></p>
 
 # Leostryx для Android
 

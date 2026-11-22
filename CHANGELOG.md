@@ -8,7 +8,78 @@ The complete list of every change and feature that was added.
 Каждая секция продублирована на английском между маркерами `<!-- EN -->` и `<!-- /EN -->`.
 Every section is duplicated in English between the `<!-- EN -->` and `<!-- /EN -->` markers.
 
-## v3.2 — 2026-11-20 (Типографика и шрифты, непрозрачные меню, детальный круг контекста с защитой от скачков токенов, авто-восстановление при обрыве связи)
+## v3.2 — 2026-11-22 (Stable Release, build 47: интерактивный HTML, ветвление и проекты, MCP Everything RU, типографика, плотные меню и стабильность)
+
+<!-- RU -->
+### Добавлено
+- **Интерактивный HTML-предпросмотр для пользовательских провайдеров (`main.js`, `index.html`):**
+  - Встроенный предпросмотр HTML-сцен в сообщениях чата и открытие HTML-карточек файлов теперь работают для всех пользовательских провайдеров (OpenAI, Claude, DeepSeek, MiMo и др.) без блокировки флагом Gemini `jetski-generative-ui`.
+- **Обновление ответов и ветвление диалогов в проекты (`main.js`, `agy_ru.js`):**
+  - На завершённых ответах на месте оценок добавлены действия **«Обновить»** и меню **«Новая ветка»** (при сохранении кнопки копирования).
+  - **Обновление ответа** находит исходный вопрос, сохраняет копию прежнего ответа и повторно отправляет текст и вложения (для последнего ответа — в текущем чате, для более раннего — в отдельной копии, сохраняя последующие сообщения).
+  - **Новая ветка** переносит контекст до выбранного ответа (начало, промежуточные обмены, последние шесть и метаданные вложений) и формирует структурированную сводку цели, решений, выполненной работы и открытых вопросов без вызова инструментов.
+  - **Проекты и ветки:** при ветвлении самостоятельного чата автоматически создаётся проект с названием исходного диалога; существующий именованный проект переиспользуется, пользовательские переименования сохраняются.
+- **Локализация команд MCP Everything в окне `/`:**
+  - Добавлен русский перевод описаний команд сервера Everything (`mcp:everything:simple-prompt`, `args-prompt`, `completable-prompt`, `resource-prompt`) для русской и системной локализации (в английском интерфейсе сохраняются оригинальные описания сервера).
+- **Расширенные настройки типографики и шрифтов (`agy_brand.js`, `agy_ru.css`):**
+  - В `Настройки → Оформление → Шрифты` добавлены регулировки яркости текста (70% / 85% / 100% / 115%), размера (85% / 100% / 115% / 130%), начертания (400 / 500 / 600), межстрочного интервала (1.3 / 1.5 / 1.7), лигатур в коде и сглаживания.
+- **Автоматическое восстановление при обрыве связи (`agy_resilient.js`):**
+  - Отказоустойчивый мост переподключения с экспоненциальным backoff (до 12 попыток), статусным баннером в интерфейсе и контрольными точками инструментов (`tool checkpointing`).
+- **Умная диктовка голосом (`agy_dictation.js`, `agy_ru.js`, `main.js`):**
+  - Прямая вставка распознанного текста в AST редактора Lexical (`__agyInsertIntoLexical`), распознавание устных команд пунктуации и регистра, автоматическая капитализация.
+- **Детальный круг контекста и локализация субагентов (`agy_shield.js`, `agy_i18n.js`, `agy_customizations.js`):**
+  - Монотонный расчёт токенов активного диалога без скачков назад, разделение Prompt / Output, кнопка «⚡ Сжать контекст сейчас», чипы возможностей модели и полный перевод субагентов и плагинов.
+
+### Исправлено и улучшено
+- **«Добавить контекст» при смене провайдера:** при переключении со стандартного Gemini на пользовательского провайдера в меню «+ → Добавить контекст» сохраняются все команды, включая «Действия» и «Браузер».
+- **Яркость текста и палитра цветов оформления:** исправлена работа регулировки яркости текста выбранной темы; палитра цветов для кнопок `Фон`, `Основной цвет` и `Акцентный цвет` открывается слева с зазором и центрируется по группе без промежуточной «узкой полоски».
+- **Плотность и ширина выпадающих списков:**
+  - Заливка выпадающих списков смешивает 96% фона активной темы (светлая, тёмная и пользовательская палитры) для языка, профиля безопасности, проверки плана, вложенных разрешений (чтение/запись файлов, MCP, сеть, терминал), уровня мышления модели и предустановок темы.
+  - Ширина списков `Мышление` (в настройках модели провайдера) и `Предустановка` (в оформлении) точно совпадает с шириной кнопки-триггера, добавлены внутренние отступы и перенос длинных подписей.
+- **Экран MCP-серверов и диалоги:** убрано размытие экрана MCP-серверов; терминал установки перенесён наверх под кнопку добавления; системные `alert()`/`confirm()` заменены на стилизованные окна под тему приложения.
+- **Запуск приложения и смена ядра:** версия на экране загрузки читается из установленного Android-приложения через `installedVersionName()`, улучшено согласование системных панелей со светлой темой.
+- **Удаление чипов «/» и компоновка поля ввода:** интерактивное удаление чипов и защита от выдавливания поля ввода при появлении фоновых задач.
+- **Упаковка и сборка (build 47):** 16 КБ выравнивание нативных библиотек `.so` (`apk-layout.json`, `rebuild.py`), полный состав исходников (`app/`, `variants/bypass/`, `android/`, `java-view/`), проверка подписей v2/v3 и целостности runtime для Standard и Bypass.
+- **Версия 3.2** (`versionCode` 47) — единая стабильная основа для последующих релизов.
+- **Контрольные суммы сборки (SHA-256):**
+  - `Leostryx-3.2-standard.apk`: `2e3617042cd33c0b574d68021c3ad517f1f6abee56c71041c9628fa39c9c647a`
+  - `Leostryx-3.2-bypass.apk`: `3681bb74c8fe7e980b07f74e144bc2826e9025f719deb6c277852a9d6967dec3`
+  - `Leostryx-repo.zip`: `8cf6d762f0c8dbd92405fbdad7109fd74d356d35428e769ecfdb809538d46e3f`
+<!-- /RU -->
+
+<!-- EN -->
+### Added
+- **Interactive HTML preview for custom providers (`main.js`, `index.html`):**
+  - Both in-chat interactive HTML previews and file card HTML viewers now work seamlessly in Custom Providers mode (OpenAI, Claude, DeepSeek, MiMo, etc.), removing the Gemini-only `jetski-generative-ui` flag dependency.
+- **Response regeneration & conversation branching into projects (`main.js`, `agy_ru.js`):**
+  - Replaced response rating controls with **Regenerate** and **New Branch** actions (while keeping Copy).
+  - **Regenerate** replays the source prompt and attachments in-place for the latest response, or in a cloned conversation for earlier responses to preserve subsequent turns.
+  - **New Branch** summarizes the conversation up to the selected response (opening, middle exchanges, last 6 turns, and attachment metadata) with tool calls disabled, launching a fresh chat with clean context.
+  - **Projects & branches:** branching a standalone chat automatically creates a project named after the conversation, reuses existing named projects, and preserves user renames.
+- **Russian localization for MCP Everything `/` commands:**
+  - Added localized Russian descriptions for `mcp:everything:simple-prompt`, `args-prompt`, `completable-prompt`, and `resource-prompt` under Russian and System (RU) UI languages, while preserving original server descriptions in English UI.
+- **Advanced typography & font customization (`agy_brand.js`, `agy_ru.css`):**
+  - Added controls for text brightness (70% / 85% / 100% / 115%), size (85% / 100% / 115% / 130%), weight (400 / 500 / 600), line-height (1.3 / 1.5 / 1.7), code ligatures, and font smoothing.
+- **Resilient auto-reconnect (`agy_resilient.js`), direct voice dictation (`agy_dictation.js`), monotonic context token tracker (`agy_shield.js`), and full subagent/plugin localization (`agy_i18n.js`, `agy_customizations.js`).**
+
+### Fixed & Improved
+- **Unified "+ → Add Context" menu across providers:** Switching from standard Gemini to a custom provider keeps all actions (including Actions and Browser) available and runnable in both modes.
+- **Theme text brightness & color pickers:** Fixed text brightness scaling for the active theme; aligned color pickers (`Background`, `Primary`, `Accent`) to open cleanly to the left centered on the button group.
+- **Dense themed dropdowns & accurate widths:**
+  - Applied dense 96% active-theme fill across language, security profile, plan review, nested permissions (file read/write, MCP tools, network, terminal commands), model thinking effort, and theme preset dropdowns.
+  - Matched trigger button widths for Thinking effort and Theme presets with proper padding and wrapping.
+- **MCP servers screen & dialogs:** Removed disruptive blur on the MCP servers screen; moved installation terminal to the top; replaced native `alert()`/`confirm()` with themed in-app dialogs.
+- **Startup & core switch polish:** Loading screen reads the installed APK version via `installedVersionName()`, with improved light-theme system bar synchronization.
+- **Packaging & source base (build 47):** 16KB alignment for native `.so` libraries (`apk-layout.json`, `rebuild.py`), complete recoverable source tree (`app/`, `variants/bypass/`, `android/`, `java-view/`), verified v2/v3 APK signatures and runtime manifests for Standard and Bypass.
+- **Version 3.2** (`versionCode` 47) — Stable Release baseline for subsequent releases.
+- **Build checksums (SHA-256):**
+  - `Leostryx-3.2-standard.apk`: `2e3617042cd33c0b574d68021c3ad517f1f6abee56c71041c9628fa39c9c647a`
+  - `Leostryx-3.2-bypass.apk`: `3681bb74c8fe7e980b07f74e144bc2826e9025f719deb6c277852a9d6967dec3`
+  - `Leostryx-repo.zip`: `8cf6d762f0c8dbd92405fbdad7109fd74d356d35428e769ecfdb809538d46e3f`
+<!-- /EN -->
+
+### Ранние изменения ветки 3.2 · 20 ноября
+
 
 <!-- RU -->
 - **Расширенные настройки типографики и шрифтов (`agy_brand.js`, `agy_ru.css`):**
@@ -989,6 +1060,9 @@ The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body
 
 ## v3.0.9 — 2026-11-11 (Comprehensive Fixes & System Integrations)
 
+> **Примечание к архивным APK.** В этом релизе все четыре опубликованных APK имеют одинаковую SHA-256. По именам Standard и Bypass выбрать разные варианты невозможно.
+
+
 <!-- RU -->
 - **Восстановление истинной прозрачности и матового стекла (Frosted Glass)**:
   - Исправлены CSS-переменные `--popover`, `--card` и `--background` для обеих тем (светлой и тёмной);
@@ -1878,6 +1952,9 @@ The 3.1.3 diagnosis was wrong: the `installScrollGuard()` changes and `html,body
 <!-- /EN -->
 
 ## Что нового в 3.0.1
+
+> **Примечание к архивным APK.** В GitHub Releases файлы Standard для 3.0.1 и 3.0.2 имеют одинаковую SHA-256. То же относится к паре Bypass. Имена файлов этих двух релизов не позволяют отличить версии приложения.
+
 
 <!-- RU -->
 Изменения, внесённые после релиза 3.0 на GitHub.
