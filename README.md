@@ -1,216 +1,93 @@
-> [!WARNING]
-> **Leostryx 3.2 временно не устанавливайте.** В этой версии обнаружены ошибки в окне ввода чата. Пока исправление проверяется, для новой установки доступен [релиз 3.1.14](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14).
+<p align="center"><img src="assets/leostryx-banner.svg" alt="Leostryx для Android" width="100%"></p>
 
-<p align="center"><img src="./assets/leostryx-banner.svg" alt="Leostryx — Russian build of Antigravity for Android" width="100%" /></p>
+# Leostryx для Android
 
-<p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14"><img src="https://img.shields.io/badge/Release-v3.1.14-0b84ff?style=flat-square" alt="Release" /></a>
-  <img src="https://img.shields.io/badge/Android-8.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" />
-  <img src="https://img.shields.io/badge/ARM64-v8.0--A+-111827?style=flat-square" alt="ARM64" />
-  <img src="https://img.shields.io/badge/Русская-локализация-0033A0?style=flat-square" alt="Русская локализация" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-0b84ff?style=flat-square" alt="License" /></a>
-</p>
+Leostryx — русскоязычная сборка Antigravity для разработки на телефоне. Откройте папку проекта, выберите ИИ-провайдера и работайте с агентом в чате. Агент может читать и редактировать файлы, выполнять команды и запускать сборку на устройстве.
 
-<p align="center"><b>Leostryx для Android — русская сборка среды разработки с ИИ-агентом Antigravity (v3.1.14).</b><br/>
-Полная русификация, поддержка любых ИИ-провайдеров (OpenAI, Claude, DeepSeek, Gemini), авто-сжатие контекста длинных диалогов, щит безопасности агента, каталог субагентов, интерактивные уведомления в шторке с прямым ответом, встроенный видеоплеер, оптимизация памяти, кастомизация маскотов (Волк, Медведь, Рысь, Сова) и Flutter SDK.</p>
+**Стабильный релиз · 3.2 · сборка 47**<br>
+Android 8.0 и выше · ARM64
 
-<p align="center"><sub>Форк <a href="https://github.com/werdio325-png/antigravity-android">werdio325-png/antigravity-android</a> · Сборка <a href="https://github.com/Leostrange">@Leostrange</a></sub></p>
+- **[Скачать Standard APK][standard]** — основной вариант для Gemini и пользовательских провайдеров.
+- **[Скачать Bypass APK][bypass]** — вариант с изменённой региональной проверкой Gemini.
 
-<p align="center">
-  <a href="https://github.com/Leostrange/Leostryx/releases/tag/v3.1.14"><b>📥 Скачать APK</b></a> &nbsp;·&nbsp;
-  <a href="#-интерфейс-и-скриншоты">📱 Скриншоты</a> &nbsp;·&nbsp;
-  <a href="#-ключевые-возможности">✨ Возможности</a> &nbsp;·&nbsp;
-  <a href="#-установка">⚙️ Установка</a> &nbsp;·&nbsp;
-  <a href="#-сборка-из-исходников">🛠 Сборка</a> &nbsp;·&nbsp;
-  <a href="CHANGELOG.md">📜 Changelog</a> &nbsp;·&nbsp;
-  <a href="https://t.me/+qji9jQ68cWRmZDky">💬 Telegram</a>
-</p>
+[Страница релиза][release] · [Контрольные суммы SHA-256][sums] · [Telegram][telegram]
 
-> [!NOTE]
-> **3.1.14 — актуальный стабильный релиз.** Готовые подписанные APK `Leostryx-3.1.14-standard.apk` и `Leostryx-3.1.14-bypass.apk` собраны и проверены, контрольные суммы зафиксированы в [`SHA256SUMS-3.1.14.txt`](https://github.com/Leostrange/Leostryx/releases/download/v3.1.14/SHA256SUMS-3.1.14.txt).
+## Что нового в 3.2
 
----
+- **HTML прямо в чате.** Интерактивную страницу можно открыть из сообщения или карточки файла. Предпросмотр работает с Gemini и пользовательскими провайдерами.
+- **Обновление ответа и ветки.** «Обновить» повторяет исходный вопрос с вложениями. Если выбрать более ранний ответ, продолжение диалога сохранится. «Новая ветка» переносит контекст в отдельный чат того же проекта.
+- **Команды у всех провайдеров.** При переходе с Gemini на пользовательского провайдера в «+» → «Добавить контекст» доступны те же команды, включая «Действия» и «Браузер». В окне `/` переведены описания четырёх команд MCP Everything.
+- **Текст и оформление.** В настройках можно менять яркость, размер и начертание шрифта. Палитра открывается слева от группы цветов. Выпадающие списки учитывают тему, а меню уровня мышления и предустановки совпадают по ширине со своими кнопками.
+- **Контекст и соединение.** Круг контекста показывает токены ввода и вывода, возможности модели и команду ручного сжатия. При обрыве связи приложение показывает состояние переподключения.
 
-## 📱 Интерфейс и скриншоты
+[Все изменения сборки 47][release] · [История версий](CHANGELOG.md)
 
-<p align="center">
-  <img src="./assets/screenshots/home.jpg" width="31%" alt="Главный экран Leostryx" />
-  <img src="./assets/screenshots/models.jpg" width="31%" alt="Выбор моделей и провайдеров" />
-  <img src="./assets/screenshots/dark-theme.jpg" width="31%" alt="Тёмная тема и чат" />
-</p>
-<p align="center">
-  <img src="./assets/screenshots/shield.jpg" width="31%" alt="Щит безопасности" />
-  <img src="./assets/screenshots/dictation.jpg" width="31%" alt="Голосовой ввод и диктовка" />
-  <img src="./assets/screenshots/light-theme.jpg" width="31%" alt="Светлая тема оформления" />
-</p>
+## Установка и обновление
 
----
+1. Скачайте один из двух APK выше. Для сторонних провайдеров подойдёт Standard.
+2. Откройте файл на телефоне и подтвердите установку. Если Android запросит разрешение, разрешите установку для приложения, из которого открыли APK.
+3. При обновлении Leostryx 3.x с тем же пакетом `com.agyru.t2` и той же подписью установите APK поверх текущей версии. Для перехода со старой сборки с другой подписью сначала сохраните нужные данные.
 
-## 💡 О проекте
+## Интерфейс
 
-- **Antigravity** — автономный агентный движок разработки, который работает **нативно в userspace Android** (Linux kernel 6.1+, ARM64, Bionic) прямо внутри процесса приложения — без PRoot, QEMU и тяжелых виртуальных машин. Агент самостоятельно исследует кодовую базу, редактирует файлы, запускает компиляцию и тестирует результат прямо на телефоне.
-- **Leostryx** — независимая расширенная сборка этого окружения. Включает авторскую русификацию, расширенную работу с внешними ИИ-провайдерами, глубокую интеграцию с системными компонентами Android и развитые инструменты разработчика.
+**Проекты и выбор модели**<br>
+Нажмите на изображение, чтобы открыть его в полном размере.
 
----
+<a href="assets/screenshots/home.jpg"><img src="assets/screenshots/home.jpg" width="47%" alt="Главный экран с проектами и чатами"></a>
+<a href="assets/screenshots/models.jpg"><img src="assets/screenshots/models.jpg" width="47%" alt="Выбор модели и уровня мышления"></a>
 
-## ✨ Ключевые возможности
+<details>
+<summary>Щит, диктовка и темы оформления</summary>
 
-### 🇷🇺 Локализация и ИИ-провайдеры
-- **Полная русская локализация:** безупречный перевод интерфейса, контекстных меню, статусов действий агента, мыслительного процесса, системных диалогов и раздела бэкапов.
-- **Поддержка любых ИИ-моделей:** быстрое переключение между Google Gemini, OpenAI, Anthropic Claude, DeepSeek, Groq, Ollama и произвольными совместимыми эндпоинтами.
-- **Голосовой ввод и диктовка:** офлайн-распознавание речи через модели Vosk без отправки аудио на сторонние серверы.
+**Разрешения агента и голосовой ввод**
 
-### 🤖 Субагенты и автономность
-- **Каталог субагентов:** вкладка в кастомизации с готовыми специализированными агентами (Code Reviewer, Android Debugger, Security Auditor, Docs Architect, Test Engineer).
-- **Вызов в чате:** быстрое делегирование задач через `@` и меню действий.
-- **Автономный режим (EAGER):** работа агента без лишних подтверждений для непрерывного решения сложных задач.
-- **Фоновый демон `agy-daemon`:** легковесный планировщик (<10 МБ RAM) с wake-lock службой — задачи выполняются даже при заблокированном экране.
+<a href="assets/screenshots/shield.jpg"><img src="assets/screenshots/shield.jpg" width="47%" alt="Щит и разрешения агента"></a>
+<a href="assets/screenshots/dictation.jpg"><img src="assets/screenshots/dictation.jpg" width="47%" alt="Настройки диктовки"></a>
 
-### 🛡 Щит безопасности и контроль
-- **Гранулярные профили доступа:** гибкое управление доступом к файловой системе, интернету, песочнице и браузерному JavaScript.
-- **Защита терминала:** прозрачный контроль над выполнением консольных команд с опцией ручного подтверждения.
+**Тёмная и светлая темы**
 
-### 🎨 Кастомизация и дизайн
-- **4 авторских маскота:** геометрические логотипы **Волк** (`03_lsx`), **Медведь** (`04_angular_x`), **Рысь** (`02_lynx`), **Сова** (`01_owl`).
-- **Смена иконки на лету:** переключение значка приложения на рабочем столе Android без переустановки APK (через `activity-alias`).
-- **Стиль и динамический акцент:** плавная адаптация акцентного цвета, темы матового стекла (Frosted Glass), адаптивный полноэкранный сплэш и экраны перезапуска ядра.
+<a href="assets/screenshots/dark-theme.jpg"><img src="assets/screenshots/dark-theme.jpg" width="47%" alt="Настройка тёмной темы"></a>
+<a href="assets/screenshots/light-theme.jpg"><img src="assets/screenshots/light-theme.jpg" width="47%" alt="Настройка светлой темы"></a>
 
-### 📱 Нативная интеграция с Android
-- **Интерактивные уведомления:** чат-уведомления в системной шторке Android с полем прямого ответа (`RemoteInput`) и кнопками подтверждения («Разрешить / Продолжить»).
-- **Кликабельные пути:** открытие каталогов в системном проводнике (DocumentsUI) и мгновенная установка APK по тапу в чате.
-- **Мобильный видеоплеер:** воспроизведение локальных видео без задержек, перемотка жестами двойного тапа (±5 секунд) и поддержка любых медиа-вложений.
-- **Повышенные привилегии:** интеграция с Shizuku (`rish`) для выполнения системных операций уровня ADB shell.
+</details>
 
-### 🛠 Инструменты разработчика (Developer Tools)
-- **Консоль и диагностика:** встроенная консоль выполнения команд, фильтр реальных ошибок и быстрый съем логов `logcat`.
-- **Flutter SDK в 1 клик:** автоматическая установка и bionic-патчинг тулчейна Flutter/Dart (`agy-fix-flutter`).
-- **Мультиверсионный Gradle & AGP:** одновременная поддержка Gradle 8.x/9.x и AGP 8.7.3/9.0.0/9.1.1 с переключением без повторного скачивания.
-- **Протоколы MCP и UTCP:** поддержка серверов Model Context Protocol (StitchMCP, sequential-thinking, exa, github-mcp-server) и спецификаций OpenAPI 3.0 / UTCP.
+## Возможности
 
----
+- **Модели и чат.** Gemini, пользовательские API, вложения, ветвление диалогов и сжатие контекста. Поддержка изображений, аудио, видео и вызова инструментов зависит от модели и провайдера.
+- **Агенты и инструменты.** Субагенты доступны через `@` и меню действий. Возможности агента можно расширять плагинами и MCP-серверами. Для разработки есть терминал, logcat, инструменты Gradle и установка Flutter SDK.
+- **Разрешения.** В меню «Щит» задаются профиль безопасности, доступ к файлам и сети, правила запуска терминала и выполнения JavaScript в браузере.
+- **Оформление.** Светлая, тёмная и пользовательские темы, настройка шрифтов и цветов. Для значка приложения доступны волк, медведь, рысь и сова.
+- **Интеграция с Android.** Голосовой ввод с офлайн-распознаванием Vosk, уведомления о задачах, открытие файлов проекта в проводнике и просмотр локального видео.
 
-## 📥 Скачать сборки (v3.1.15)
+<details>
+<summary><strong>Исходники и сборка</strong></summary>
 
-| Вариант | Назначение | Пакет | SHA-256 контрольная сумма |
-|---|---|---|---|
-| **Standard** | Базовая сборка без изменений ядра | [`Leostryx-3.1.15-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15) | `792309b9e459e37bf541295fd90f44434fd5d42642ae1ee5414c2fab51713153` |
-| **Bypass** | С обходом региональных ограничений Gemini | [`Leostryx-3.1.15-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15) | `8976b37e17b84e5ad06a1cdfdc86a571019b4ac984a48b0f052ff0809262c353` |
+[Архив исходников релиза][source]. Для сборки из рабочего дерева репозитория используются Python 3 и OpenJDK 17. Из корня проекта выполните:
 
-> [!TIP]
-> **Чем отличается Bypass?**
-> В варианте **Bypass** модифицировано ядро `liblanguage_server.so`: в проверках геолокации выставлен принудительный пропуск региональных ограничений Google Gemini. Если вы используете сторонние модели (OpenAI, DeepSeek, Claude) или находитесь в поддерживаемом регионе, выбирайте **Standard**.
-
----
-
-## ⚙️ Установка
-
-> [!WARNING]
-> **Обновление поверх старых версий:** Сборки ветки 3.x (`com.agyru.t2`) обновляются поверх предыдущих версий 3.x штатно без потери данных. Если у вас была установлена устаревшая сборка 2.x, потребуется чистая переустановка из-за несовместимости ключей подписи.
-
-1. Скачайте нужный APK из [релиза v3.1.15](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.15).
-2. Сверьте контрольную сумму через SHA-256:
-   ```bash
-   sha256sum Leostryx-3.1.15-*.apk
-   ```
-3. Установите APK на устройство и запустите приложение.
-
----
-
-## 🛠 Сборка из исходников
-
-Для сборки требуются Python 3 и Java (OpenJDK 17):
-
-```bash
-# Собрать оба варианта (Standard и Bypass):
+```sh
 python3 rebuild.py both
-
-# Собрать конкретный вариант:
-python3 rebuild.py standard
-python3 rebuild.py bypass
 ```
 
-Готовые и подписанные APK создаются в каталоге `dist/signed/`.
+Для одного варианта передайте `standard` или `bypass`. Сборщик помещает подписанные APK в `dist/signed/`. Логика упаковки и подписи описана в [rebuild.py](rebuild.py).
 
-<details>
-<summary><b>📂 Структура репозитория и проверка артефактов</b></summary>
-
-```text
-├── README.md, CHANGELOG.md, LICENSE
-├── assets/
-│   ├── leostryx-banner.svg              # Векторный баннер проекта
-│   └── screenshots/                     # Скриншоты интерфейса
-├── app/                                 # Полное дерево пакета приложения
-│   ├── AndroidManifest.xml, classes*.dex, res/
-│   └── assets/
-│       ├── web/                         # Веб-интерфейс, скрипты и стили
-│       │   ├── agy_ru.js, agy_i18n.js   # Русификация и i18n
-│       │   ├── agy_paths.js             # Кликабельные пути и действия
-│       │   ├── agy_loading.js           # Полноэкранный сплэш ядра
-│       │   ├── brand/                   # Векторные наборы маскотов
-│       ├── runtime/                     # Go-ядро (liblanguage_server.so)
-│       └── env/                         # Userspace оверлей Linux
-├── variants/bypass/                     # Дельта bypass-ядра и манифеста
-├── docs/                                # Технические руководства
-│   ├── gradle-agp-toolchain.md          # Руководство по Gradle & AGP
-│   ├── flutter-toolchain.md             # Руководство по Flutter SDK
-│   ├── jadx-fixes.md                    # Инструкции по jadx-agy
-│   └── archive/                         # Архив отчетов сессий
-├── tools/                               # Скрипты и утилиты сборки
-└── rebuild.py                           # Основной скрипт сборки релизов
-```
-
-Хеши ядра внутри каждого APK можно проверить командами:
-```bash
-sha256sum dist/signed/standard.apk dist/signed/bypass.apk
-unzip -p dist/signed/standard.apk assets/runtime/bin/liblanguage_server.so | sha256sum
-unzip -p dist/signed/bypass.apk   assets/runtime/bin/liblanguage_server.so | sha256sum
-```
 </details>
 
----
-
-## 📜 Что нового в 3.1.13
-
-- **Восстановление просмотра файлов в чате (`agy_paths.js`):** устранена блокировка открытия кода, markdown, логов и скриптов в чате — просмотрщик IDE работает беспрепятственно, а модальное окно действий открывается только для `.apk`.
-- **Локализация контекстного меню проектов (`agy_i18n.js`):** переведены пункты «Копировать название проекта», «Удалить проект» и диалог подтверждения удаления с правильными падежами диалогов.
-- **Подписи завершения задач (`agy_fun_notify.js`):** локализованы alt-тексты и подписи поздравительных GIF-анимаций.
-- **Релизная синхронизация:** актуализация версий `3.1.13` (код 39) в манифесте, веб-интерфейсе и сборщике.
-
-👉 **Полная история всех изменений и предыдущих релизов доступна в [CHANGELOG.md](CHANGELOG.md)**.
-
----
-
 <details>
-<summary><b>🇺🇸 English version / Read in English</b></summary>
+<summary><strong>English overview</strong></summary>
 
-<!-- EN -->
-# Leostryx for Android (v3.1.13)
+Leostryx is an Android build of Antigravity for working with an AI coding agent on your phone. Open a project, choose a provider and use the chat to edit files or run commands.
 
-**Leostryx** is an advanced Russian build of the **Antigravity** autonomous AI developer environment running natively on Android (Linux 6.1+, ARM64, Bionic userspace) without PRoot or containers.
+**Stable release 3.2, build 47** requires Android 8.0 or later on ARM64. Download [Standard][standard] for the default core or [Bypass][bypass] for the alternative Gemini region check. This release adds interactive HTML previews for custom providers, project branches and Russian descriptions for MCP Everything commands. See the [release notes][release] for details.
 
-### Key Highlights
-- **Full Russian UI Localization:** seamless Russian interface, context menus, pluralization, and backup manager.
-- **Multi-Provider AI Engine:** native support for Google Gemini, OpenAI, Anthropic Claude, DeepSeek, Groq, Ollama, and custom endpoints.
-- **Subagents Hub:** pre-configured subagents (Code Reviewer, Android Debugger, Security Auditor) with in-chat invocation.
-- **Security Shield:** fine-grained permissions for filesystem, internet, sandboxing, and terminal command execution.
-- **Branding & Customization:** 4 geometric mascot packs (Wolf, Bear, Lynx, Owl), live launcher icon switching via `activity-alias`, and dynamic accent colors.
-- **Deep Android Integration:** interactive notifications with `RemoteInput` direct reply, DocumentsUI integration, clickable file paths, and Shizuku `rish` support.
-- **Built-in Toolchains:** Flutter SDK with automatic Bionic patching (`agy-fix-flutter`), multi-version Gradle & AGP toolchains, and MCP/UTCP support.
-
-### Download Releases (v3.1.13)
-- **Standard Edition:** [`Leostryx-3.1.13-standard.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `176e5c5ac37a8461661811a95a5337d3129a21bb9b3f18351677840b148aef5a`
-- **Bypass Edition:** [`Leostryx-3.1.13-bypass.apk`](https://github.com/Leostrange/Leostryx/releases/tag/v3.1.13) — `9363cf980aaf88adb07b54512cbf4776e5977e72af6060eb0ffb1e597a5d6193`
-
-Full changelog is available in [CHANGELOG.md](CHANGELOG.md).
-<!-- /EN -->
 </details>
 
----
+## Проект и лицензия
 
-## 📄 Лицензия
+Leostryx основан на [Antigravity для Android](https://github.com/werdio325-png/antigravity-android). Сборку поддерживает [Leostrange](https://github.com/Leostrange). Код проекта распространяется по [Apache License 2.0](LICENSE). Для сторонних компонентов действуют лицензии их авторов.
 
-Исходный код проекта распространяется по лицензии [Apache 2.0](LICENSE). Antigravity, Gemini и сторонние компоненты принадлежат соответствующим авторам и распространяются по их собственным лицензиям.
-
-Оригинальный проект: [werdio325-png/antigravity-android](https://github.com/werdio325-png/antigravity-android).
-
-<p align="center"><sub>Разработано с заботой о сообществе · <a href="https://github.com/Leostrange">Leostrange</a></sub></p>
+[standard]: https://github.com/Leostrange/Leostryx/releases/download/v3.2/Leostryx-3.2-standard.apk
+[bypass]: https://github.com/Leostrange/Leostryx/releases/download/v3.2/Leostryx-3.2-bypass.apk
+[release]: https://github.com/Leostrange/Leostryx/releases/tag/v3.2
+[sums]: https://github.com/Leostrange/Leostryx/releases/download/v3.2/SHA256SUMS-3.2.txt
+[source]: https://github.com/Leostrange/Leostryx/releases/download/v3.2/Leostryx-repo.zip
+[telegram]: https://t.me/+qji9jQ68cWRmZDky
